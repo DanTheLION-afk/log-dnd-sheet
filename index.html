@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOG DND</title>
+  <style>
+    :root{
+      --bg:#120c08;
+      --bg2:#24180f;
+      --panel:#18100b;
+      --panel2:#21160f;
+      --line:#7d5b3b;
+      --line2:#b58a61;
+      --text:#f2e5d3;
+      --muted:#d0b79a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      color:var(--text);
+      font-family:Georgia, "Times New Roman", serif;
+      background:
+        radial-gradient(circle at top, rgba(255,241,214,.18) 0%, rgba(168,118,72,.12) 18%, rgba(50,31,18,.65) 45%, rgba(15,10,7,1) 100%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 1px, transparent 1px 96px),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 72px),
+        linear-gradient(180deg,var(--bg2),var(--bg));
+    }
+    .wrap{max-width:1320px;margin:20px auto;padding:18px;}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .title{font-size:34px;letter-spacing:3px;font-variant:small-caps;color:#f6debf;text-shadow:0 0 10px rgba(181,138,97,.2)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid var(--line2);background:linear-gradient(180deg,#322217,#1b120d);color:var(--text);cursor:pointer}
+    button:hover{filter:brightness(1.08)}
+    .sheet{display:grid;grid-template-columns:340px 1fr 320px;gap:16px}
+    .panel{
+      position:relative;
+      background:
+        radial-gradient(circle at 18% 14%, rgba(255,233,196,.06), transparent 24%),
+        radial-gradient(circle at 80% 82%, rgba(255,233,196,.04), transparent 22%),
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)),
+        linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 10px 28px rgba(0,0,0,.28);
+      overflow:hidden;
+    }
+    .panel:before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(255,245,228,.05)}
+    .panel:after{content:"";position:absolute;inset:7px;pointer-events:none;border:1px solid rgba(181,138,97,.18);border-radius:10px}
+    .section-title{margin:0 0 10px;font-size:18px;letter-spacing:1.6px;font-variant:small-caps;text-transform:uppercase;color:#f4dcc0;border-bottom:1px solid rgba(181,138,97,.4);padding-bottom:8px;position:relative}
+    .section-title:after{content:"✦";position:absolute;right:2px;top:-1px;color:rgba(181,138,97,.6);font-size:14px}
+    .field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+    .field label{font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+    input, textarea, select{width:100%;font:inherit;border-radius:10px;border:1px solid #6f5235;background:#140e0a;color:var(--text);padding:10px 11px;outline:none}
+    input:focus, textarea:focus, select:focus{border-color:var(--line2);box-shadow:0 0 0 2px rgba(181,138,97,.14)}
+    textarea{min-height:96px;resize:vertical}
+    .identity-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:10px}
+    .mini-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .stats{display:grid;grid-template-columns:1fr;gap:10px}
+    .stat-card{background:rgba(16,12,9,.84);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-height:0;display:grid;grid-template-columns:110px 90px;align-items:center;justify-content:space-between;gap:10px}
+    .stat-card h4{margin:0;font-size:15px;letter-spacing:.8px;font-variant:small-caps;color:#e0c6aa;text-align:left}
+    .stat-value{font-size:22px;text-align:center;width:90px;padding:8px 10px;min-height:0;height:42px}
+    .portrait-frame{margin-top:8px;border:1px solid var(--line);border-radius:14px;background:#120d0a;min-height:240px;display:grid;place-items:center;overflow:hidden}
+    .portrait-frame img{display:none;max-width:100%;max-height:360px;object-fit:cover}
+    .muted-center{color:var(--muted);padding:16px;text-align:center}
+    .tracks{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .track-card{border:1px solid #5f4837;border-radius:12px;padding:10px;background:#130e0a}
+    .hp-box{font-size:26px;text-align:center}
+    .wounds{display:flex;gap:10px}
+    .wound{flex:1;border:1px solid #7a433b;background:#170f0f;border-radius:12px;padding:12px;text-align:center;cursor:pointer;user-select:none}
+    .wound.active{background:linear-gradient(180deg,#62251d,#38120e);border-color:#ca6a5f}
+    .weapon-card,.perk-row,.trait-row{border:1px solid #5f4837;border-radius:12px;padding:10px;background:#130e0a;margin-bottom:10px}
+    .weapon-grid{display:grid;grid-template-columns:1.4fr .7fr 1fr .9fr;gap:8px;align-items:end}
+    .gp-track{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .gp{width:34px;height:34px;border-radius:10px;border:1px solid var(--line2);display:grid;place-items:center;background:#130e0a;cursor:pointer;user-select:none}
+    .gp.used{background:#3a1c18;border-color:#ad5850;color:#f0d1ca}
+    .perk-row{display:grid;grid-template-columns:1.2fr 1fr;gap:8px}
+    .rule-box{border:1px solid #5f4837;border-radius:12px;padding:10px;background:#130e0a;line-height:1.5}
+    @media (max-width:1180px){.sheet{grid-template-columns:1fr}}
+    @media (max-width:1100px){.stat-card{grid-template-columns:100px 84px}}
+    @media (max-width:700px){.identity-grid{grid-template-columns:1fr}.mini-grid,.weapon-grid,.perk-row,.tracks{grid-template-columns:1fr}.stat-card{grid-template-columns:100px 84px}.stat-card h4{text-align:left}}
+    @media print{
+      body{background:#fff;color:#111}
+      .wrap{max-width:none;margin:0;padding:0}
+      .actions{display:none}
+      .sheet{grid-template-columns:1fr 1fr;gap:8px}
+      .panel,.stat-card,.weapon-card,.perk-row,.trait-row,.wound,.gp,.portrait-frame,.track-card,.rule-box{background:#fff !important;color:#111 !important;border:1px solid #777 !important;box-shadow:none}
+      input,textarea,select{background:#fff !important;color:#111 !important;border:1px solid #777 !important}
+      .title,.section-title{color:#111 !important;text-shadow:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">LOG DND</div>
+      <div class="actions">
+        <button onclick="saveCharacter()">Save Character</button>
+        <button onclick="loadCharacter()">Load Character</button>
+        <button onclick="exportCharacter()">Export JSON</button>
+        <button onclick="importCharacter()">Import JSON</button>
+        <button onclick="window.print()">Print</button>
+        <button onclick="resetSheet()">Reset</button>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="panel">
+        <h2 class="section-title">Identity</h2>
+        <div class="identity-grid">
+          <div class="field"><label>Name</label><input id="name" type="text"></div>
+          <div class="field"><label>Level</label><input id="level" type="number" min="0" value="0"></div>
+          <div class="field"><label>Class</label><input id="class" type="text"></div>
+        </div>
+        <div class="mini-grid">
+          <div class="field"><label>Background</label><input id="background" type="text"></div>
+          <div class="field"><label>Homeland</label><input id="homeland" type="text"></div>
+          <div class="field"><label>Age</label><input id="age" type="text"></div>
+          <div class="field"><label>Player</label><input id="player" type="text"></div>
+        </div>
+
+        <div class="field"><label>Race</label><input id="race" type="text"></div>
+
+        <h2 class="section-title">Portrait</h2>
+        <div class="field">
+          <label>Portrait</label>
+          <input id="portrait" type="file" accept="image/*">
+        </div>
+        <div class="portrait-frame">
+          <img id="portraitPreview" alt="">
+          <div id="portraitPlaceholder" class="muted-center">Portrait</div>
+        </div>
+
+        <h2 class="section-title" style="margin-top:14px">Attributes</h2>
+        <div class="stats">
+          <div class="stat-card"><h4>Muscles</h4><input id="statM" class="stat-value" type="text" value="0"></div>
+          <div class="stat-card"><h4>Flexibility</h4><input id="statF" class="stat-value" type="text" value="0"></div>
+          <div class="stat-card"><h4>Mind</h4><input id="statI" class="stat-value" type="text" value="0"></div>
+          <div class="stat-card"><h4>Charisma</h4><input id="statC" class="stat-value" type="text" value="0"></div>
+          <div class="stat-card"><h4>Luck</h4><input id="statL" class="stat-value" type="text" value="0"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">Combat</h2>
+        <div class="tracks">
+          <div class="track-card">
+            <div class="field"><label>Current HP</label><input id="hpCurrent" class="hp-box" type="text" value="10"></div>
+            <div class="field"><label>Max HP</label><input id="hpMax" class="hp-box" type="text" value="10"></div>
+          </div>
+          <div class="track-card">
+            <div class="field"><label>Initiative</label><input id="initiative" type="text"></div>
+            <div class="field"><label>Movement</label><input id="movement" type="text"></div>
+          </div>
+        </div>
+
+        <h2 class="section-title" style="margin-top:14px">Wounds</h2>
+        <div class="wounds">
+          <div class="wound" onclick="toggleWound(0)" id="w1">Minor</div>
+          <div class="wound" onclick="toggleWound(1)" id="w2">Serious</div>
+          <div class="wound" onclick="toggleWound(2)" id="w3">Critical</div>
+        </div>
+
+        <h2 class="section-title" style="margin-top:14px">Armor & Shield</h2>
+        <div class="mini-grid">
+          <div class="field">
+            <label>Armor</label>
+            <select id="armorType" onchange="applyArmor()">
+              <option value="None">None</option>
+              <option value="Light">Light</option>
+              <option value="Medium">Medium</option>
+              <option value="Heavy">Heavy</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div class="field"><label>Helmet</label><select id="helmet"><option>No</option><option>Yes</option></select></div>
+          <div class="field"><label>Damage Reduction</label><input id="armorReduction" type="text" value="0"></div>
+          <div class="field"><label>Flex Penalty</label><input id="armorFlexPenalty" type="text" value="0"></div>
+        </div>
+
+        <div class="mini-grid">
+          <div class="field">
+            <label>Shield</label>
+            <select id="shieldType" onchange="applyShield()">
+              <option value="None">None</option>
+              <option value="Buckler">Buckler</option>
+              <option value="Round Shield">Round Shield</option>
+              <option value="Kite Shield">Kite Shield</option>
+              <option value="Tower Shield">Tower Shield</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div class="field"><label>Guard Points</label><input id="shieldGP" type="number" value="0" min="0" max="8" onchange="buildGPTrack()"></div>
+        </div>
+        <div class="gp-track" id="gpTrack"></div>
+
+        <h2 class="section-title" style="margin-top:14px">Weapons</h2>
+        <div class="weapon-card">
+          <div class="weapon-grid">
+            <div class="field"><label>Primary Weapon</label><input id="weapon1name" type="text"></div>
+            <div class="field"><label>Die</label><input id="weapon1die" type="text"></div>
+            <div class="field"><label>Tags</label><input id="weapon1tags" type="text"></div>
+            <div class="field"><label>Notes</label><input id="weapon1notes" type="text"></div>
+          </div>
+        </div>
+        <div class="weapon-card">
+          <div class="weapon-grid">
+            <div class="field"><label>Secondary Weapon</label><input id="weapon2name" type="text"></div>
+            <div class="field"><label>Die</label><input id="weapon2die" type="text"></div>
+            <div class="field"><label>Tags</label><input id="weapon2tags" type="text"></div>
+            <div class="field"><label>Notes</label><input id="weapon2notes" type="text"></div>
+          </div>
+        </div>
+        <div class="weapon-card">
+          <div class="weapon-grid">
+            <div class="field"><label>Ranged Weapon</label><input id="weapon3name" type="text"></div>
+            <div class="field"><label>Die</label><input id="weapon3die" type="text"></div>
+            <div class="field"><label>Tags</label><input id="weapon3tags" type="text"></div>
+            <div class="field"><label>Notes</label><input id="weapon3notes" type="text"></div>
+          </div>
+        </div>
+
+        <h2 class="section-title" style="margin-top:14px">Combat Notes</h2>
+        <textarea id="combatNotes"></textarea>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">Perks</h2>
+        <div id="perksContainer">
+          <div class="perk-row">
+            <div class="field"><label>Perk 1</label><input id="perk1" type="text"></div>
+            <div class="field"><label>Upgrade</label><select id="perk1tier"><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option></select></div>
+          </div>
+          <div class="perk-row">
+            <div class="field"><label>Perk 2</label><input id="perk2" type="text"></div>
+            <div class="field"><label>Upgrade</label><select id="perk2tier"><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option></select></div>
+          </div>
+        </div>
+        <button type="button" onclick="addPerkRow()">Add Perk</button>
+
+        <h2 class="section-title" style="margin-top:14px">Race Traits</h2>
+        <div id="traitsContainer">
+          <div class="trait-row"><div class="field"><label>Trait 1</label><input id="trait1" type="text"></div></div>
+          <div class="trait-row"><div class="field"><label>Trait 2</label><input id="trait2" type="text"></div></div>
+          <div class="trait-row"><div class="field"><label>Trait 3</label><input id="trait3" type="text"></div></div>
+        </div>
+        <button type="button" onclick="addTraitRow()">Add Race Trait</button>
+
+        <h2 class="section-title" style="margin-top:14px">Inventory</h2>
+        <textarea id="inventory"></textarea>
+
+        <h2 class="section-title" style="margin-top:14px">Backstory & Notes</h2>
+        <textarea id="notes" style="min-height:180px"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const armorDB = {
+      "None": {dr:"0", flex:"0"},
+      "Light": {dr:"1", flex:"0"},
+      "Medium": {dr:"2", flex:"0"},
+      "Heavy": {dr:"3", flex:"-1"},
+      "Custom": {dr:"0", flex:"0"}
+    };
+    const shieldDB = {
+      "None": {gp:0},
+      "Buckler": {gp:2},
+      "Round Shield": {gp:3},
+      "Kite Shield": {gp:4},
+      "Tower Shield": {gp:5},
+      "Custom": {gp:0}
+    };
+    let woundState = [false,false,false];
+    let portraitData = "";
+
+    function init(){ applyArmor(); applyShield(); bindPortrait(); }
+
+    function bindPortrait(){
+      const input = document.getElementById("portrait");
+      input.addEventListener("change", e=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ev=>{ portraitData = ev.target.result; renderPortrait(); };
+        reader.readAsDataURL(file);
+      });
+    }
+    function renderPortrait(){
+      const img = document.getElementById("portraitPreview");
+      const ph = document.getElementById("portraitPlaceholder");
+      if(portraitData){ img.src = portraitData; img.style.display = "block"; ph.style.display = "none"; }
+      else { img.style.display = "none"; ph.style.display = "block"; }
+    }
+    function applyArmor(){
+      const found = armorDB[document.getElementById("armorType").value];
+      if(found){ document.getElementById("armorReduction").value = found.dr; document.getElementById("armorFlexPenalty").value = found.flex; }
+    }
+    function applyShield(){
+      const found = shieldDB[document.getElementById("shieldType").value];
+      if(found){ document.getElementById("shieldGP").value = found.gp; }
+      buildGPTrack();
+    }
+    function buildGPTrack(){
+      const gp = Number(document.getElementById("shieldGP").value || 0);
+      const track = document.getElementById("gpTrack");
+      track.innerHTML = "";
+      for(let i=0;i<gp;i++){
+        const el = document.createElement("div");
+        el.className = "gp";
+        el.textContent = i + 1;
+        el.onclick = ()=>el.classList.toggle("used");
+        track.appendChild(el);
+      }
+    }
+    function toggleWound(idx){
+      woundState[idx] = !woundState[idx];
+      for(let i=0;i<3;i++) document.getElementById(`w${i+1}`).classList.toggle("active", woundState[i]);
+    }
+    function addPerkRow(){
+      const c = document.getElementById("perksContainer");
+      const idx = c.querySelectorAll(".perk-row").length + 1;
+      const row = document.createElement("div");
+      row.className = "perk-row";
+      row.innerHTML = `<div class="field"><label>Perk ${idx}</label><input id="perk${idx}" type="text"></div><div class="field"><label>Upgrade</label><select id="perk${idx}tier"><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option></select></div>`;
+      c.appendChild(row);
+    }
+    function addTraitRow(){
+      const c = document.getElementById("traitsContainer");
+      const idx = c.querySelectorAll(".trait-row").length + 1;
+      const row = document.createElement("div");
+      row.className = "trait-row";
+      row.innerHTML = `<div class="field"><label>Trait ${idx}</label><input id="trait${idx}" type="text"></div>`;
+      c.appendChild(row);
+    }
+    function getFields(){ return Array.from(document.querySelectorAll("input, select, textarea")).filter(el => el.id !== "portrait"); }
+    function gatherData(){
+      const data = {};
+      getFields().forEach(el=>{ if(el.id) data[el.id] = el.value; });
+      data.woundState = woundState;
+      data.gpUsed = Array.from(document.querySelectorAll(".gp")).map(x=>x.classList.contains("used"));
+      data.perkCount = document.querySelectorAll("#perksContainer .perk-row").length;
+      data.traitCount = document.querySelectorAll("#traitsContainer .trait-row").length;
+      data.portraitData = portraitData;
+      return data;
+    }
+    function ensureDynamicRows(data){
+      while(document.querySelectorAll("#perksContainer .perk-row").length < (data.perkCount || 2)) addPerkRow();
+      while(document.querySelectorAll("#traitsContainer .trait-row").length < (data.traitCount || 3)) addTraitRow();
+    }
+    function applyData(data){
+      ensureDynamicRows(data);
+      getFields().forEach(el=>{ if(el.id && data[el.id] !== undefined) el.value = data[el.id]; });
+      if(Array.isArray(data.woundState)){
+        woundState = data.woundState.slice(0,3);
+        for(let i=0;i<3;i++) document.getElementById(`w${i+1}`).classList.toggle("active", !!woundState[i]);
+      }
+      if(Array.isArray(data.gpUsed)){
+        applyShield();
+        const nodes = Array.from(document.querySelectorAll(".gp"));
+        nodes.forEach((n,i)=>n.classList.toggle("used", !!data.gpUsed[i]));
+      } else applyShield();
+      applyArmor();
+      if(data.portraitData){ portraitData = data.portraitData; renderPortrait(); }
+    }
+    function saveCharacter(){
+      const name = document.getElementById("name").value.trim() || "unnamed-character";
+      localStorage.setItem("log-dnd-sheet-save", JSON.stringify(gatherData()));
+      alert(`Saved locally for ${name}.`);
+    }
+    function loadCharacter(){
+      const raw = localStorage.getItem("log-dnd-sheet-save");
+      if(!raw){ alert("No local save found."); return; }
+      applyData(JSON.parse(raw));
+      alert("Character loaded.");
+    }
+    function exportCharacter(){
+      const data = gatherData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+      const a = document.createElement("a");
+      const name = (document.getElementById("name").value.trim() || "character").replace(/\s+/g,"-").toLowerCase();
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}-sheet.json`;
+      a.click();
+    }
+    function importCharacter(){
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.onchange = e=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ev=>{ try{ applyData(JSON.parse(ev.target.result)); alert("Character loaded."); } catch { alert("Invalid JSON file."); } };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+    function resetSheet(){ if(confirm("Reset the entire sheet?")) window.location.reload(); }
+    init();
+  </script>
+</body>
+</html>
