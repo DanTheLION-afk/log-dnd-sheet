@@ -561,32 +561,39 @@ function renderPerks(){
 }
 function renderRaceTracker(){
   const box=document.getElementById('raceTracker');
+  const r=RACES[CHAR.race];
+  // full traits reference (all three), then the interactive tracker for the one that needs it
+  let traitsRef=`<h2>${r.icon} ${CHAR.race} — Racial Traits</h2>
+    <div class="hint">${r.tag}</div>`;
+  r.traits.forEach(([t,d])=>{
+    traitsRef+=`<div class="perk-item" style="background:rgba(123,108,196,.08);"><div class="pn">${t}</div><div class="pd">${d}</div></div>`;
+  });
+  traitsRef+=`<div class="divider"></div>`;
+
+  let tracker='';
   if(CHAR.race==="Shadow Vampire"){
     let dots='';for(let i=1;i<=5;i++){dots+=`<div class="shadow-dot ${i<=CHAR.shadows?'full':''}" onclick="setShadows(${i})">${i<=CHAR.shadows?'☾':''}</div>`;}
-    box.innerHTML=`<h2>Shadows ☽</h2>
-      <div class="hint">Stored shadows (max 5). One feeds you 4 days. Spend on weapons or sun-teleport. Tap a dot to set the count; tap the lit count to clear the last.</div>
+    tracker=`<div class="meter-label"><span>Stored Shadows ☽</span></div>
       <div class="shadow-track">${dots}</div>
-      <div class="note">Currently holding <span class="gold">${CHAR.shadows}</span> — about <span class="gold">${CHAR.shadows*4} days</span> of food, or ${CHAR.shadows} weapon(s)/teleport(s).</div>`;
+      <div class="note">Currently holding <span class="gold">${CHAR.shadows}</span> — about <span class="gold">${CHAR.shadows*4} days</span> of food, or ${CHAR.shadows} weapon(s)/teleport(s). Tap a dot to set the count.</div>`;
   } else if(CHAR.race==="Doppelganger"){
     const m=CHAR.divided;
-    box.innerHTML=`<h2>Divided Identity ☾</h2>
-      <div class="hint">Rises +1 each encounter. At 10, roll Will vs DR 8 — fail and lose a random perk. Resets after the save. Ends only when you kill your original.</div>
-      <div class="meter-wrap">
-        <div class="meter-label"><span>Meter</span><span>${m} / 10</span></div>
+    tracker=`<div class="meter-wrap">
+        <div class="meter-label"><span>Divided Identity meter</span><span>${m} / 10</span></div>
         <div class="bar"><div class="fill divide" style="width:${m/10*100}%"></div></div>
         <div class="btn-row" style="margin-top:10px;">
           <button class="btn ghost small" onclick="adjDivided(1)">+1 (encounter)</button>
           <button class="btn ghost small" onclick="adjDivided(-1)">−1</button>
           ${m>=10?'<button class="btn small" onclick="dividedSave()">⚠ Roll the save</button>':''}
         </div>
-        <div class="note">This meter is also <span class="gold">added to encounter difficulty</span>.</div>
+        <div class="note">Your current meter value is also <span class="gold">added to encounter difficulty</span>.</div>
       </div>`;
   } else {
-    box.innerHTML=`<h2>One Step Ahead ☉</h2>
-      <div class="hint">Once per session you may reroll any one roll and keep the new result.</div>
-      <div class="btn-row"><button class="btn ghost small" id="rerollBtn" onclick="useReroll()">${CHAR._rerollUsed?'✓ Used this session':'Reroll available — tap when used'}</button>
+    tracker=`<div class="meter-label"><span>One Step Ahead — session reroll</span></div>
+      <div class="btn-row" style="margin-top:8px;"><button class="btn ghost small" id="rerollBtn" onclick="useReroll()">${CHAR._rerollUsed?'✓ Used this session':'Reroll available — tap when used'}</button>
       <button class="btn ghost small" onclick="CHAR._rerollUsed=false;renderRaceTracker();markDirty();">Reset (new session)</button></div>`;
   }
+  box.innerHTML=traitsRef+tracker;
 }
 
 // ---------- sheet actions ----------
