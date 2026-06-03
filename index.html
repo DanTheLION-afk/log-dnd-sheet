@@ -210,9 +210,9 @@
     <div class="cstep hidden" data-step="1">
       <div class="panel">
         <h2>II. The Six Stats</h2>
-        <div class="hint">Every stat starts at 1. Spend 9 points among them — but no stat may go above 2 at creation. You will be fragile at first; that is intended.</div>
+        <div class="hint">Every stat starts at 1 (that's 6 points already placed). You have a total budget of 9, so 3 points remain to distribute — and no stat may go above 2 at creation. You will be fragile at first; that is intended.</div>
         <div style="text-align:center;margin-bottom:18px;">
-          <span class="budget" id="budgetPill">9 points remaining</span>
+          <span class="budget" id="budgetPill">3 points remaining</span>
         </div>
         <div class="stat-grid" id="statGrid"></div>
         <div class="note">Reminder: a fresh character has roughly three stats at 2 and three at 1. Three stats will stay weak for the whole game — no one is good at everything.</div>
@@ -385,7 +385,7 @@ let cStats={Power:1,Finesse:1,Vitality:1,Reason:1,Awareness:1,Will:1};
 const BUDGET=9, MAXC=2;
 let cRace=null;
 
-function spent(){return Object.values(cStats).reduce((a,b)=>a+b,0)-6;}
+function spent(){return Object.values(cStats).reduce((a,b)=>a+b,0);}
 function remaining(){return BUDGET-spent();}
 
 function buildStatGrid(){
