@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legacy of the Gods — Character Sheet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=EB+Garamond:wght@400;500&display=swap');
+
+  :root{
+    --night:#0a0a18;
+    --night2:#12122a;
+    --panel:rgba(22,22,48,0.72);
+    --panel-edge:rgba(150,140,220,0.18);
+    --sun:#f2c14e;
+    --sun-deep:#d99a2b;
+    --moon:#cfd6f2;
+    --star:#fff7e0;
+    --violet:#7b6cc4;
+    --violet-deep:#4a3b86;
+    --blood:#a8413f;
+    --ink:#e9e6f5;
+    --ink-dim:#9b97bd;
+    --line:rgba(150,140,220,0.22);
+    --good:#8fd6a0;
+    --bad:#d98a8a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'EB Garamond',serif;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(242,193,78,0.10), transparent 38%),
+      radial-gradient(circle at 82% 80%, rgba(123,108,196,0.16), transparent 42%),
+      linear-gradient(160deg, var(--night) 0%, var(--night2) 60%, #0a0a18 100%);
+    color:var(--ink);
+    min-height:100vh;
+    line-height:1.5;
+    overflow-x:hidden;
+  }
+  /* starfield */
+  #stars{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .star{position:absolute;background:var(--star);border-radius:50%;opacity:.6;animation:tw 4s infinite ease-in-out;}
+  @keyframes tw{0%,100%{opacity:.15;}50%{opacity:.85;}}
+
+  .wrap{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:32px 20px 80px;}
+
+  header.brand{text-align:center;margin-bottom:28px;position:relative;}
+  .celestial{display:flex;justify-content:center;align-items:center;gap:18px;margin-bottom:8px;}
+  .orb{width:46px;height:46px;border-radius:50%;position:relative;}
+  .orb.sun{background:radial-gradient(circle at 35% 35%, var(--sun), var(--sun-deep));box-shadow:0 0 26px rgba(242,193,78,.5);}
+  .orb.moon{background:radial-gradient(circle at 65% 40%, var(--moon), #6a6f96);box-shadow:0 0 20px rgba(207,214,242,.35);}
+  .orb.moon::after{content:"";position:absolute;top:4px;right:6px;width:30px;height:30px;border-radius:50%;background:var(--night2);}
+  h1{font-family:'Cinzel',serif;font-weight:700;font-size:2.1rem;letter-spacing:.06em;color:var(--ink);
+     text-shadow:0 0 24px rgba(123,108,196,.5);}
+  .sub{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-dim);font-size:1.05rem;letter-spacing:.03em;}
+
+  .panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:14px;padding:24px;margin-bottom:22px;
+    backdrop-filter:blur(8px);box-shadow:0 8px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);}
+  .panel h2{font-family:'Cinzel',serif;font-size:1.15rem;letter-spacing:.05em;color:var(--sun);margin-bottom:4px;font-weight:600;}
+  .panel .hint{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-dim);font-size:1.02rem;margin-bottom:18px;}
+
+  .divider{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:18px 0;}
+
+  label.fld{display:block;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px;}
+  input[type=text], textarea, select{
+    width:100%;background:rgba(10,10,24,.6);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    font-family:'EB Garamond',serif;font-size:1.02rem;padding:10px 12px;outline:none;transition:.2s;}
+  input[type=text]:focus, textarea:focus, select:focus{border-color:var(--violet);box-shadow:0 0 0 3px rgba(123,108,196,.18);}
+  textarea{resize:vertical;min-height:70px;}
+
+  /* stat allocator */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
+  .stat-card{background:rgba(10,10,24,.5);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;position:relative;transition:.2s;}
+  .stat-card .name{font-family:'Cinzel',serif;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--moon);}
+  .stat-card .gov{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:.86rem;color:var(--ink-dim);min-height:34px;display:flex;align-items:center;justify-content:center;margin:4px 0;}
+  .stat-val{font-family:'Cinzel',serif;font-size:2rem;color:var(--sun);margin:4px 0;text-shadow:0 0 16px rgba(242,193,78,.4);}
+  .stepper{display:flex;gap:8px;justify-content:center;}
+  .stepper button{width:34px;height:34px;border-radius:50%;border:1px solid var(--violet-deep);background:rgba(74,59,134,.3);color:var(--ink);
+    font-size:1.2rem;cursor:pointer;transition:.15s;font-family:'Cinzel',serif;line-height:1;}
+  .stepper button:hover:not(:disabled){background:var(--violet);transform:scale(1.08);}
+  .stepper button:disabled{opacity:.25;cursor:not-allowed;}
+
+  .budget{display:inline-block;font-family:'Cinzel',serif;letter-spacing:.05em;background:rgba(242,193,78,.12);
+    border:1px solid rgba(242,193,78,.3);border-radius:30px;padding:6px 16px;color:var(--sun);font-size:.9rem;}
+  .budget.spent{background:rgba(168,65,63,.15);border-color:rgba(168,65,63,.4);color:var(--bad);}
+
+  /* race picker */
+  .race-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+  .race-card{background:rgba(10,10,24,.5);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;transition:.22s;position:relative;overflow:hidden;}
+  .race-card:hover{transform:translateY(-3px);border-color:var(--violet);}
+  .race-card.sel{border-color:var(--sun);box-shadow:0 0 0 2px rgba(242,193,78,.3),0 10px 30px rgba(0,0,0,.4);}
+  .race-card .ricon{font-family:'Cinzel';font-size:1.7rem;margin-bottom:6px;}
+  .race-card h3{font-family:'Cinzel',serif;font-size:1.05rem;letter-spacing:.04em;margin-bottom:6px;color:var(--ink);}
+  .race-card .rdesc{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-dim);font-size:.96rem;}
+  .race-card .traits{margin-top:10px;font-size:.9rem;color:var(--ink-dim);}
+  .race-card .traits b{color:var(--moon);font-style:normal;font-family:'EB Garamond';}
+
+  .btn{font-family:'Cinzel',serif;letter-spacing:.08em;text-transform:uppercase;font-size:.82rem;
+    background:linear-gradient(135deg,var(--sun),var(--sun-deep));color:#1a1405;border:none;border-radius:30px;
+    padding:13px 30px;cursor:pointer;transition:.2s;font-weight:600;box-shadow:0 4px 18px rgba(242,193,78,.3);}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 7px 24px rgba(242,193,78,.45);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+  .btn.ghost{background:transparent;border:1px solid var(--violet);color:var(--ink);box-shadow:none;}
+  .btn.ghost:hover{background:rgba(123,108,196,.18);}
+  .btn.small{padding:8px 16px;font-size:.72rem;}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+
+  .warn{color:var(--bad);font-family:'Cormorant Garamond';font-style:italic;font-size:.98rem;}
+
+  /* living sheet */
+  .topline{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  .charname{font-family:'Cinzel',serif;font-size:1.7rem;color:var(--sun);text-shadow:0 0 18px rgba(242,193,78,.4);}
+  .charmeta{font-family:'Cormorant Garamond';font-style:italic;color:var(--ink-dim);}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media(max-width:760px){.twocol{grid-template-columns:1fr;}}
+
+  .statline{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);}
+  .statline:last-child{border-bottom:none;}
+  .statline .sname{font-family:'Cinzel';font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--moon);}
+  .statline .sright{display:flex;align-items:center;gap:10px;}
+  .statline .sv{font-family:'Cinzel';font-size:1.3rem;color:var(--sun);min-width:24px;text-align:center;}
+  .tier-badge{font-size:.62rem;font-family:'Cinzel';letter-spacing:.06em;padding:2px 7px;border-radius:20px;background:rgba(123,108,196,.18);border:1px solid var(--violet-deep);color:var(--moon);}
+  .mini{width:28px;height:28px;border-radius:50%;border:1px solid var(--violet-deep);background:rgba(74,59,134,.25);color:var(--ink);cursor:pointer;font-size:1rem;line-height:1;}
+  .mini:hover:not(:disabled){background:var(--violet);}
+  .mini:disabled{opacity:.25;cursor:not-allowed;}
+
+  /* hp / meters */
+  .meter-wrap{margin:14px 0;}
+  .meter-label{display:flex;justify-content:space-between;font-family:'Cinzel';font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px;}
+  .bar{height:18px;border-radius:10px;background:rgba(10,10,24,.7);border:1px solid var(--line);overflow:hidden;position:relative;}
+  .bar .fill{height:100%;transition:width .35s ease;}
+  .fill.hp{background:linear-gradient(90deg,var(--blood),#cf5a57);}
+  .fill.divide{background:linear-gradient(90deg,var(--violet-deep),var(--violet));}
+  .fill.shadow{background:linear-gradient(90deg,#2a2440,#6a5fb0);}
+
+  .reactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+  .react-chip{font-family:'Cinzel';font-size:.68rem;letter-spacing:.06em;padding:6px 12px;border-radius:20px;border:1px solid var(--line);cursor:pointer;transition:.15s;color:var(--ink-dim);}
+  .react-chip.used{background:rgba(168,65,63,.2);border-color:var(--blood);color:var(--bad);text-decoration:line-through;}
+
+  .perk-item{background:rgba(10,10,24,.4);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:8px;}
+  .perk-item .pn{font-family:'Cinzel';font-size:.82rem;letter-spacing:.03em;color:var(--moon);}
+  .perk-item .pd{font-family:'Cormorant Garamond';font-style:italic;font-size:.96rem;color:var(--ink-dim);}
+  .perk-item .px{float:right;cursor:pointer;color:var(--bad);font-style:normal;}
+
+  .shadow-track{display:flex;gap:8px;margin:10px 0;}
+  .shadow-dot{width:30px;height:30px;border-radius:50%;border:1px solid var(--violet-deep);background:rgba(10,10,24,.6);cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+  .shadow-dot.full{background:radial-gradient(circle at 40% 35%,#7b6cc4,#2a2440);box-shadow:0 0 12px rgba(123,108,196,.5);}
+
+  .save-row{position:sticky;bottom:0;background:linear-gradient(0deg,var(--night) 60%,transparent);padding:18px 0 6px;margin-top:10px;}
+  .saved-flash{font-family:'Cormorant Garamond';font-style:italic;color:var(--good);opacity:0;transition:.3s;}
+  .saved-flash.show{opacity:1;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--night2);
+    border:1px solid var(--violet);border-radius:12px;padding:14px 22px;font-family:'Cormorant Garamond';font-size:1.05rem;
+    z-index:50;transition:.35s;box-shadow:0 10px 40px rgba(0,0,0,.5);max-width:90%;text-align:center;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast .big{font-family:'Cinzel';color:var(--sun);display:block;margin-bottom:4px;letter-spacing:.05em;}
+
+  .hidden{display:none!important;}
+  .note{font-family:'Cormorant Garamond';font-style:italic;color:var(--ink-dim);font-size:.95rem;margin-top:8px;}
+  .gold{color:var(--sun);}
+  .stepwrap{margin-bottom:10px;}
+  .stepdots{display:flex;gap:8px;justify-content:center;margin-bottom:24px;}
+  .stepdot{width:10px;height:10px;border-radius:50%;background:var(--line);transition:.2s;}
+  .stepdot.active{background:var(--sun);box-shadow:0 0 10px rgba(242,193,78,.6);}
+  .stepdot.done{background:var(--violet);}
+</style>
+</head>
+<body>
+<div id="stars"></div>
+<div class="wrap">
+  <header class="brand">
+    <div class="celestial">
+      <div class="orb sun"></div>
+      <div class="orb moon"></div>
+    </div>
+    <h1>Legacy of the Gods</h1>
+    <div class="sub">You become what you do.</div>
+  </header>
+
+  <!-- ===================== CREATION ===================== -->
+  <div id="creation">
+    <div class="stepdots">
+      <div class="stepdot active" data-d="0"></div>
+      <div class="stepdot" data-d="1"></div>
+      <div class="stepdot" data-d="2"></div>
+      <div class="stepdot" data-d="3"></div>
+    </div>
+
+    <!-- step 0: identity -->
+    <div class="cstep" data-step="0">
+      <div class="panel">
+        <h2>I. Who Are You</h2>
+        <div class="hint">A name, and a few words on who this character is. You can leave the story blank and fill it in later.</div>
+        <label class="fld">Character Name</label>
+        <input type="text" id="cName" placeholder="Name your character…">
+        <div style="height:14px"></div>
+        <label class="fld">Player Name (optional)</label>
+        <input type="text" id="cPlayer" placeholder="Your name…">
+        <div style="height:14px"></div>
+        <label class="fld">Concept / Notes (optional)</label>
+        <textarea id="cConcept" placeholder="A wandering thing that doesn't know what it is…"></textarea>
+      </div>
+      <div class="btn-row"><button class="btn" onclick="nextStep()">Continue →</button></div>
+    </div>
+
+    <!-- step 1: stats -->
+    <div class="cstep hidden" data-step="1">
+      <div class="panel">
+        <h2>II. The Six Stats</h2>
+        <div class="hint">Every stat starts at 1. Spend 9 points among them — but no stat may go above 2 at creation. You will be fragile at first; that is intended.</div>
+        <div style="text-align:center;margin-bottom:18px;">
+          <span class="budget" id="budgetPill">9 points remaining</span>
+        </div>
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="note">Reminder: a fresh character has roughly three stats at 2 and three at 1. Three stats will stay weak for the whole game — no one is good at everything.</div>
+      </div>
+      <div class="btn-row"><button class="btn ghost" onclick="prevStep()">← Back</button><button class="btn" id="statNext" onclick="nextStep()">Continue →</button></div>
+    </div>
+
+    <!-- step 2: race -->
+    <div class="cstep hidden" data-step="2">
+      <div class="panel">
+        <h2>III. Your Nature</h2>
+        <div class="hint">Three races, three very different lives. Choose one.</div>
+        <div class="race-grid" id="raceGrid"></div>
+        <div id="raceDetail" class="note"></div>
+      </div>
+      <div class="btn-row"><button class="btn ghost" onclick="prevStep()">← Back</button><button class="btn" id="raceNext" onclick="nextStep()" disabled>Continue →</button></div>
+    </div>
+
+    <!-- step 3: starting perk -->
+    <div class="cstep hidden" data-step="3">
+      <div class="panel">
+        <h2>IV. Your First Step</h2>
+        <div class="hint" id="perkHint"></div>
+        <div id="startPerkArea"></div>
+        <div class="note">The full perk list is still being written for this world. For now, record your starting perk by name and a short description — your GM will confirm it. As the game gives you more perks, you'll add them on your sheet.</div>
+      </div>
+      <div class="btn-row"><button class="btn ghost" onclick="prevStep()">← Back</button><button class="btn" id="finishBtn" onclick="finishCreation()">Forge Character ✦</button></div>
+    </div>
+  </div>
+
+  <!-- ===================== LIVING SHEET ===================== -->
+  <div id="sheet" class="hidden">
+    <div class="panel">
+      <div class="topline">
+        <div>
+          <div class="charname" id="shName">—</div>
+          <div class="charmeta" id="shMeta">—</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost small" onclick="newRound()">↺ New Round</button>
+          <button class="btn ghost small" onclick="editCharacter()">Edit</button>
+        </div>
+      </div>
+
+      <div class="twocol">
+        <!-- left: stats -->
+        <div>
+          <h2 style="font-family:'Cinzel';color:var(--sun);font-size:1.05rem;letter-spacing:.05em;margin-bottom:4px;">Stats</h2>
+          <div class="hint" style="font-family:'Cormorant Garamond';font-style:italic;color:var(--ink-dim);margin-bottom:10px;">Tier shows which perk tier each stat unlocks (3 / 6 / 9).</div>
+          <div id="shStats"></div>
+          <div class="meter-wrap">
+            <div class="meter-label"><span>Stat points earned</span><span id="spLabel">0 / 20</span></div>
+            <div class="bar"><div class="fill divide" id="spFill" style="width:0%"></div></div>
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn ghost small" onclick="grantStatPoint()">+ Earned a stat point</button>
+            </div>
+            <div class="note">Granted only for clearing a difficulty-7+ challenge. Use the + then raise the stat you actually used to win.</div>
+          </div>
+        </div>
+
+        <!-- right: vitals -->
+        <div>
+          <h2 style="font-family:'Cinzel';color:var(--sun);font-size:1.05rem;letter-spacing:.05em;margin-bottom:10px;">Vitals</h2>
+          <div class="meter-wrap">
+            <div class="meter-label"><span>Hit Points</span><span id="hpLabel">—</span></div>
+            <div class="bar"><div class="fill hp" id="hpFill" style="width:100%"></div></div>
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="mini" onclick="adjHP(-1)">−</button>
+              <button class="mini" onclick="adjHP(-5)" style="width:auto;border-radius:14px;padding:0 10px;">−5</button>
+              <button class="mini" onclick="adjHP(1)">+</button>
+              <button class="mini" onclick="adjHP(5)" style="width:auto;border-radius:14px;padding:0 10px;">+5</button>
+              <button class="btn ghost small" onclick="fullHeal()">Full</button>
+            </div>
+            <div class="note">HP = 15 + (Vitality × 4) = <span class="gold" id="hpFormula">—</span></div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="meter-label"><span>Reaction this round (one only)</span></div>
+          <div class="reactions">
+            <div class="react-chip" id="rc-dodge" onclick="toggleReaction('dodge')">Dodge ▸ Finesse</div>
+            <div class="react-chip" id="rc-block" onclick="toggleReaction('block')">Block ▸ Power</div>
+            <div class="react-chip" id="rc-interrupt" onclick="toggleReaction('interrupt')">Interrupt ▸ Awareness</div>
+          </div>
+          <div class="note">Tap the one you spend. Hit "New Round" to refresh.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- race-specific tracker -->
+    <div class="panel" id="raceTracker"></div>
+
+    <!-- perks -->
+    <div class="panel">
+      <h2>Perks</h2>
+      <div class="hint">Options you've earned through play. Each perk should name its category, stat gate, and what it lets you DO.</div>
+      <div id="perkList"></div>
+      <div class="divider"></div>
+      <div class="btn-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
+        <input type="text" id="newPerkName" placeholder="Perk name (e.g. Berserk — Aggression, Power 3)">
+        <input type="text" id="newPerkDesc" placeholder="What it lets you do…">
+        <button class="btn small" onclick="addPerk()">+ Add Perk</button>
+      </div>
+    </div>
+
+    <!-- notes -->
+    <div class="panel">
+      <h2>Journal</h2>
+      <textarea id="shNotes" style="min-height:120px" placeholder="Inventory, allies, what happened last session, threads to chase…" oninput="markDirty()"></textarea>
+    </div>
+
+    <div class="save-row">
+      <div class="btn-row">
+        <button class="btn" onclick="saveLocal()">✦ Save</button>
+        <button class="btn ghost" onclick="exportChar()">⇩ Export File</button>
+        <button class="btn ghost" onclick="document.getElementById('importFile').click()">⇧ Import</button>
+        <input type="file" id="importFile" class="hidden" accept=".json" onchange="importChar(event)">
+        <span class="saved-flash" id="savedFlash">saved to this device ✦</span>
+      </div>
+      <div class="note">Saves live in this browser only. Use Export to send your GM a file, or to move to another device.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- data ----------
+const STATS = [
+  ["Power","force · melee · breaking · block"],
+  ["Finesse","ranged · dodge · stealth · initiative"],
+  ["Vitality","HP · soak · endurance"],
+  ["Reason","knowledge · puzzles · social by logic"],
+  ["Awareness","perception · surprise · interrupt"],
+  ["Will","resolve · social by force · focus"],
+];
+const RACES = {
+  Human:{
+    icon:"☉", tag:"the sun — the cog the world is built around",
+    desc:"The default the world is shaped for. Steady, flexible, always useful.",
+    traits:[
+      ["Human Nature","Begin with 1 perk already chosen, instead of 0."],
+      ["Inside Knowledge","Advantage on Reason checks to identify or understand supernatural things."],
+      ["One Step Ahead","Once per session, reroll any one roll and keep the new result — even if worse."]
+    ]
+  },
+  "Shadow Vampire":{
+    icon:"☽", tag:"the shadows the sun casts",
+    desc:"Born special, origin unknown. Feeds on shadows. Does not fear the sun.",
+    traits:[
+      ["Shadow Energy","Harvest a human's shadow (a scene, sun up, stealth check; they go shadowless). Store up to 5; one feeds you 4 days. Steal from another shadow-user via a Will contest — lose and take 1d4."],
+      ["Shadows Make You Stronger","Spend 1 stored shadow to conjure a weapon lasting 10 encounters. Eat it or arm yourself — not both."],
+      ["I Love The Sun","Sun up: teleport to a target's shadow and get a free hit. Costs 1 shadow + your whole turn. Once per combat."]
+    ]
+  },
+  Doppelganger:{
+    icon:"☾", tag:"the moon — a reflection of something real",
+    desc:"A copy of a real person. Driven to find and kill the original to become whole.",
+    traits:[
+      ["You Are Who You Make To Be","You're the copy of an NPC out there. Hunt and confront them. In the final duel they always sit +1 above your best stat — you win by outplaying, not out-statting."],
+      ["Divided Identity","A meter rises +1 each encounter. At 10: roll Will vs DR 8. Fail = lose a random perk. Resets after each save. Ends only when you kill your original."],
+      ["I Love Meters","Your current meter value is added to encounter difficulty — the higher it climbs, the more real and dangerous the world becomes."]
+    ]
+  }
+};
+const TIER = v => v>=9?"T3":v>=6?"T2":v>=3?"T1":"—";
+
+// ---------- creation state ----------
+let step=0;
+let cStats={Power:1,Finesse:1,Vitality:1,Reason:1,Awareness:1,Will:1};
+const BUDGET=9, MAXC=2;
+let cRace=null;
+
+function spent(){return Object.values(cStats).reduce((a,b)=>a+b,0)-6;}
+function remaining(){return BUDGET-spent();}
+
+function buildStatGrid(){
+  const g=document.getElementById('statGrid');g.innerHTML='';
+  STATS.forEach(([n,gov])=>{
+    const card=document.createElement('div');card.className='stat-card';
+    card.innerHTML=`
+      <div class="name">${n}</div>
+      <div class="gov">${gov}</div>
+      <div class="stat-val" id="sv-${n}">${cStats[n]}</div>
+      <div class="stepper">
+        <button onclick="adjC('${n}',-1)" id="dn-${n}">−</button>
+        <button onclick="adjC('${n}',1)" id="up-${n}">+</button>
+      </div>`;
+    g.appendChild(card);
+  });
+  refreshC();
+}
+function adjC(n,d){
+  const nv=cStats[n]+d;
+  if(nv<1||nv>MAXC)return;
+  if(d>0&&remaining()<=0)return;
+  cStats[n]=nv;refreshC();
+}
+function refreshC(){
+  STATS.forEach(([n])=>{
+    document.getElementById('sv-'+n).textContent=cStats[n];
+    document.getElementById('up-'+n).disabled=(cStats[n]>=MAXC||remaining()<=0);
+    document.getElementById('dn-'+n).disabled=(cStats[n]<=1);
+  });
+  const pill=document.getElementById('budgetPill');
+  const r=remaining();
+  pill.textContent=r===0?"all 9 points spent ✦":r+" point"+(r===1?"":"s")+" remaining";
+  pill.className="budget"+(r===0?" ":" ")+(r<0?" spent":"");
+  document.getElementById('statNext').disabled=(r!==0);
+}
+
+function buildRaceGrid(){
+  const g=document.getElementById('raceGrid');g.innerHTML='';
+  Object.entries(RACES).forEach(([name,r])=>{
+    const c=document.createElement('div');c.className='race-card'+(cRace===name?' sel':'');
+    c.onclick=()=>{cRace=name;buildRaceGrid();showRaceDetail();document.getElementById('raceNext').disabled=false;};
+    c.innerHTML=`<div class="ricon">${r.icon}</div><h3>${name}</h3><div class="rdesc">${r.desc}</div>`;
+    g.appendChild(c);
+  });
+}
+function showRaceDetail(){
+  if(!cRace){document.getElementById('raceDetail').innerHTML='';return;}
+  const r=RACES[cRace];
+  let h=`<div style="margin-top:8px;"><b class="gold" style="font-family:Cinzel;letter-spacing:.04em;">${cRace}</b> — <i>${r.tag}</i><div style="margin-top:8px;">`;
+  r.traits.forEach(([t,d])=>{h+=`<div style="margin-bottom:6px;"><b style="color:var(--moon);font-family:EB Garamond;">${t}.</b> ${d}</div>`;});
+  h+='</div></div>';
+  document.getElementById('raceDetail').innerHTML=h;
+}
+
+function buildStartPerk(){
+  const r=RACES[cRace];
+  const human=cRace==="Human";
+  document.getElementById('perkHint').innerHTML = human
+    ? "As a Human, you begin with <b class='gold'>one perk already chosen</b> (Human Nature). Name it and what it does — your GM will confirm it fits an unlocked tier of a stat you have at 3+."
+    : "Most characters start with <b>no perks</b> and earn them through play. You can record a starting perk here only if your GM grants one; otherwise leave it blank and continue.";
+  const area=document.getElementById('startPerkArea');
+  area.innerHTML=`
+    <label class="fld">Starting perk name ${human?'':'(optional)'}</label>
+    <input type="text" id="spName" placeholder="e.g. Berserk — Aggression, Power 3">
+    <div style="height:12px"></div>
+    <label class="fld">What it does</label>
+    <textarea id="spDesc" placeholder="Enter a rage — can't flee; each hit forces the target to test or lose its reaction…"></textarea>`;
+}
+
+function nextStep(){
+  if(step===0){const n=document.getElementById('cName').value.trim();if(!n){toast("Name your character","A character needs a name before the world will notice them.");return;}}
+  step++;showStep();
+}
+function prevStep(){step--;showStep();}
+function showStep(){
+  document.querySelectorAll('.cstep').forEach(s=>s.classList.add('hidden'));
+  document.querySelector(`.cstep[data-step="${step}"]`).classList.remove('hidden');
+  document.querySelectorAll('.stepdot').forEach((d,i)=>{
+    d.classList.toggle('active',i===step);d.classList.toggle('done',i<step);
+  });
+  if(step===1)buildStatGrid();
+  if(step===2){buildRaceGrid();showRaceDetail();}
+  if(step===3)buildStartPerk();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ---------- character object ----------
+let CHAR=null;
+function finishCreation(){
+  const perks=[];
+  const spn=document.getElementById('spName')?.value.trim();
+  const spd=document.getElementById('spDesc')?.value.trim();
+  if(spn)perks.push({name:spn,desc:spd||""});
+  if(cRace==="Human"&&!spn){
+    if(!confirm("As a Human you start with 1 perk (Human Nature). You haven't named one. Continue anyway and add it later?"))return;
+  }
+  CHAR={
+    name:document.getElementById('cName').value.trim(),
+    player:document.getElementById('cPlayer').value.trim(),
+    concept:document.getElementById('cConcept').value.trim(),
+    race:cRace,
+    stats:{...cStats},
+    perks,
+    statPointsEarned:0,
+    hpCurrent:null,
+    notes:"",
+    reactions:{dodge:false,block:false,interrupt:false},
+    // race-specific
+    shadows:0,
+    divided:0
+  };
+  CHAR.hpCurrent=maxHP();
+  document.getElementById('creation').classList.add('hidden');
+  document.getElementById('sheet').classList.remove('hidden');
+  renderSheet();
+  saveLocal(true);
+  toast("Character forged ✦", CHAR.name+" steps into the world.");
+}
+
+function maxHP(){return 15+CHAR.stats.Vitality*4;}
+
+// ---------- living sheet render ----------
+function renderSheet(){
+  document.getElementById('shName').textContent=CHAR.name;
+  document.getElementById('shMeta').innerHTML=`${RACES[CHAR.race].icon} ${CHAR.race}${CHAR.player?` · played by ${CHAR.player}`:''}${CHAR.concept?` · <i>${CHAR.concept}</i>`:''}`;
+  // stats
+  const sc=document.getElementById('shStats');sc.innerHTML='';
+  STATS.forEach(([n])=>{
+    const v=CHAR.stats[n];
+    const row=document.createElement('div');row.className='statline';
+    row.innerHTML=`<span class="sname">${n}</span>
+      <span class="sright">
+        <span class="tier-badge">${TIER(v)}</span>
+        <button class="mini" onclick="adjStat('${n}',-1)" ${v<=1?'disabled':''}>−</button>
+        <span class="sv">${v}</span>
+        <button class="mini" onclick="adjStat('${n}',1)" ${v>=10?'disabled':''}>+</button>
+      </span>`;
+    sc.appendChild(row);
+  });
+  // stat points
+  const sp=CHAR.statPointsEarned;
+  document.getElementById('spLabel').textContent=sp+" / 20";
+  document.getElementById('spFill').style.width=(sp/20*100)+"%";
+  // hp
+  renderHP();
+  // reactions
+  ['dodge','block','interrupt'].forEach(r=>{
+    document.getElementById('rc-'+r).classList.toggle('used',CHAR.reactions[r]);
+  });
+  // race tracker
+  renderRaceTracker();
+  // perks
+  renderPerks();
+  document.getElementById('shNotes').value=CHAR.notes||"";
+}
+function renderHP(){
+  const mx=maxHP();
+  if(CHAR.hpCurrent==null)CHAR.hpCurrent=mx;
+  CHAR.hpCurrent=Math.max(0,Math.min(CHAR.hpCurrent,mx));
+  document.getElementById('hpLabel').textContent=CHAR.hpCurrent+" / "+mx;
+  document.getElementById('hpFill').style.width=(CHAR.hpCurrent/mx*100)+"%";
+  document.getElementById('hpFormula').textContent="15 + ("+CHAR.stats.Vitality+" × 4) = "+mx;
+}
+function renderPerks(){
+  const pl=document.getElementById('perkList');pl.innerHTML='';
+  if(!CHAR.perks.length){pl.innerHTML='<div class="note">No perks yet. They come from what you do in play.</div>';return;}
+  CHAR.perks.forEach((p,i)=>{
+    const d=document.createElement('div');d.className='perk-item';
+    d.innerHTML=`<span class="px" onclick="delPerk(${i})">✕</span><div class="pn">${p.name}</div>${p.desc?`<div class="pd">${p.desc}</div>`:''}`;
+    pl.appendChild(d);
+  });
+}
+function renderRaceTracker(){
+  const box=document.getElementById('raceTracker');
+  if(CHAR.race==="Shadow Vampire"){
+    let dots='';for(let i=1;i<=5;i++){dots+=`<div class="shadow-dot ${i<=CHAR.shadows?'full':''}" onclick="setShadows(${i})">${i<=CHAR.shadows?'☾':''}</div>`;}
+    box.innerHTML=`<h2>Shadows ☽</h2>
+      <div class="hint">Stored shadows (max 5). One feeds you 4 days. Spend on weapons or sun-teleport. Tap a dot to set the count; tap the lit count to clear the last.</div>
+      <div class="shadow-track">${dots}</div>
+      <div class="note">Currently holding <span class="gold">${CHAR.shadows}</span> — about <span class="gold">${CHAR.shadows*4} days</span> of food, or ${CHAR.shadows} weapon(s)/teleport(s).</div>`;
+  } else if(CHAR.race==="Doppelganger"){
+    const m=CHAR.divided;
+    box.innerHTML=`<h2>Divided Identity ☾</h2>
+      <div class="hint">Rises +1 each encounter. At 10, roll Will vs DR 8 — fail and lose a random perk. Resets after the save. Ends only when you kill your original.</div>
+      <div class="meter-wrap">
+        <div class="meter-label"><span>Meter</span><span>${m} / 10</span></div>
+        <div class="bar"><div class="fill divide" style="width:${m/10*100}%"></div></div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn ghost small" onclick="adjDivided(1)">+1 (encounter)</button>
+          <button class="btn ghost small" onclick="adjDivided(-1)">−1</button>
+          ${m>=10?'<button class="btn small" onclick="dividedSave()">⚠ Roll the save</button>':''}
+        </div>
+        <div class="note">This meter is also <span class="gold">added to encounter difficulty</span>.</div>
+      </div>`;
+  } else {
+    box.innerHTML=`<h2>One Step Ahead ☉</h2>
+      <div class="hint">Once per session you may reroll any one roll and keep the new result.</div>
+      <div class="btn-row"><button class="btn ghost small" id="rerollBtn" onclick="useReroll()">${CHAR._rerollUsed?'✓ Used this session':'Reroll available — tap when used'}</button>
+      <button class="btn ghost small" onclick="CHAR._rerollUsed=false;renderRaceTracker();markDirty();">Reset (new session)</button></div>`;
+  }
+}
+
+// ---------- sheet actions ----------
+function adjStat(n,d){const v=CHAR.stats[n]+d;if(v<1||v>10)return;CHAR.stats[n]=v;renderSheet();markDirty();}
+function adjHP(d){CHAR.hpCurrent=(CHAR.hpCurrent??maxHP())+d;renderHP();markDirty();}
+function fullHeal(){CHAR.hpCurrent=maxHP();renderHP();markDirty();}
+function grantStatPoint(){
+  if(CHAR.statPointsEarned>=20){toast("Lifetime cap reached","20 stat points is the lifetime limit. This character grows through perks now.");return;}
+  CHAR.statPointsEarned++;
+  document.getElementById('spLabel').textContent=CHAR.statPointsEarned+" / 20";
+  document.getElementById('spFill').style.width=(CHAR.statPointsEarned/20*100)+"%";
+  toast("A point earned ✦","Raise the stat you actually used to win that challenge — use the + beside it.");
+  markDirty();
+}
+function toggleReaction(r){
+  if(!CHAR.reactions[r]){['dodge','block','interrupt'].forEach(x=>CHAR.reactions[x]=false);CHAR.reactions[r]=true;}
+  else CHAR.reactions[r]=false;
+  renderSheet();markDirty();
+}
+function newRound(){CHAR.reactions={dodge:false,block:false,interrupt:false};renderSheet();markDirty();toast("New round","Your reaction is refreshed.");}
+function setShadows(i){CHAR.shadows=(CHAR.shadows===i)?i-1:i;renderRaceTracker();markDirty();}
+function adjDivided(d){CHAR.divided=Math.max(0,Math.min(10,CHAR.divided+d));renderRaceTracker();markDirty();}
+function dividedSave(){
+  toast("Roll Will vs DR 8","If you fail: roll 1d"+(CHAR.perks.length||1)+" and lose that perk. Then the meter resets — tap −1's or set it back to 0.");
+  CHAR.divided=0;renderRaceTracker();markDirty();
+}
+function useReroll(){CHAR._rerollUsed=!CHAR._rerollUsed;renderRaceTracker();markDirty();}
+function addPerk(){
+  const n=document.getElementById('newPerkName').value.trim();
+  const d=document.getElementById('newPerkDesc').value.trim();
+  if(!n){toast("Name the perk","A perk needs at least a name.");return;}
+  CHAR.perks.push({name:n,desc:d});
+  document.getElementById('newPerkName').value='';document.getElementById('newPerkDesc').value='';
+  renderPerks();markDirty();
+}
+function delPerk(i){if(confirm("Remove this perk?")){CHAR.perks.splice(i,1);renderPerks();markDirty();}}
+
+function editCharacter(){
+  if(!confirm("Go back to the creation screens? Your current sheet values stay saved; this lets you re-run creation for a NEW character. To just tweak stats, use the +/− on the sheet instead."))return;
+  document.getElementById('sheet').classList.add('hidden');
+  document.getElementById('creation').classList.remove('hidden');
+  step=0;cStats={Power:1,Finesse:1,Vitality:1,Reason:1,Awareness:1,Will:1};cRace=null;showStep();
+}
+
+// ---------- persistence ----------
+let dirty=false;
+function markDirty(){dirty=true;if(window._notesTO)clearTimeout(window._notesTO);window._notesTO=setTimeout(()=>{CHAR.notes=document.getElementById('shNotes').value;},300);}
+function saveLocal(silent){
+  CHAR.notes=document.getElementById('shNotes')?document.getElementById('shNotes').value:CHAR.notes;
+  try{
+    localStorage.setItem('legacy_char_'+(CHAR.name||'unnamed'),JSON.stringify(CHAR));
+    localStorage.setItem('legacy_last',CHAR.name||'unnamed');
+    dirty=false;
+    if(!silent){const f=document.getElementById('savedFlash');f.classList.add('show');setTimeout(()=>f.classList.remove('show'),1800);}
+  }catch(e){toast("Couldn't save","This browser is blocking local storage. Use Export File instead to keep your character.");}
+}
+function loadLast(){
+  try{
+    const last=localStorage.getItem('legacy_last');
+    if(!last)return false;
+    const raw=localStorage.getItem('legacy_char_'+last);
+    if(!raw)return false;
+    CHAR=JSON.parse(raw);
+    if(CHAR._rerollUsed===undefined)CHAR._rerollUsed=false;
+    document.getElementById('creation').classList.add('hidden');
+    document.getElementById('sheet').classList.remove('hidden');
+    renderSheet();
+    return true;
+  }catch(e){return false;}
+}
+function exportChar(){
+  CHAR.notes=document.getElementById('shNotes').value;
+  const blob=new Blob([JSON.stringify(CHAR,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=(CHAR.name||'character').replace(/[^a-z0-9]/gi,'_')+'_legacy.json';
+  a.click();
+  toast("Exported ✦","Send this file to your GM, or open it on another device with Import.");
+}
+function importChar(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      CHAR=JSON.parse(r.result);
+      if(CHAR._rerollUsed===undefined)CHAR._rerollUsed=false;
+      document.getElementById('creation').classList.add('hidden');
+      document.getElementById('sheet').classList.remove('hidden');
+      renderSheet();saveLocal(true);
+      toast("Imported ✦",CHAR.name+" loaded.");
+    }catch(err){toast("Couldn't read that file","Make sure it's a character file exported from this sheet.");}
+  };
+  r.readAsText(f);
+}
+
+// ---------- toast ----------
+function toast(big,small){
+  const t=document.getElementById('toast');
+  t.innerHTML=(big?`<span class="big">${big}</span>`:'')+(small||'');
+  t.classList.add('show');
+  clearTimeout(window._toastTO);
+  window._toastTO=setTimeout(()=>t.classList.remove('show'),3600);
+}
+
+// ---------- stars ----------
+(function(){
+  const c=document.getElementById('stars');
+  for(let i=0;i<70;i++){
+    const s=document.createElement('div');s.className='star';
+    const sz=Math.random()*2+1;
+    s.style.width=sz+'px';s.style.height=sz+'px';
+    s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';
+    s.style.animationDelay=(Math.random()*4)+'s';
+    c.appendChild(s);
+  }
+})();
+
+// autosave on unload + periodic
+window.addEventListener('beforeunload',()=>{if(CHAR&&dirty)saveLocal(true);});
+setInterval(()=>{if(CHAR&&dirty)saveLocal(true);},5000);
+
+// boot
+if(!loadLast()){showStep();}
+</script>
+</body>
+</html>
