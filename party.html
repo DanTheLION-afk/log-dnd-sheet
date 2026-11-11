@@ -2357,13 +2357,19 @@ function parseAurora(files, rs) {
   const raceIds = new Map();
   for (const sp of srd.species || []) raceIds.set(slug(sp.name), sp.id);
   const srdSubs = new Set((srd.species || []).flatMap(sp => (sp.subs || []).map(x => sp.id + ':' + slug(x.name))));
+  const raceKey = new Map(), subIdToRace = new Map();
+  const SUBSEL = t => /sub ?race|race variant/i.test(String(t || ''));
+  const mapSubSel = (x, rid) => {
+    for (const k of String(x.a.supports || '').split(/[,|]/).map(v => v.trim()).filter(Boolean)) {
+      if (/^ID_/i.test(k)) subIdToRace.set(k, rid); else raceKey.set(k.toLowerCase(), rid);
+    }
+  };
   for (const r of of('Race')) {
     const sid = srdNames.species.get(slug(r.name));
-    const subSel = (r.rules || []).find(x => x.tag === 'select' && /sub ?race/i.test(String(x.a.type)));
-    const id = sid || newId('species', r.name);
+    const id = sid || raceIds.get(slug(r.name)) || newId('species', r.name);
     raceIds.set(slug(r.name), id);
-    if (subSel && subSel.a.supports) raceIds.set(String(subSel.a.supports).trim().toLowerCase(), id);
-    if (sid) continue;
+    for (const x of r.rules || []) if (x.tag === 'select' && SUBSEL(x.a.type)) mapSubSel(x, id);
+    if (sid || out.species.some(x => x.id === id)) continue;
     const { tr, dv } = traitsFrom(r.rules);
     const pr = { saves: new Set(), skills: new Set(), armor: new Set(), weapons: new Set(), tools: new Set() };
     collectProfs(r.rules, pr);
@@ -2375,22 +2381,51 @@ function parseAurora(files, rs) {
     const ss = skillSelect(r.rules); if (ss) e.skillChoice = ss;
     out.species.push(e);
   }
+  /* races sometimes pick their subrace inside a racial trait */
+  const raceGrantedBy = new Map();
+  for (const r of of('Race')) {
+    const rid = raceIds.get(slug(r.name));
+    const walk = (rules, depth) => { for (const x of rules || []) if (x.tag === 'grant' && x.a.id) for (const gid of x.a.id.split(',').map(v => v.trim())) { if (raceGrantedBy.has(gid)) continue; raceGrantedBy.set(gid, rid); const fe = els.get(gid); if (fe && depth < 3) walk(fe.rules, depth + 1); } };
+    walk(r.rules, 0);
+  }
+  const raceFromId = id => { const U = String(id || '').toUpperCase(); let best = null; for (const [nm, rid] of raceIds) { const tok = nm.toUpperCase().replace(/-/g, '_'); if (new RegExp('(^|_)' + tok + '(_|$)').test(U) && (!best || tok.length > best[0].length)) best = [tok, rid]; } return best ? best[1] : null; };
+  const raceFromName = n => { const t = ' ' + String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' '; let best = null; for (const [nm, rid] of raceIds) { const w = ' ' + nm.replace(/-/g, ' ') + ' '; if (t.includes(w) && (!best || w.length > best[0].length)) best = [w, rid]; } return best ? best[1] : null; };
+  for (const e of els.values()) {
+    if (String(e.type).toLowerCase() === 'race') continue;
+    for (const x of e.rules || []) if (x.tag === 'select' && SUBSEL(x.a.type)) { const rid = raceGrantedBy.get(e.id) || raceFromId(e.id); if (rid) mapSubSel(x, rid); }
+  }
+  const resolveSub = s => {
+    if (subIdToRace.has(s.id)) return subIdToRace.get(s.id);
+    const toks = supportsTokens(s);
+    for (const k of toks) { if (raceKey.has(k)) return raceKey.get(k); if (raceIds.has(slug(k))) return raceIds.get(slug(k)); }
+    for (const k of toks) {
+      const bare = k.replace(/\b(sub ?races?|variants?|lineages?|heritages?|descents?|dragonmarks?|ancestry|ancestries)\b/g, ' ').replace(/\s+/g, ' ').trim();
+      if (bare && raceKey.has(bare)) return raceKey.get(bare);
+      if (bare && raceIds.has(slug(bare))) return raceIds.get(slug(bare));
+    }
+    for (const k of toks) { const r = raceFromName(k); if (r) return r; }
+    return raceFromId(s.id) || raceFromName(s.name) || null;
+  };
+  const standalone = [];
   for (const s of [...of('Sub Race'), ...of('Race Variant')]) {
-    const key = supportsTokens(s).find(k => raceIds.has(k) || raceIds.has(slug(k)));
-    const parent = key ? (raceIds.get(key) || raceIds.get(slug(key))) : null;
-    if (!parent) { notes.push(`${s.name}: couldn’t find its species; skipped.`); continue; }
-    if (srdSubs.has(parent + ':' + slug(s.name))) continue;
+    const parent = resolveSub(s);
+    if (parent && srdSubs.has(parent + ':' + slug(s.name))) continue;
     const { tr, dv } = traitsFrom(s.rules);
     const pr = { saves: new Set(), skills: new Set(), armor: new Set(), weapons: new Set(), tools: new Set() };
     collectProfs(s.rules, pr);
+    if (!parent) {
+      const sp = { id: newId('species', s.name), name: s.name, size: 'Medium', speed: speedOf(s.rules) || 30, dv, ab: abilityStats(s.rules), traits: tr, langs: [], langChoice: 0, skills: Array.from(pr.skills), subs: [], d: descOf(s), src: s.source || 'Aurora' };
+      out.species.push(sp); standalone.push(s.name); continue;
+    }
     const e = { id: newId('subspecies', s.name), of: parent, name: s.name, ab: abilityStats(s.rules), traits: tr, skills: Array.from(pr.skills), src: s.source || 'Aurora' };
     if (dv) e.dv = dv;
     const sp = speedOf(s.rules); if (sp) e.speed = sp;
     if ((s.rules || []).some(x => x.tag === 'stat' && /^hp$/i.test(x.a.name))) e.hpLv = 1;
     out.subspecies.push(e);
   }
+  if (standalone.length) notes.push(`${standalone.length === 1 ? '1 subrace was added as its own species because its main species wasn\u2019t in these files, so that species\u2019 traits aren\u2019t included' : standalone.length + ' subraces were added as their own species because their main species weren\u2019t in these files, so those species\u2019 traits aren\u2019t included'}: ${standalone.slice(0, 8).join(', ')}${standalone.length > 8 ? ` and ${standalone.length - 8} more` : ''}. Import the file with the main species to fix that.`);
   /* --- backgrounds --- */
-  for (const b of of('Background')) {
+  for (const b of [...of('Background'), ...of('Background Variant')]) {
     if (srdNames.backgrounds.get(slug(b.name))) continue;
     const pr = { saves: new Set(), skills: new Set(), armor: new Set(), weapons: new Set(), tools: new Set() };
     collectProfs(b.rules, pr);
@@ -2458,8 +2493,8 @@ function parseAurora(files, rs) {
     out.items.push(e);
   }
   const unknown = new Map();
-  for (const [t, list] of byType) if (!['class', 'archetype', 'race', 'sub race', 'race variant', 'background', 'feat', 'spell', 'weapon', 'armor', 'item', 'magic item', 'class feature', 'archetype feature', 'racial trait', 'background feature', 'proficiency', 'language', 'size', 'source', 'feat feature', 'information', 'grants', 'option', 'support', 'rule'].includes(t)) unknown.set(t, list.length);
-  if (unknown.size) notes.push('Not imported (no matching builder slot): ' + Array.from(unknown).map(([t, n]) => `${n} ${t}`).join(', ') + '.');
+  for (const [t, list] of byType) if (!['class', 'archetype', 'race', 'sub race', 'race variant', 'background', 'background variant', 'feat', 'spell', 'weapon', 'armor', 'item', 'magic item', 'class feature', 'archetype feature', 'racial trait', 'background feature', 'proficiency', 'language', 'size', 'source', 'feat feature', 'information', 'grants', 'option', 'support', 'rule'].includes(t)) unknown.set(t, list.length);
+  if (unknown.size) notes.push('Not used by the builder, safe to ignore: ' + Array.from(unknown).map(([t, n]) => `${n} ${t}`).join(', ') + '.');
   if (!els.size) notes.push('No Aurora <element> entries found in these files.');
   return { entries: out, notes, name: packName };
 }
@@ -2524,7 +2559,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them.</footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 6</span></footer>`;
 function render() {
   const app = document.getElementById('app');
   if (!app) return;
