@@ -1973,7 +1973,7 @@ function importModal() {
     const r = m.result;
     const total = sum(TYPES.map(t => (r.entries[t] || []).length));
     body = `<div class="stack"><div class="row">${TYPES.filter(t => (r.entries[t] || []).length).map(t => `<span class="pill acc">${(r.entries[t] || []).length} ${TYPE_LABEL[t].toLowerCase()}</span>`).join('') || '<span class="muted">Nothing usable found.</span>'}</div>
-      ${r.notes.length ? `<details><summary class="small" style="cursor:pointer">${r.notes.length} note${r.notes.length === 1 ? '' : 's'} from the import</summary><ul class="small">${r.notes.slice(0, 60).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}
+      ${r.notes.length ? `<details><summary class="small" style="cursor:pointer">${r.notes.length} note${r.notes.length === 1 ? '' : 's'} from the import</summary><ul class="small">${r.notes.slice(0, 150).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}
       ${r.chars && r.chars.length ? `<div class="note">${r.chars.length} character file${r.chars.length === 1 ? '' : 's'} found. They'll be added to your characters.</div>` : ''}
       <div class="grid2"><label class="field"><span class="lbl">Pack name</span><input type="text" id="f-impname" value="${esc(m.name || r.name || 'Imported content')}"></label>
       <label class="field"><span class="lbl">Use with</span><select id="f-imprs">${RULESET_OPTS.map(([v, l]) => opt(v, l, (m.rs || r.ruleset || '2014') === v)).join('')}</select></label>
@@ -2214,14 +2214,18 @@ function parseAurora(files, rs) {
 
   /* --- classes --- */
   const archKeyToClass = new Map();
+  const classIdByName = new Map((srd.classes || []).map(c => [slug(c.name), c.id]));
+  const keptClasses = new Set();
   const PROG = { bard: 'full', cleric: 'full', druid: 'full', sorcerer: 'full', wizard: 'full', paladin: 'half', ranger: 'half', artificer: 'halfup', warlock: 'pact' };
   for (const c of of('Class')) {
     const sid = srdNames.classes.get(slug(c.name));
     const archSel = (c.rules || []).find(r => r.tag === 'select' && String(r.a.type).toLowerCase() === 'archetype');
-    const id = sid || newId('classes', c.name);
+    const id = sid || classIdByName.get(slug(c.name)) || newId('classes', c.name);
+    classIdByName.set(slug(c.name), id);
     if (archSel && archSel.a.supports) archKeyToClass.set(String(archSel.a.supports).trim().toLowerCase(), id);
     archKeyToClass.set(slug(c.name), id);
-    if (sid) { notes.push(`${c.name}: kept the built-in class. Imported subclasses attach to it.`); continue; }
+    if (sid) { keptClasses.add(c.name); continue; }
+    if (out.classes.some(x => x.id === id)) continue;
     const pr = { saves: new Set(), skills: new Set(), armor: new Set(), weapons: new Set(), tools: new Set() };
     collectProfs(c.rules, pr);
     const features = [];
@@ -2262,13 +2266,60 @@ function parseAurora(files, rs) {
     const asiLevels = features.some(f => f.asi) ? null : [4, 8, 12, 16, 19];
     out.classes.push({ id, name: c.name, hd: +hd, saves: Array.from(pr.saves), armor: Array.from(pr.armor), weapons: Array.from(pr.weapons), tools: Array.from(pr.tools), skills, spell, subLevel: archSel ? lvl(archSel) : 3, subLabel: (archSel && archSel.a.name) || 'Subclass', asiLevels, features: features.sort((a, b) => a.l - b.l), resources: [], mc, d: descOf(c), src: c.source || 'Aurora' });
   }
+  if (keptClasses.size) notes.push(`Kept the built-in ${Array.from(keptClasses).join(', ')}. Imported subclasses attach to them.`);
+  /* which class owns each subclass group? Classes often pick their subclass inside a feature, not in their own rules */
+  const classFromId = id => {
+    const U = String(id || '').toUpperCase();
+    let best = null;
+    for (const [nm, cid] of classIdByName) { const tok = nm.toUpperCase().replace(/-/g, '_'); if (new RegExp('(^|_)' + tok + '(_|$)').test(U) && (!best || tok.length > best[0].length)) best = [tok, cid]; }
+    return best ? best[1] : null;
+  };
+  const grantedBy = new Map(), grantLevel = new Map();
+  for (const c of of('Class')) {
+    const cid = classIdByName.get(slug(c.name));
+    const walk = (rules, depth, lv) => {
+      for (const r of rules || []) {
+        if (r.tag !== 'grant' || !r.a.id) continue;
+        for (const gid of r.a.id.split(',').map(x => x.trim())) {
+          if (grantedBy.has(gid)) continue;
+          grantedBy.set(gid, cid); grantLevel.set(gid, depth === 0 ? lvl(r) : lv);
+          const fe = els.get(gid); if (fe && depth < 3) walk(fe.rules, depth + 1, depth === 0 ? lvl(r) : lv);
+        }
+      }
+    };
+    walk(c.rules, 0, 1);
+  }
+  for (const e of els.values()) {
+    for (const r of e.rules || []) {
+      if (r.tag !== 'select' || String(r.a.type).toLowerCase() !== 'archetype' || !r.a.supports) continue;
+      const cid = e.type.toLowerCase() === 'class' ? classIdByName.get(slug(e.name)) : (grantedBy.get(e.id) || classFromId(e.id));
+      if (!cid) continue;
+      for (const k of String(r.a.supports).split(/[,|]/)) if (k.trim()) archKeyToClass.set(k.trim().toLowerCase(), cid);
+      const ic = out.classes.find(x => x.id === cid);
+      if (ic && e.type.toLowerCase() !== 'class') { ic.subLevel = +(r.a.level || 0) || grantLevel.get(e.id) || ic.subLevel; ic.subLabel = r.a.name || ic.subLabel; }
+    }
+  }
+  const GROUP_TO_CLASS = { 'primal path': 'barbarian', 'bard college': 'bard', 'bardic college': 'bard', 'divine domain': 'cleric', 'druid circle': 'druid', 'druidic circle': 'druid', 'martial archetype': 'fighter', 'monastic tradition': 'monk', 'sacred oath': 'paladin', 'ranger archetype': 'ranger', 'ranger conclave': 'ranger', 'roguish archetype': 'rogue', 'sorcerous origin': 'sorcerer', 'otherworldly patron': 'warlock', 'arcane tradition': 'wizard', 'artificer specialist': 'artificer', 'artificer specialization': 'artificer', 'mystic order': 'mystic', 'blood hunter order': 'blood-hunter' };
+  const resolveArch = a => {
+    const toks = String(a.supports || '').split(/[,|]/).map(s => s.trim().toLowerCase()).filter(Boolean);
+    for (const k of toks) if (archKeyToClass.has(k)) return { cls: archKeyToClass.get(k) };
+    for (const k of toks) {
+      if (GROUP_TO_CLASS[k]) { const id = classIdByName.get(GROUP_TO_CLASS[k]); return id ? { cls: id } : { missing: GROUP_TO_CLASS[k] }; }
+      const m = k.match(/^(.+?) subclass$/); if (m && classIdByName.get(slug(m[1]))) return { cls: classIdByName.get(slug(m[1])) };
+      if (classIdByName.get(slug(k))) return { cls: classIdByName.get(slug(k)) };
+    }
+    const byId = classFromId(a.id) || classFromId(a.supports);
+    if (byId) return { cls: byId };
+    return { missing: '' };
+  };
+  const missingFor = new Map();
   /* --- archetypes --- */
   for (const a of of('Archetype')) {
-    const key = String(a.supports || '').split(/[,|]/).map(s => s.trim().toLowerCase()).find(k => archKeyToClass.has(k));
-    const cls = key ? archKeyToClass.get(key) : (srdNames.classes.get(slug(String(a.supports || '').split(' ')[0])) || null);
-    if (!cls) { notes.push(`${a.name}: couldn’t tell which class it belongs to; skipped.`); continue; }
+    const res = resolveArch(a);
+    const cls = res.cls;
+    if (!cls) { const k = res.missing || ''; if (!missingFor.has(k)) missingFor.set(k, []); missingFor.get(k).push(a.name); continue; }
     const sid = srdNames.subclasses.get(slug(a.name));
-    if (sid) continue;
+    if (sid && (srd.subclasses || []).some(s => s.id === sid && s.cls === cls)) continue;
     const features = [];
     for (const r of a.rules || []) {
       const t = String(r.a.type || '').toLowerCase();
@@ -2281,6 +2332,11 @@ function parseAurora(files, rs) {
     const e = { id: newId('subclasses', a.name), name: a.name, cls, d: descOf(a), features: features.sort((x, y) => x.l - y.l), spells: [], src: a.source || 'Aurora' };
     if (a.spellcasting && a.spellcasting.ability) e.spell = { ab: AB_NAMES[String(a.spellcasting.ability).toLowerCase()] || 'int', prog: 'third', list: slug(a.spellcasting.list || 'wizard') };
     out.subclasses.push(e);
+  }
+  for (const [k, names] of missingFor) {
+    const list = names.slice(0, 6).join(', ') + (names.length > 6 ? ` and ${names.length - 6} more` : '');
+    if (k) notes.push(`${names.length} subclass${names.length === 1 ? ' needs' : 'es need'} the ${k.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} class, which wasn’t in these files: ${list}. Import that class too, then import these again.`);
+    else notes.push(`${names.length} subclass${names.length === 1 ? '' : 'es'} couldn’t be matched to any class: ${list}.`);
   }
   /* --- species --- */
   const traitsFrom = rules => {
