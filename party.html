@@ -1963,11 +1963,12 @@ function importModal() {
   const st = m.stage || 'pick';
   let body = '';
   if (st === 'pick') {
-    body = `<p class="small">Pick JSON packs exported from here, Aurora Builder XML content files, a folder of them (for example Aurora's custom content folder), or a .zip. The page can't download from links, so get the files onto your device first.</p>
+    body = `<p class="small">Pick JSON packs exported from here, Aurora Builder XML content files, Aurora <b>.index</b> files, a folder of them (for example Aurora's custom content folder), or a .zip.${CAN_FETCH ? ' Index files download every file they list, including nested indexes.' : ' On this Claude-hosted page, index files can’t download what they list. Use the GitHub version of Party Ledger for that, or pick the XML files themselves.'}</p>
       <div class="drop" id="dropzone">Drop files or a folder here<br><span class="small">or</span><div class="row" style="justify-content:center;margin-top:8px"><label class="btn">Choose files<input class="hidden-input" type="file" id="f-files" multiple accept=".xml,.json,.zip,.index"></label><label class="btn">Choose a folder<input class="hidden-input" type="file" id="f-folder" webkitdirectory multiple></label></div></div>
+      ${CAN_FETCH ? `<div class="stack"><span class="lbl">Or paste an index link</span><div class="row"><input type="text" id="f-idxurl" placeholder="https://…/something.index" style="flex:1;min-width:200px"><button class="btn" data-act="impurl">Download</button></div><div class="small muted">GitHub page links are turned into direct file links for you. Some sites block downloads from other pages; those files are listed as skipped.</div></div>` : ''}
       ${m.err ? `<div class="errline">${esc(m.err)}</div>` : ''}`;
   } else if (st === 'reading') {
-    body = `<p>Reading ${m.n || 0} file${m.n === 1 ? '' : 's'}…</p><div class="bar-prog"><i style="width:${Math.round((m.done || 0) / Math.max(1, m.n || 1) * 100)}%"></i></div>`;
+    body = `<p>${m.downloading ? 'Downloading' : 'Reading'} ${m.done || 0} of ${m.n || 0} file${m.n === 1 ? '' : 's'}…</p><div class="bar-prog"><i style="width:${Math.round((m.done || 0) / Math.max(1, m.n || 1) * 100)}%"></i></div>`;
   } else if (st === 'review') {
     const r = m.result;
     const total = sum(TYPES.map(t => (r.entries[t] || []).length));
@@ -1984,10 +1985,64 @@ function importModal() {
   }
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Import content"><div class="row"><h2>Import content</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>${body}</div>`;
 }
-async function readImportFiles(fileList) {
+const CAN_FETCH = !!window.PL_SITE;
+function toRawUrl(u) {
+  u = String(u || '').trim();
+  const m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:blob|raw)\/(.+)$/i);
+  return m ? `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}` : u;
+}
+function indexFileList(text) {
+  let doc;
+  try { doc = new DOMParser().parseFromString(text, 'application/xml'); } catch (e) { return null; }
+  if (!doc || !doc.documentElement || doc.getElementsByTagName('parsererror').length) return null;
+  const out = [];
+  for (const files of Array.from(doc.getElementsByTagName('files'))) {
+    for (const f of Array.from(files.getElementsByTagName('file'))) { const url = f.getAttribute('url'); if (url) out.push({ name: f.getAttribute('name') || url.split('/').pop(), url }); }
+  }
+  return out;
+}
+const looksLikeIndex = t => /<index[\s>]/i.test(String(t).slice(0, 3000)) && !/<elements[\s>]/i.test(String(t).slice(0, 3000));
+async function downloadIndexes(seeds, notes, onProgress) {
+  const seen = new Set(); const out = []; const queue = seeds.slice();
+  let done = 0, total = queue.length, size = 0;
+  while (queue.length) {
+    const batch = queue.splice(0, 6);
+    await Promise.all(batch.map(async item => {
+      let text = item.text;
+      if (text == null) {
+        const url = toRawUrl(item.url);
+        if (seen.has(url)) { total--; return; }
+        seen.add(url);
+        try {
+          const r = await fetch(url, { mode: 'cors' });
+          if (!r.ok) throw new Error('the site answered ' + r.status);
+          text = await r.text();
+        } catch (e) {
+          notes.push(`${item.name}: couldn’t download (${/fetch|network/i.test(String(e && e.message)) ? 'the site blocks downloads from other pages, or the link is wrong' : (e && e.message) || e}).`);
+          done++; return;
+        }
+      }
+      done++;
+      if (looksLikeIndex(text)) {
+        const list = indexFileList(text);
+        if (!list) { notes.push(item.name + ': not a readable index file.'); return; }
+        for (const f of list) { if (!seen.has(toRawUrl(f.url))) { queue.push({ name: f.name, url: f.url }); total++; } }
+      } else if (/\.json(\?|$)/i.test(item.url || item.name || '')) {
+        out.push({ name: (item.name || 'file').replace(/(\.json)?$/i, '.json'), text }); size += text.length;
+      } else {
+        out.push({ name: (item.name || 'file').replace(/(\.xml)?$/i, '.xml'), text }); size += text.length;
+      }
+    }));
+    onProgress(done, total);
+    if (seen.size > 4000) { notes.push('Stopped after 4,000 files. Import the rest separately.'); break; }
+  }
+  return { files: out, size };
+}
+async function readImportFiles(fileList, urlSeeds) {
   const files = Array.from(fileList || []);
-  const m = UI.modal; m.stage = 'reading'; m.n = files.length; m.done = 0; renderModal();
+  const m = UI.modal; m.stage = 'reading'; m.n = files.length; m.done = 0; m.downloading = false; renderModal();
   const texts = []; const notes = [];
+  const indexSeeds = (urlSeeds || []).map(u => ({ name: u, url: u }));
   let size = 0;
   for (const f of files) {
     const nm = (f.webkitRelativePath || f.name || '').toLowerCase();
@@ -1995,18 +2050,26 @@ async function readImportFiles(fileList) {
       if (nm.endsWith('.zip')) {
         if (!window.JSZip) { notes.push(f.name + ': zip support didn’t load. Unzip it and pick the folder.'); continue; }
         const zip = await JSZip.loadAsync(f);
-        const ents = Object.values(zip.files).filter(z => !z.dir && /\.(xml|json)$/i.test(z.name));
+        const ents = Object.values(zip.files).filter(z => !z.dir && /\.(xml|json|index)$/i.test(z.name));
         m.n += ents.length;
-        for (const z of ents) { const t = await z.async('string'); size += t.length; texts.push({ name: z.name, text: t }); m.done++; if (m.done % 20 === 0) renderModal(); }
+        for (const z of ents) { const t = await z.async('string'); if (/\.index$/i.test(z.name)) indexSeeds.push({ name: z.name, text: t }); else { size += t.length; texts.push({ name: z.name, text: t }); } m.done++; if (m.done % 20 === 0) renderModal(); }
       } else if (nm.endsWith('.xml') || nm.endsWith('.json')) {
         const t = await f.text(); size += t.length; texts.push({ name: f.webkitRelativePath || f.name, text: t });
       } else if (nm.endsWith('.index')) {
-        const t = await f.text();
-        const urls = (t.match(/url="[^"]+"/g) || []).length;
-        notes.push(`${f.name} is an index that lists ${urls} file${urls === 1 ? '' : 's'} online. This page can't download them; download the XML files and import those.`);
+        indexSeeds.push({ name: f.name, text: await f.text() });
       }
     } catch (e) { notes.push(f.name + ': ' + ((e && e.message) || 'could not be read')); }
     m.done++; if (m.done % 20 === 0) renderModal();
+  }
+  if (indexSeeds.length) {
+    if (!CAN_FETCH) {
+      for (const s of indexSeeds) { const n = s.text ? (indexFileList(s.text) || []).length : 0; notes.push(`${s.name} lists ${n} file${n === 1 ? '' : 's'} online. This Claude-hosted page can’t download them; use the GitHub version of Party Ledger, or import the XML files themselves.`); }
+    } else {
+      m.downloading = true; m.n = indexSeeds.length; m.done = 0; renderModal();
+      const got = await downloadIndexes(indexSeeds, notes, (d, t) => { m.done = d; m.n = t; renderModal(); });
+      texts.push(...got.files); size += got.size;
+      if (!got.files.length) notes.push('The index didn’t lead to any files that could be downloaded.');
+    }
   }
   const xml = texts.filter(t => /\.xml$/i.test(t.name));
   const json = texts.filter(t => /\.json$/i.test(t.name));
@@ -2776,6 +2839,11 @@ const ACT = {
     if (!(await saveFile('party-ledger-template.json', text))) openModal({ kind: 'text', title: 'Homebrew JSON template', html: '<p>Edit a copy of this and import it. Every entry type is shown once.</p>', text, readonly: true, tall: true });
   },
   hbimport() { openModal({ kind: 'import', stage: 'pick' }); },
+  impurl() {
+    const u = (($('#f-idxurl') || {}).value || '').trim();
+    if (!/^https?:\/\/\S+$/i.test(u)) { UI.modal.err = 'Paste a full link that starts with https://'; renderModal(); return; }
+    readImportFiles([], [u]);
+  },
   async impgo() {
     const m = UI.modal; const r = m.result; if (!r) return;
     m.name = ($('#f-impname').value || '').trim() || 'Imported content';
