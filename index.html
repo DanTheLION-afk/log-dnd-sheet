@@ -6,6 +6,13 @@
 <title>Party Ledger</title>
 <meta name="description" content="D&amp;D 5e and 5.5e character builder with a live party view for the DM.">
 <meta name="theme-color" content="#16201c">
+<link rel="manifest" href="party-manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="party-icon-192.png">
+<link rel="apple-touch-icon" href="party-icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Party Ledger">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap">
@@ -1221,6 +1228,10 @@ const IDB = {
     const db = await this.open(); if (!db) return [];
     return new Promise(res => { try { const out = []; const tx = db.transaction('packs').objectStore('packs').openCursor(); tx.onsuccess = e => { const c = e.target.result; if (c) { out.push(c.value); c.continue(); } else res(out); }; tx.onerror = () => res([]); } catch (e) { res([]); } });
   },
+  async get(key) {
+    const db = await this.open(); if (!db) return null;
+    return new Promise(res => { try { const r = db.transaction('packs').objectStore('packs').get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); } });
+  },
   async put(key, val) {
     const db = await this.open(); if (!db) throw new Error('This browser blocks device storage.');
     return new Promise((res, rej) => { const tx = db.transaction('packs', 'readwrite'); tx.objectStore('packs').put(val, key); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
@@ -1329,12 +1340,71 @@ function queueWrite(path, patch, delay = 450) {
   clearTimeout(q.timer);
   q.timer = setTimeout(() => flushWrite(path), delay);
   setSaving(true);
+  keepQueue();
+}
+
+/* ===== offline keep (website build only) =====
+   The last campaign data this device saw, and any changes it has not managed to send yet,
+   are kept on the device so the app opens and stays usable with no internet. */
+const KEEP = { seeded: false, timer: null, qtimer: null };
+const keepOn = () => !!window.PL_SITE && S.mode === 'live' && !!(S.campaign && S.campaign.code);
+const keepKey = k => 'keep.' + S.campaign.code + '.' + k;
+function keepQueue() {
+  if (!keepOn()) return;
+  clearTimeout(KEEP.qtimer);
+  KEEP.qtimer = setTimeout(() => {
+    const out = {};
+    for (const [path, q] of Object.entries(WQ)) if (q.pending || q.inflight) out[path] = deepMerge(clone(q.inflight || {}), clone(q.pending || {}));
+    LS.set(keepKey('wq'), out);
+  }, 120);
+}
+function keepDocs() {
+  if (!keepOn()) return;
+  clearTimeout(KEEP.timer);
+  KEEP.timer = setTimeout(() => {
+    const body = { docs: S.docs, settings: S.settings, at: Date.now() };
+    if (!LS.set(keepKey('docs'), body)) { const mine = {}; if (S.docs[S.me.id]) mine[S.me.id] = S.docs[S.me.id]; LS.set(keepKey('docs'), { docs: mine, settings: S.settings, at: Date.now() }); }
+  }, 900);
+}
+function keepShared() {
+  if (!keepOn()) return;
+  const key = 'keep:' + S.campaign.code;
+  IDB.put(key, { _key: key, parts: S.sharedParts || [] }).catch(() => { });
+}
+/* put the kept copy on screen until the server answers */
+function keepSeed(onChange) {
+  if (!keepOn()) return;
+  const kept = LS.get(keepKey('docs'), null);
+  if (kept && kept.docs && Object.keys(kept.docs).length) {
+    S.docs = kept.docs; S.ver++; KEEP.seeded = true; KEEP.at = kept.at || 0;
+    if (kept.settings) { S.settings = Object.assign({ off: [] }, kept.settings); setOffSources(S.settings.off); }
+  }
+  IDB.get('keep:' + S.campaign.code).then(v => {
+    if (v && Array.isArray(v.parts) && v.parts.length && !(S.sharedParts || []).length) { S.sharedParts = v.parts; KEEP.seededParts = true; refreshPacks(); onChange('packs'); }
+  }).catch(() => { });
+  /* changes made last time that never reached the server go out again */
+  const wq = LS.get(keepKey('wq'), null);
+  if (wq && typeof wq === 'object') {
+    for (const [path, patch] of Object.entries(wq)) {
+      if (!patch || typeof patch !== 'object') continue;
+      const [col, id] = path.split('/');
+      if (col === 'characters' && id !== S.me.id && !S.me.isOwner) continue;
+      if (col !== 'characters' && !S.me.isOwner) continue;
+      if (col === 'characters') applyLocalDoc(id, patch);
+      queueWrite(path, patch, 400);
+    }
+  }
+}
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+function statusText() {
+  if (S.mode === 'live' && isOffline()) return 'Offline: changes wait on this device';
+  return S.status;
 }
 async function flushWrite(path) {
   const q = WQ[path];
   if (!q || !q.pending) return;
   if (q.busy) { q.timer = setTimeout(() => flushWrite(path), 300); return; }
-  const patch = q.pending; q.pending = null; q.busy = true;
+  const patch = q.pending; q.pending = null; q.busy = true; q.inflight = patch;
   try {
     const ref = S.db.doc(path);
     if (S.known[path] === undefined) { const g = await ref.get(); S.known[path] = g.exists; }
@@ -1352,8 +1422,9 @@ async function flushWrite(path) {
       toastMsg('Saving failed: ' + ((e && e.message) || e));
     }
   } finally {
-    q.busy = false;
+    q.busy = false; q.inflight = null;
     if (!Object.values(WQ).some(x => x.pending || x.busy)) setSaving(false);
+    keepQueue();
   }
 }
 let savingFlag = false;
@@ -1403,6 +1474,7 @@ function deleteChar(ch) {
 function applyLocalDoc(owner, patch) {
   S.ver++;
   S.docs[owner] = deepMerge(S.docs[owner] || { owner, chars: {}, play: {} }, clone(patch));
+  keepDocs();
 }
 let persistTimer = null;
 function persistLocal() {
@@ -1418,23 +1490,44 @@ function saveInit(next) {
   else LS.set('init', next);
 }
 /* DM-only state. In a live campaign only the DM can read or write it. */
+const DM_BLANK = () => ({ combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' });
+function keepDM() {
+  if (!keepOn() || !S.me.isOwner) return;
+  clearTimeout(KEEP.dtimer);
+  KEEP.dtimer = setTimeout(() => LS.set(keepKey('dm'), S.dm), 900);
+}
 function saveDM(patch) {
-  S.dm = Object.assign({ combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' }, S.dm, patch);
-  if (S.mode === 'live') { if (S.me.isOwner) queueWrite('dm/state', patch, 250); }
+  S.dm = Object.assign(DM_BLANK(), S.dm, patch);
+  if (S.mode === 'live') { if (S.me.isOwner) { queueWrite('dm/state', patch, 250); keepDM(); } }
   else LS.set('dm', S.dm);
 }
 const TAB = 't' + Math.random().toString(36).slice(2, 10);
-const isResolver = () => S.mode !== 'live' || (!!S.me.isOwner && (S.dm || {}).resolver === TAB);
+/* one DM window settles player rolls. Until the server has answered (no internet yet) a main DM window settles its own. */
+const isResolver = () => S.mode !== 'live' || (!!S.me.isOwner && (!!S.dmSolo || (S.dm || {}).resolver === TAB));
 function subscribeDM(onChange) {
   if (!S.db || !S.me.isOwner || S.dmSub) return;
   S.dmSub = true;
+  const popout = typeof UI === 'object' && !!UI.fromUrl;
+  let server = false, seeded = false;
+  if (keepOn()) { const k = LS.get(keepKey('dm'), null); if (k && k.combat && Array.isArray(k.combat.list)) { S.dm = Object.assign(DM_BLANK(), k); seeded = true; } }
+  S.dmSolo = !popout;
   S.db.doc('dm/state').onSnapshot(snap => {
+    const cached = !!(snap.metadata && snap.metadata.fromCache);
+    /* no internet yet: the server library reports an empty local copy, so keep what this device has */
+    if (cached && !server && (seeded || !snap.exists)) { onChange('dm'); return; }
+    if (!cached) server = true;
+    /* the server's copy, with my own unsent changes on top */
     const q = WQ['dm/state'];
-    if (q && (q.pending || q.busy)) return;
-    S.dm = Object.assign({ combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' }, snap.exists ? clone(snap.data()) : {});
+    let data = snap.exists ? clone(snap.data()) : {};
+    if (q && (q.pending || q.inflight)) data = deepMerge(data, deepMerge(clone(q.inflight || {}), clone(q.pending || {})));
+    S.dm = Object.assign(DM_BLANK(), data);
     if (!S.dm.combat || !Array.isArray(S.dm.combat.list)) S.dm.combat = { round: 1, cur: null, list: [] };
-    /* one DM window settles player rolls; the main window claims the job when it opens, pop-outs never do */
-    if (!S.dmClaimed) { S.dmClaimed = true; if (!(typeof UI === 'object' && UI.fromUrl)) saveDM({ resolver: TAB }); }
+    if (!cached) {
+      S.dmSolo = false;
+      /* the main window claims the settling job when it opens, pop-outs never do */
+      if (!S.dmClaimed) { S.dmClaimed = true; if (!popout) saveDM({ resolver: TAB }); }
+    }
+    keepDM();
     onChange('dm');
   }, () => { S.dmSub = false; });
 }
@@ -1476,20 +1569,29 @@ async function startLive({ db, user, room, dl }, onChange) {
   S.dmClaimed = false;
   if (S.me.canWrite === false && !S.me.isOwner) S.readOnly = true;
   onChange();
-  let loaded = false;
-  const timer = setTimeout(() => { if (!loaded) { S.status = 'Campaign not reachable yet'; onChange(); } }, 10000);
+  let loaded = false, seenServer = false;
+  KEEP.seeded = false; KEEP.seededParts = false;
+  keepSeed(onChange);
+  const waiting = () => KEEP.seeded ? 'Offline: showing your last saved sheets' : 'Campaign not reachable yet';
+  if (KEEP.seeded) { S.status = isOffline() ? waiting() : 'Connecting\u2026'; onChange(); }
+  const timer = setTimeout(() => { if (!loaded) { S.status = waiting(); onChange(); } }, 10000);
   db.collection('characters').onSnapshot(snap => {
+    const cached = !!(snap.metadata && snap.metadata.fromCache);
+    /* with no internet the server library first reports an empty local copy: keep showing ours instead */
+    if (cached && !seenServer && KEEP.seeded) { S.status = waiting(); onChange(); return; }
+    if (!cached) seenServer = true;
     loaded = true; clearTimeout(timer);
     const next = {};
     for (const d of snap.docs) { next[d.id] = clone(d.data() || {}); S.known['characters/' + d.id] = true; }
     // keep my own unflushed changes on top
     for (const path of Object.keys(WQ)) {
       const q = WQ[path]; const id = path.split('/')[1];
-      if (path.startsWith('characters/') && q.pending) next[id] = deepMerge(next[id] || { owner: id, chars: {}, play: {} }, clone(q.pending));
+      if (path.startsWith('characters/') && (q.pending || q.inflight)) next[id] = deepMerge(next[id] || { owner: id, chars: {}, play: {} }, deepMerge(clone(q.inflight || {}), clone(q.pending || {})));
     }
     S.docs = next;
     S.ver++;
     S.status = snap.metadata.fromCache ? 'Syncing\u2026' : 'Live campaign';
+    keepDocs();
     resolveNames(onChange);
     onChange();
   }, err => { clearTimeout(timer); S.status = 'Campaign unavailable'; S.mode = 'local'; onChange(); });
@@ -1497,17 +1599,21 @@ async function startLive({ db, user, room, dl }, onChange) {
     if (snap.exists) S.init = Object.assign({ round: 1, turn: 0, list: [] }, clone(snap.data()));
     onChange('init');
   }, () => {});
-  S.settings = { off: [] }; setOffSources([]);
+  if (!KEEP.seeded) { S.settings = { off: [] }; setOffSources([]); }
   db.doc('campaign/settings').onSnapshot(snap => {
     const q = WQ['campaign/settings'];
     if (q && (q.pending || q.busy)) return;
+    if (!snap.exists && KEEP.seeded && !seenServer) return;
     S.settings = Object.assign({ off: [] }, snap.exists ? clone(snap.data()) : {});
     setOffSources(S.settings.off);
+    keepDocs();
     onChange('settings');
   }, () => {});
   db.collection('homebrew').onSnapshot(snap => {
+    if (snap.metadata && snap.metadata.fromCache && !seenServer && KEEP.seededParts) return;
     S.sharedParts = snap.docs.map(d => Object.assign({ _key: d.id }, clone(d.data() || {})));
     refreshPacks();
+    if (!(snap.metadata && snap.metadata.fromCache)) keepShared();
     onChange('packs');
   }, () => {});
   subscribeDM(onChange);
@@ -1625,10 +1731,10 @@ function fselect(o) {
 function viewBar() {
   if (UI.view === 'table') return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Table display</span></div></div></header>`;
   const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].concat(isDMish() ? [['campaign', 'Campaign']] : []);
-  const cls = S.mode === 'live' ? (S.status === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
+  const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
-    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(S.status)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${window.PL_SITE && !S.fbSetup ? `<button class="btn sm" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
+    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${window.PL_SITE && !S.fbSetup ? `<button class="btn sm" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
     <nav class="tabs" aria-label="Views">${tabs.map(([k, l]) => `<button class="tab" data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</nav>
   </div></header>${requestBanner()}`;
 }
@@ -3031,7 +3137,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 9</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 10</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -3059,7 +3165,7 @@ function render() {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
   }
-  app.innerHTML = viewBar() + `<main class="wrap">${body}</main>` + FOOTER;
+  app.innerHTML = viewBar() + `<main class="wrap">${body}</main>` + (typeof installNote === 'function' ? installNote() : '') + FOOTER;
   Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).forEach((el, i) => { const v = scrollers[i]; if (v) { const [t, l] = v.split(':'); el.scrollTop = +t; el.scrollLeft = +l; } });
   for (const id of Object.keys(keep)) {
     const el = document.getElementById(id);
@@ -4049,6 +4155,7 @@ const modeTag = r => r.mode === 'adv' ? ' (adv.)' : r.mode === 'dis' ? ' (disadv
 const DICE_RE = /^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/i;
 /* change live play state; a label makes the change undoable */
 function play(ch, patch, label) {
+  if (!ch || !ch.id) return;
   if (label) {
     const prev = {}; for (const k of Object.keys(patch)) prev[k] = ch.play[k] === undefined ? null : clone(ch.play[k]);
     const cid = ch.id, owner = ch._owner;
@@ -4057,6 +4164,7 @@ function play(ch, patch, label) {
   savePlay(ch, patch); queueRender();
 }
 function hpChange(ch, delta) {
+  if (!ch || !ch.id) return;
   if (!ch || !delta) return;
   const D = getD(ch); let hp = hpOf(ch, D), temp = +ch.play.temp || 0; const patch = {};
   if (delta < 0) {
@@ -4364,11 +4472,12 @@ function fbRoom(root) {
   const col = FB.fs.collection(root + '/rolls');
   return {
     on(topic, h) {
-      let first = true;
+      /* everything up to and including the first answer from the server is history, not a live roll */
+      let synced = false;
       return col.orderBy('at', 'desc').limit(40).onSnapshot(s => {
         const added = s.docChanges().filter(c => c.type === 'added').map(c => c.doc.data()).reverse();
-        for (const d of added) h({ topic, data: d, by: d.by || null, isMe: d.by === FB.uid, sameTab: d.sess === FB.sess, old: first, peer: d.sess });
-        first = false;
+        for (const d of added) h({ topic, data: d, by: d.by || null, isMe: d.by === FB.uid, sameTab: d.sess === FB.sess, old: !synced, peer: d.sess });
+        if (!(s.metadata && s.metadata.fromCache)) synced = true;
       }, () => { });
     },
     emit(topic, data) { return col.add(Object.assign({}, data, { by: FB.uid, sess: FB.sess, at: Date.now() })).then(() => { }, () => { }); },
@@ -4389,6 +4498,12 @@ const fbDl = {
   },
 };
 
+/* a server read that gives up instead of hanging when there is no internet */
+function fbSoon(p) {
+  const ms = isOffline() ? 2500 : 12000;
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => { const e = new Error('The campaign server did not answer.'); e.code = 'unavailable'; rej(e); }, ms))]);
+}
+const fbDown = e => isOffline() || !!(e && (e.code === 'unavailable' || e.code === 'deadline-exceeded' || /offline|network/i.test(e.message || '')));
 async function fbConnect(onChange) {
   S.dl = fbDl;
   if (!fbConfigured() || !window.firebase) { S.mode = 'local'; S.status = 'This device only'; S.fbSetup = true; onChange(); return; }
@@ -4412,15 +4527,28 @@ async function fbConnect(onChange) {
 }
 async function fbJoin(code, onChange) {
   code = String(code || '').trim().toUpperCase();
-  let meta;
-  try { meta = await FB.fs.doc('campaigns/' + code).get(); } catch (e) { meta = null; }
-  if (!meta || !meta.exists) {
-    S.needCampaign = true; S.joinErr = `No campaign uses the code ${code}. Check it with your DM.`; LS.set('camp', ''); onChange(); return false;
+  let meta, down = false;
+  try { meta = await fbSoon(FB.fs.doc('campaigns/' + code).get()); } catch (e) { meta = null; down = fbDown(e); }
+  const kept = LS.get('keep.' + code + '.meta', null);
+  if (down) {
+    /* no internet: open the campaign from what this device saw last time, if it has been here before */
+    if (!kept || kept.uid !== FB.uid) {
+      S.needCampaign = true; S.prefillCode = code; S.status = 'Offline'; S.joinErr = `You're offline, and this device hasn't opened campaign ${code} before. Connect to the internet and try again.`; onChange(); return false;
+    }
+    FB.code = code; S.campaign = Object.assign({ code }, kept.data || {});
+    FB.isDM = !!kept.isDM; FB.dmKey = kept.k || '';
+  } else {
+    if (!meta || !meta.exists) {
+      S.needCampaign = true; S.joinErr = `No campaign uses the code ${code}. Check it with your DM.`; LS.set('camp', ''); onChange(); return false;
+    }
+    FB.code = code; LS.set('camp', code);
+    S.campaign = Object.assign({ code }, meta.data());
+    try {
+      const dm = await fbSoon(FB.fs.doc(`campaigns/${code}/dms/${FB.uid}`).get()); FB.isDM = !!(dm && dm.exists); FB.dmKey = FB.isDM ? (dm.data() || {}).k || '' : '';
+      LS.set('keep.' + code + '.meta', { uid: FB.uid, data: meta.data(), isDM: FB.isDM, k: FB.dmKey });
+    } catch (e) { const same = kept && kept.uid === FB.uid; FB.isDM = !!(same && kept.isDM); FB.dmKey = same ? kept.k || '' : ''; }
   }
-  FB.code = code; LS.set('camp', code);
-  S.campaign = Object.assign({ code }, meta.data());
   try { if (location.hash !== '#' + code) history.replaceState(null, '', '#' + code); } catch (e) { }
-  try { const dm = await FB.fs.doc(`campaigns/${code}/dms/${FB.uid}`).get(); FB.isDM = !!(dm && dm.exists); FB.dmKey = FB.isDM ? (dm.data() || {}).k || '' : ''; } catch (e) { FB.isDM = false; }
   S.needCampaign = false; S.joinErr = '';
   await startLive({ db: fbDb('campaigns/' + code), user: fbUser, room: fbRoom('campaigns/' + code), dl: fbDl }, onChange);
   const nm = LS.get('pname', '');
@@ -4477,7 +4605,7 @@ Object.assign(ACT, {
     if (nm) LS.set('pname', nm);
     try {
       let code = randCode(6);
-      for (let i = 0; i < 5; i++) { const ex = await FB.fs.doc('campaigns/' + code).get(); if (!ex.exists) break; code = randCode(6); }
+      for (let i = 0; i < 5; i++) { const ex = await fbSoon(FB.fs.doc('campaigns/' + code).get()); if (!ex.exists) break; code = randCode(6); }
       const key = randCode(12);
       await FB.fs.doc('campaigns/' + code).set({ name, createdBy: FB.uid, created: Date.now() });
       await FB.fs.doc(`campaigns/${code}/private/key`).set({ k: key });
@@ -4502,10 +4630,17 @@ Object.assign(ACT, {
     const k = ($('#f-dmkey').value || '').trim().toUpperCase();
     if (!k) return;
     try {
-      await FB.fs.doc(`campaigns/${FB.code}/dms/${FB.uid}`).set({ k });
+      await fbSoon(FB.fs.doc(`campaigns/${FB.code}/dms/${FB.uid}`).set({ k }));
       FB.isDM = true; FB.dmKey = k; S.me.isOwner = true; S.readOnly = false; subscribeDM(() => queueRender());
+      const c = Object.assign({}, S.campaign); delete c.code; LS.set('keep.' + FB.code + '.meta', { uid: FB.uid, data: c, isDM: true, k });
       closeModal(); toastMsg('You’re the DM on this device now.'); queueRender();
-    } catch (e) { UI.modal.err = 'That key doesn’t match this campaign.'; renderModal(); }
+    } catch (e) { UI.modal.err = e && e.code === 'unavailable' ? 'No internet. Try again when you’re back online.' : 'That key doesn’t match this campaign.'; renderModal(); }
+  },
+  async install() {
+    if (!PWA.prompt) return;
+    const p = PWA.prompt; PWA.prompt = null;
+    try { p.prompt(); await p.userChoice; } catch (e) { }
+    queueRender();
   },
   campleave() { LS.set('camp', ''); try { history.replaceState(null, '', location.pathname); } catch (e) { } location.reload(); },
 });
@@ -4513,6 +4648,34 @@ function copyText(t, msg) {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toastMsg(msg), () => toastMsg('Select the text and copy it.'));
   else toastMsg('Select the text and copy it.');
 }
+
+/* ===== install as an app + offline loading (website build) ===== */
+const PWA = { prompt: null, standalone: false, sw: false };
+function pwaBoot() {
+  if (!window.PL_SITE) return;
+  try { PWA.standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; } catch (e) { }
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA.prompt = e; queueRender(); });
+  window.addEventListener('appinstalled', () => { PWA.prompt = null; PWA.standalone = true; toastMsg('Installed. Open Party Ledger from your apps like any other program.'); queueRender(); });
+  window.addEventListener('online', () => { if (S.mode === 'live') toastMsg('Back online. Sending anything that was waiting.'); queueRender(); });
+  window.addEventListener('offline', () => { if (S.mode === 'live') toastMsg('No internet. You can keep working: changes are kept on this device and sent when you’re back.'); queueRender(); });
+  const okHost = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if ('serviceWorker' in navigator && okHost) {
+    navigator.serviceWorker.register('party-sw.js', { scope: './' }).then(() => { PWA.sw = true; queueRender(); }, () => { });
+  }
+}
+function installNote() {
+  if (!window.PL_SITE || PWA.standalone) return '';
+  const ua = navigator.userAgent || '';
+  const ios = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  let how;
+  if (PWA.prompt) how = `<button class="btn sm pri" data-act="install">Install Party Ledger</button>`;
+  else if (ios) how = `On iPhone or iPad: tap Share, then <b>Add to Home Screen</b>.`;
+  else if (/firefox/i.test(ua) && /android/i.test(ua)) how = `In Firefox on Android: open the menu, then <b>Install</b> or <b>Add to Home screen</b>.`;
+  else if (/firefox/i.test(ua)) how = `In Firefox on Windows: click the web app button in the address bar. Other browsers on a PC: open this page in Chrome or Edge and use the install icon in the address bar.`;
+  else how = `Use your browser’s menu and pick <b>Install</b> or <b>Add to Home screen</b>.`;
+  return `<details class="wrap small muted" data-k="install" style="padding-block:0 10px"><summary>Use it like an app</summary><div class="stack" style="margin-top:6px"><div>${how}</div><div>It gets its own icon and window, and opens without internet: your sheets from last time are shown, and changes are sent when you’re back online.${PWA.sw ? '' : ' Offline opening starts working after one more visit with internet.'}</div></div></details>`;
+}
+pwaBoot();
 
 'use strict';
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

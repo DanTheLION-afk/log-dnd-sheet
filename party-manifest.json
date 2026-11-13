@@ -1,0 +1,31 @@
+{
+  "name": "Party Ledger",
+  "short_name": "Party Ledger",
+  "description": "D&D 5e and 5.5e character builder with a live party view for the DM.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#16201c",
+  "theme_color": "#16201c",
+  "icons": [
+    {
+      "src": "party-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "party-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "party-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
