@@ -363,7 +363,7 @@ button.vital:hover { border-color: var(--accent); }
 }
 
 
-/* Build 12: battle map. The board keeps a dark backdrop in both themes so map art reads the same everywhere. */
+/* Build 13: battle map. The board keeps a dark backdrop in both themes so map art reads the same everywhere. */
 .maplay { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; align-items: start; }
 @media (max-width: 960px) { .maplay { grid-template-columns: minmax(0, 1fr); } }
 .mapmain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -704,7 +704,7 @@ function derive(ch) {
   const sc = {}; const parts = {};
   for (const a of ABIL) { sc[a] = +ch.abil.base[a] || 10; parts[a] = [['Base', sc[a]]]; }
   const addAb = (src, map, cap = 20) => { for (const a of ABIL) { const v = +((map || {})[a] || 0); if (v) { sc[a] += v; parts[a].push([src, v]); } } };
-  if (!is24 || (sp && Object.keys(sp.ab || {}).length)) {
+  if (!is24 || (sp && Object.keys(sp.ab || {}).length) || (sub && Object.keys(sub.ab || {}).length) || (sp && sp.abChoice)) {
     addAb('Species', sp && sp.ab); addAb('Subspecies', sub && sub.ab);
     if (sp && sp.abChoice) addAb('Species choice', ch.spBonus);
   }
@@ -3202,7 +3202,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 12</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 13</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4787,8 +4787,7 @@ const mapCanEdit = () => isDMish() && !S.readOnly;
 function mapGeom(meta) {
   meta = meta || MAP.meta;
   if (!meta || !meta.w) return null;
-  const across = clamp(Math.round(+meta.across || 20), 2, 200);
-  const cell = meta.w / across;
+  const cell = +meta.cell >= 6 ? +meta.cell : meta.w / clamp(Math.round(+meta.across || 20), 2, 200);
   const ox = ((+meta.ox || 0) % cell + cell) % cell, oy = ((+meta.oy || 0) % cell + cell) % cell;
   const cols = Math.max(1, Math.ceil((meta.w - ox) / cell) + (ox > 0.5 ? 1 : 0));
   const rows = Math.max(1, Math.ceil((meta.h - oy) / cell) + (oy > 0.5 ? 1 : 0));
@@ -4875,9 +4874,69 @@ async function mapLoadImage(meta) {
 }
 
 /* ---------- uploading (DM) ---------- */
-function mapGuessAcross(w) {
-  for (const px of [140, 100, 70, 256, 200, 128, 50]) if (w % px === 0 && w / px >= 6 && w / px <= 80) return w / px;
-  return clamp(Math.round(w / 100), 8, 60);
+function mapGuessAcross(w) { return clamp(Math.round(w / 100), 8, 60); }
+
+/* Find the grid printed on a map picture. Thin dark lines leave regular peaks in how much "line"
+   each column and row holds; the spacing that repeats best is the square size, and where the peaks
+   fall is the offset. Returns null when the picture has no clear grid. */
+function mapDetectGrid(src) {
+  const W0 = src.width || src.naturalWidth, H0 = src.height || src.naturalHeight;
+  const k = Math.min(1, 1600 / Math.max(W0, H0)), w = Math.max(16, Math.round(W0 * k)), h = Math.max(16, Math.round(H0 * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(src, 0, 0, w, h);
+  const px = cx.getImageData(0, 0, w, h).data;
+  const L = new Float32Array(w * h);
+  for (let i = 0, j = 0; i < L.length; i++, j += 4) L[i] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+  const pX = new Float64Array(w), pY = new Float64Array(h), r = 2;
+  for (let y = r; y < h - r; y++) {
+    const row = y * w;
+    for (let x = r; x < w - r; x++) {
+      const v = L[row + x];
+      const ex = (L[row + x - r] + L[row + x + r]) / 2 - v; if (ex > 6) pX[x] += ex;
+      const ey = (L[row - r * w + x] + L[row + r * w + x]) / 2 - v; if (ey > 6) pY[y] += ey;
+    }
+  }
+  const axis = (P) => {
+    const n = P.length; let mean = 0; for (let i = 0; i < n; i++) mean += P[i]; mean /= n;
+    const Q = Float64Array.from(P, v => v - mean);
+    let r0 = 0; for (let i = 0; i < n; i++) r0 += Q[i] * Q[i]; if (r0 <= 0) return null;
+    const maxK = Math.min(Math.floor(n / 3), 420), R = new Float64Array(maxK + 2);
+    for (let kk = 6; kk <= maxK; kk++) { let s2 = 0; for (let i = 0; i + kk < n; i++) s2 += Q[i] * Q[i + kk]; R[kk] = s2 / r0 * n / (n - kk); }
+    let best = 0, bk = 0;
+    for (let kk = 7; kk < maxK; kk++) if (R[kk] > R[kk - 1] && R[kk] >= R[kk + 1] && R[kk] > best) { best = R[kk]; bk = kk; }
+    if (!bk || best < 0.12) return null;
+    /* the strongest repeat can be two or three squares; take the smallest spacing that repeats almost as well */
+    for (let m = 6; m >= 2; m--) { const kk = Math.round(bk / m); if (kk >= 7) { let loc = 0, lk = 0; for (let t = kk - 2; t <= kk + 2; t++) if (R[t] > loc) { loc = R[t]; lk = t; } if (loc >= best * 0.6) { bk = lk; best = loc; break; } } }
+    /* refine to a fraction of a pixel and find where the lines fall */
+    let bp = bk, bs = -Infinity, bo = 0;
+    for (let p = bk - 1.5; p <= bk + 1.5; p += 0.02) {
+      const steps = Math.floor(n / p);
+      for (let o = 0; o < p; o += 0.5) {
+        let s2 = 0; for (let i = 0; i <= steps; i++) { const x = Math.round(o + i * p); if (x < n) s2 += Q[x]; }
+        s2 /= steps + 1;
+        if (s2 > bs) { bs = s2; bp = p; bo = o; }
+      }
+    }
+    return { p: bp, o: bo, conf: best };
+  };
+  const ax = axis(pX), ay = axis(pY);
+  let gx = ax, gy = ay;
+  if (ax && ay && Math.abs(ax.p - ay.p) / Math.min(ax.p, ay.p) > 0.06) { if (ax.conf >= ay.conf) gy = null; else gx = null; }
+  if (!gx && !gy) return null;
+  const p = gx && gy ? (gx.p + gy.p) / 2 : (gx || gy).p;
+  const cell = p / k;
+  if (cell < 8 || W0 / cell < 3) return null;
+  return { cell, ox: gx ? gx.o / k : 0, oy: gy ? gy.o / k : 0, conf: Math.max(gx ? gx.conf : 0, gy ? gy.conf : 0) };
+}
+async function mapDetectNow(silent) {
+  if (!MAP.meta || !MAP.img || !mapCanEdit()) return;
+  const meta = MAP.meta;
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = MAP.img; });
+  let g = null; try { g = mapDetectGrid(img); } catch (e) { g = null; }
+  if (!MAP.meta || MAP.meta.id !== meta.id) return;
+  if (!g) { mapSaveMeta({ auto: 1 }); if (!silent) toastMsg('No clear grid found in the picture. Set “Squares across” and nudge it by hand.'); return; }
+  mapSaveMeta({ cell: +g.cell.toFixed(3), across: Math.round(meta.w / g.cell), ox: +g.ox.toFixed(2), oy: +g.oy.toFixed(2), lines: false, auto: 1 });
+  toastMsg(`Grid lined up with the picture: ${Math.round(meta.w / g.cell)} squares across.`);
 }
 async function mapUpload(file) {
   if (!file || !mapCanEdit()) return;
@@ -4893,17 +4952,22 @@ async function mapUpload(file) {
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       const cx = cv.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
       data = cv.toDataURL('image/jpeg', q);
-      if (data.length <= MAP_PART * MAP_MAXPARTS) { URL.revokeObjectURL(url); return await mapPublish(data, w, h, mapGuessAcross(ow), file.name); }
+      if (data.length <= MAP_PART * MAP_MAXPARTS) {
+        URL.revokeObjectURL(url);
+        MAP.busy = 'Looking for the grid in the picture…'; queueRender(); await new Promise(r => setTimeout(r, 30));
+        let grid = null; try { grid = mapDetectGrid(cv); } catch (e) { grid = null; }
+        return await mapPublish(data, w, h, grid, file.name);
+      }
       if (q > 0.6) q -= 0.12; else scale *= 0.8;
     }
     throw new Error('That picture is too large even after shrinking it.');
   } catch (e) { toastMsg((e && e.message) || 'The map could not be uploaded.'); }
   finally { MAP.busy = ''; queueRender(); }
 }
-async function mapPublish(data, w, h, across, fname) {
+async function mapPublish(data, w, h, grid, fname) {
   const id = uid('map');
   const parts = Math.ceil(data.length / MAP_PART);
-  const meta = { id, name: String(fname || 'Map').replace(/\.[a-z0-9]+$/i, '').slice(0, 60), w, h, across, ox: 0, oy: 0, lines: true, ft: 5, fog: false, reveal: '', rc: '', parts, at: Date.now() };
+  const meta = { id, name: String(fname || 'Map').replace(/\.[a-z0-9]+$/i, '').slice(0, 60), w, h, across: grid ? Math.round(w / grid.cell) : mapGuessAcross(w), cell: grid ? +grid.cell.toFixed(3) : 0, ox: grid ? +grid.ox.toFixed(2) : 0, oy: grid ? +grid.oy.toFixed(2) : 0, lines: !grid, auto: 1, ft: 5, fog: false, reveal: '', rc: '', parts, at: Date.now() };
   await MAPDB.put('img:' + id, data);
   if (S.mode === 'live') {
     for (let i = 0; i < parts; i++) {
@@ -4918,7 +4982,7 @@ async function mapPublish(data, w, h, across, fname) {
   MAP.meta = meta; MAP.img = data; MAP.imgId = id; MAP.view = null; MAP.sel = ''; MAP.tool = 'move';
   MAPDB.clearExcept('img:' + id);
   mapRepublish();
-  toastMsg(`Map ready. Set “Squares across” in Map settings so the grid matches the picture.`);
+  toastMsg(grid ? `Map ready. Found the picture's grid: ${Math.round(w / grid.cell)} squares across.` : `Map ready. No grid found in the picture, so check “Squares across” in Map settings.`);
 }
 async function mapRemove() {
   if (!mapCanEdit()) return;
@@ -5059,6 +5123,7 @@ function mapAfterRender() {
   el.toks.style.width = meta.w + 'px'; el.toks.style.height = meta.h + 'px';
   el.over.setAttribute('width', meta.w); el.over.setAttribute('height', meta.h); el.over.setAttribute('viewBox', `0 0 ${meta.w} ${meta.h}`);
   if (!MAP.view || MAP.view.id !== meta.id) mapFit(); else mapApplyView();
+  if (!meta.auto && !meta.cell && mapCanEdit() && !MAP.detecting) { MAP.detecting = meta.id; setTimeout(() => mapDetectNow(true).finally(() => { MAP.detecting = ''; }), 50); }
   mapDrawGrid(); mapDrawFog(); mapDrawTokens(); mapDrawOverlay();
 }
 function mapDrawGrid() {
@@ -5280,12 +5345,13 @@ function viewMap() {
   const G = meta ? mapGeom(meta) : null;
   const settings = meta && edit ? `<details class="panel mapset" data-k="mapset"><summary class="ph">Map settings</summary><div class="stack">
       <div class="grid3">
-        <label class="field"><span class="lbl">Squares across</span><input type="number" id="f-map-across" min="2" max="200" data-act="mapgrid" data-k="across" value="${esc(meta.across)}"></label>
+        <label class="field"><span class="lbl">Squares across</span><input type="number" id="f-map-across" min="2" max="200" step="0.5" data-act="mapgrid" data-k="across" value="${esc(+(meta.w / G.cell).toFixed(1))}"></label>
+        <label class="field"><span class="lbl">Square size (pixels)</span><input type="number" id="f-map-cell" min="6" max="1000" step="0.1" data-act="mapgrid" data-k="cell" value="${esc(+G.cell.toFixed(1))}"></label>
         <label class="field"><span class="lbl">Nudge grid right</span><input type="number" id="f-map-ox" step="1" data-act="mapgrid" data-k="ox" value="${esc(Math.round(+meta.ox || 0))}"></label>
         <label class="field"><span class="lbl">Nudge grid down</span><input type="number" id="f-map-oy" step="1" data-act="mapgrid" data-k="oy" value="${esc(Math.round(+meta.oy || 0))}"></label>
         <label class="field"><span class="lbl">Feet per square</span><input type="number" id="f-map-ft" min="1" max="100" data-act="mapgrid" data-k="ft" value="${esc(meta.ft || 5)}"></label>
       </div>
-      <span class="small muted">Count the squares along the top edge of your picture and type that number. The grid is ${G.cols} × ${G.rows} squares, each ${Math.round(G.cell)} pixels.</span>
+      <div class="row"><button class="btn sm" data-act="mapdetect">Find the grid in the picture</button><span class="small muted">Or count the squares along the top edge and type that number, then nudge until the lines sit on the picture's lines. The grid is ${G.cols} × ${G.rows} squares.</span></div>
       <div class="row"><label class="chk"><input type="checkbox" data-act="mapgrid" data-k="lines"${meta.lines !== false ? ' checked' : ''}> Draw grid lines</label>
         <label class="chk"><input type="checkbox" data-act="mapgrid" data-k="fog"${meta.fog ? ' checked' : ''}> Fog of war</label></div>
       ${meta.fog ? `<div class="row"><button class="btn sm" data-act="mapfogall" data-v="1">Reveal everything</button><button class="btn sm" data-act="mapfogall" data-v="0">Cover everything</button><span class="small muted">Then use Reveal and Hide on the toolbar.</span></div>` : ''}
@@ -5336,10 +5402,12 @@ Object.assign(ACT, {
     const k = el.dataset.k; if (!MAP.meta) return;
     if (k === 'lines' || k === 'fog') { const p = { [k]: !!el.checked }; if (k === 'fog' && el.checked && !MAP.meta.reveal) { const G = mapGeom(); p.reveal = mapBitsEncode(new Uint8Array(Math.ceil(G.cols * G.rows / 8))); p.rc = G.cols + 'x' + G.rows; } if (k === 'fog' && !el.checked && (MAP.tool === 'reveal' || MAP.tool === 'hide')) MAP.tool = 'move'; mapSaveMeta(p); return; }
     let v = +el.value; if (!isFinite(v)) return;
-    if (k === 'across') v = clamp(Math.round(v), 2, 200);
+    if (k === 'across') { v = clamp(v, 2, 200); mapSaveMeta({ across: Math.round(v), cell: +(MAP.meta.w / v).toFixed(3) }); return; }
+    if (k === 'cell') { v = clamp(v, 6, 1000); mapSaveMeta({ cell: v, across: Math.round(MAP.meta.w / v) }); return; }
     if (k === 'ft') v = clamp(Math.round(v), 1, 100);
     mapSaveMeta({ [k]: v });
   },
+  mapdetect() { mapDetectNow(false); },
   mapfogall(el) {
     const G = mapGeom(); const arr = new Uint8Array(Math.ceil(G.cols * G.rows / 8));
     if (el.dataset.v === '1') for (let i = 0; i < G.cols * G.rows; i++) bitSet(arr, i, true);
