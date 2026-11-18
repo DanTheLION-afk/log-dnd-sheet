@@ -362,6 +362,64 @@ button.vital:hover { border-color: var(--accent); }
   .sheet .sec.sec-top, .sheet[data-sec="actions"] .sec-actions, .sheet[data-sec="spells"] .sec-spells, .sheet[data-sec="skills"] .sec-skills, .sheet[data-sec="features"] .sec-features, .sheet[data-sec="gear"] .sec-gear, .sheet[data-sec="notes"] .sec-notes { display: flex; }
 }
 
+
+/* Build 11: battle map. The board keeps a dark backdrop in both themes so map art reads the same everywhere. */
+.maplay { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; align-items: start; }
+@media (max-width: 960px) { .maplay { grid-template-columns: minmax(0, 1fr); } }
+.mapmain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.mapbar { margin-bottom: 10px; }
+.mapmount { position: relative; height: calc(100dvh - 230px); min-height: 420px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #1a201d; }
+.mapmount.tv { height: calc(100dvh - 86px); border-radius: 0; border: 0; }
+@media (max-width: 960px) { .mapmount { height: 62dvh; min-height: 340px; } }
+.mapempty { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; color: #dfe7e2; z-index: 2; }
+.mapempty .muted { color: #a8b7b0; }
+.mapempty h3 { font-family: var(--f-display); font-size: 22px; }
+.mapview { position: absolute; inset: 0; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; overflow: hidden; }
+.mapview:active { cursor: grabbing; }
+.mapview.tool-measure, .mapview.tool-reveal, .mapview.tool-hide, .mapview.placing { cursor: crosshair; }
+.mapview.drop { outline: 3px dashed var(--accent); outline-offset: -6px; }
+.mapstage { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.mapstage .mapimg, .mapstage canvas { position: absolute; left: 0; top: 0; display: block; max-width: none; pointer-events: none; }
+.maptoks { position: absolute; left: 0; top: 0; }
+.mapover { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.mapover .ruler { stroke: #f4c95d; stroke-linecap: round; stroke-dasharray: 0.01 1.6; fill: none; }
+.mapover .ruler.path { stroke: #ffffff; opacity: .85; }
+.mapover .rdot { fill: #f4c95d; }
+.mapover .fogsel { fill: rgba(91, 194, 166, .18); stroke: #5bc2a6; }
+.mapover .fogsel.hide { fill: rgba(0, 0, 0, .35); stroke: #e7716c; }
+.mapover .ping circle { fill: none; stroke: #f4c95d; transform-box: fill-box; transform-origin: center; animation: mapping 1.2s ease-out infinite; }
+.mapover .ping circle.pc { fill: #f4c95d; stroke: none; animation: none; }
+.mapover .ping text { fill: #ffffff; paint-order: stroke; stroke: #000; stroke-width: 3px; text-anchor: middle; font-family: var(--f-label); font-weight: 700; }
+@keyframes mapping { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mapover .ping circle { animation: none; } }
+.maphud { position: absolute; z-index: 4; background: #16201c; color: #f3f6f4; font-family: var(--f-label); font-weight: 700; font-size: 15px; padding: 2px 10px; border-radius: 99px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+
+.tok { position: absolute; box-sizing: border-box; border-radius: 50%; border-style: solid; display: grid; place-items: center; font-family: var(--f-label); font-weight: 700; line-height: 1; color: #10221c; background: #cfe9df; border-color: #22705e; box-shadow: 0 2px 6px rgba(0,0,0,.45); transition: left .18s ease, top .18s ease, box-shadow .15s; }
+.tok.movable { cursor: grab; }
+.tok.mon { background: #f3d2cf; border-color: #a33a34; color: #3a1210; }
+.tok.mine { background: #ffffff; }
+.tok.cur { box-shadow: 0 0 0 .14em #f4c95d, 0 0 .9em .2em rgba(244, 201, 93, .75); }
+.tok.sel { outline: .09em dashed #ffffff; outline-offset: .12em; }
+.tok.hid { opacity: .55; border-style: dashed; }
+.tok.down { filter: grayscale(1); opacity: .6; }
+.tok.down .tl::after { content: "×"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.6em; color: #a33a34; }
+.tok.drag { transition: none; cursor: grabbing; z-index: 5; box-shadow: 0 8px 18px rgba(0,0,0,.55); }
+.tok .tl { position: relative; pointer-events: none; }
+.tok .thp { position: absolute; left: 12%; right: 12%; bottom: -.38em; height: .2em; border-radius: 99px; background: rgba(0,0,0,.55); overflow: hidden; pointer-events: none; }
+.tok .thp b { display: block; height: 100%; background: #3fa65a; }
+.tok .thp b.mid { background: #e2a64b; }
+.tok .thp b.low { background: #e7716c; }
+.tok .tc { position: absolute; top: -.25em; right: -.25em; min-width: 1.05em; height: 1.05em; padding: 0 .2em; border-radius: 99px; background: #a33a34; color: #fff; font-size: .6em; display: grid; place-items: center; pointer-events: none; }
+.tok .tn { position: absolute; top: calc(100% + .45em); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: .55em; color: #fff; background: rgba(0,0,0,.72); padding: .15em .45em; border-radius: .3em; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.tok:hover .tn, .tok.sel .tn, .tok.cur .tn, .tok.drag .tn { opacity: 1; }
+.maptray .panel { padding: 12px 14px; }
+.mapturn { border-color: #b8902e; }
+.mapset summary { cursor: pointer; margin-bottom: 0; }
+.mapset[open] summary { margin-bottom: 10px; }
+.tdot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-label); font-weight: 700; font-size: 12px; border: 2px solid var(--accent); background: var(--accent-soft); color: var(--accent); flex: none; }
+.tdot.mon { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
+.maphelp { margin: 0; }
+.tvwrap { max-width: none; padding: 0; }
 </style>
 </head>
 <body>
@@ -1617,6 +1675,7 @@ async function startLive({ db, user, room, dl }, onChange) {
     onChange('packs');
   }, () => {});
   subscribeDM(onChange);
+  mapSubscribe(db, onChange);
   if (room) {
     try {
       room.on('roll', msg => {
@@ -1730,7 +1789,8 @@ function fselect(o) {
 /* ===== top bar ===== */
 function viewBar() {
   if (UI.view === 'table') return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Table display</span></div></div></header>`;
-  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  if (UI.view === 'map' && MAP.tv) return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Battle map · what players see</span></div><span class="spacer"></span><button class="btn sm" data-act="mapzoom" data-v="fit">Fit</button></div></header>`;
+  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].concat(isDMish() ? [['campaign', 'Campaign']] : []);
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
@@ -3137,12 +3197,13 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 10</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 11</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
   const app = document.getElementById('app');
   if (!app) return;
+  if (typeof mapBusy === 'function' && mapBusy()) { MAP.later = true; return; }
   const a = document.activeElement;
   const inApp = !!(a && app.contains(a));
   const fid = inApp && a.id ? a.id : null;
@@ -3160,12 +3221,13 @@ function render() {
   const scrollers = Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).map(el => el.scrollTop + ':' + el.scrollLeft);
   let body;
   try {
-    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : viewChars();
+    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : UI.view === 'map' ? viewMap() : viewChars();
   } catch (err) {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
   }
-  app.innerHTML = viewBar() + `<main class="wrap">${body}</main>` + (typeof installNote === 'function' ? installNote() : '') + FOOTER;
+  app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER);
+  try { mapAfterRender(); } catch (err) { console.error(err); }
   Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).forEach((el, i) => { const v = scrollers[i]; if (v) { const [t, l] = v.split(':'); el.scrollTop = +t; el.scrollLeft = +l; } });
   for (const id of Object.keys(keep)) {
     const el = document.getElementById(id);
@@ -3252,7 +3314,7 @@ function addImportedChar(o) {
 function getD(ch) { return derive(ch); }
 
 const MODALS = {};   // extra dialogs registered by other files
-const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table'];
+const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map'];
 const ACT = {
   view(el) { UI.view = el.dataset.v; if (!UI.fromUrl) LS.set('view', UI.view); queueRender(); window.scrollTo(0, 0); },
   open(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; LS.set('cur', UI.cur); UI.startSel = {}; UI.pk = {}; UI.flt = {}; queueRender(); },
@@ -3638,6 +3700,7 @@ function onChange(ev) {
     if (fn) fn(el, ev);
   }
   if (el.id === 'f-files' || el.id === 'f-folder') readImportFiles(el.files);
+  if (el.id === 'f-mapfile' && el.files && el.files[0]) { mapUpload(el.files[0]); el.value = ''; }
 }
 function onClick(ev) {
   const el = ev.target.closest('[data-act]');
@@ -3682,6 +3745,7 @@ function boot() {
   document.addEventListener('keydown', onKey);
   let qv = ''; try { qv = new URLSearchParams(location.search).get('v') || ''; } catch (e) { }
   if (VIEWS.includes(qv)) { UI.view = qv; UI.fromUrl = true; }
+  try { if (qv === 'map' && new URLSearchParams(location.search).get('pv') === '1') { MAP.tv = true; MAP.asPlayer = true; } } catch (e) { }
   if (UI.view === 'init') UI.view = 'combat';
   if (!VIEWS.includes(UI.view) || (UI.view === 'table' && !UI.fromUrl)) UI.view = 'chars';
   UI.priv = !!LS.get('priv', false);
@@ -3712,7 +3776,7 @@ function publicCombat(cb) {
   return {
     round: cb.round || 1, cur: cur && !cur.hidden ? cur.id : null, unseen: !!(cur && cur.hidden),
     list: cb.list.filter(c => !c.hidden).map(c => c.kind === 'mon'
-      ? { id: c.id, kind: 'mon', name: c.name, init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [] }
+      ? { id: c.id, kind: 'mon', name: c.name, init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [], sz: monSize(c), pos: mapPubPos(c) }
       : { id: c.id, kind: 'pc', name: c.name, init: c.init == null ? null : c.init, cid: c.cid, owner: c.owner }),
   };
 }
@@ -3794,6 +3858,7 @@ function logLine(m) {
 }
 function handleMsg(m) {
   if (!m || typeof m !== 'object') return;
+  if (m.kind === 'ping') { if (!m.old) mapPing(m); return; }
   S.log.unshift(logLine(m)); S.log = S.log.slice(0, 150);
   if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note') showRoll(S.log[0]);
   if (m.kind === 'res' && !m.old) { toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); } }
@@ -4382,7 +4447,7 @@ function viewCampaign() {
     ${hand.map(h => `<div class="row"><b class="grow">${esc(h.title || 'Handout')}</b><button class="btn ghost sm danger" data-act="hodel" data-v="${esc(h.id)}">Remove</button></div>`).join('') || '<span class="small muted">Nothing shared yet. Handouts appear at the top of every player’s Party tab.</span>'}
     <input type="text" id="f-hot" placeholder="Title, e.g. The letter from Baron Vey"><textarea id="f-hox" placeholder="Text the players can read"></textarea><button class="btn" data-act="hoadd" style="align-self:flex-start">Share handout</button></div>`;
   const notes = `<div class="panel stack"><h3>Private DM notes</h3><textarea id="f-dmnotes" style="min-height:180px" placeholder="Only you can read these.">${esc((S.dm || {}).notes || '')}</textarea><span class="small muted">Saved a moment after you stop typing.${live ? ' Stored where only the DM can read.' : ''}</span></div>`;
-  const windows = window.PL_SITE ? `<div class="panel stack"><h3>More windows</h3><div class="row">${[['combat', 'Combat screen'], ['party', 'Party'], ['log', 'Dice log'], ['table', 'Table display for players']].map(([k, l]) => `<a class="btn" href="?v=${k}${location.hash}" target="_blank" rel="noopener">${l}</a>`).join('')}</div><span class="small muted">Each opens in its own window and stays in sync. The table display shows the turn order with nothing secret on it, for a TV or shared screen.</span></div>` : '';
+  const windows = window.PL_SITE ? `<div class="panel stack"><h3>More windows</h3><div class="row">${[['combat', 'Combat screen'], ['party', 'Party'], ['log', 'Dice log'], ['table', 'Table display for players'], ['map&pv=1', 'Battle map for a TV']].map(([k, l]) => `<a class="btn" href="?v=${k}${location.hash}" target="_blank" rel="noopener">${l}</a>`).join('')}</div><span class="small muted">Each opens in its own window and stays in sync. The table display shows the turn order with nothing secret on it, for a TV or shared screen.</span></div>` : '';
   return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Campaign</h2>${S.campaign ? `<span class="pill">${esc(S.campaign.name || '')}</span>` : ''}</div><div class="grid2" style="align-items:start"><div class="stack">${rules}${sheets}</div><div class="stack">${windows}${notes}${handouts}</div></div>`;
 }
 let dmNotesTimer = null;
@@ -4680,6 +4745,603 @@ pwaBoot();
 'use strict';
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
+'use strict';
+/* ===== battle map =====
+   campaign/map (everyone reads, the DM writes): { id, name, w, h, across, ox, oy, lines, ft, fog, reveal, rc, parts }
+   campaign/mapimg-<i> (same rules): the picture, cut into pieces small enough for one stored document each.
+   Monsters keep their square on the DM's fight (c.pos) and reach players through the public turn order,
+   minus hidden monsters and anything still under fog. Player characters keep theirs in play.pos, which each
+   player may write, so players move their own tokens without the DM's device having to be open. */
+const MAP = { meta: null, img: '', imgId: '', loading: '', sel: '', tool: 'move', placing: '', view: null, el: null, pings: [], asPlayer: false, tv: false, unsub: null, localBooted: false, g: null, later: false, gridKey: '', fogKey: '' };
+const MAP_PART = 900000, MAP_MAXPARTS = 4, MAP_MAXDIM = 2400;
+const MAP_SIZES = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
+const MAP_HEALTH = { Healthy: 100, Hurt: 72, Bloodied: 45, Critical: 18, Down: 0 };
+
+/* a separate small database for map pictures, so they never mix with homebrew */
+const MAPDB = {
+  _db: null,
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('party-ledger-maps', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('img');
+        r.onsuccess = () => { this._db = r.result; res(this._db); };
+        r.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+  },
+  async get(k) { const db = await this.open(); if (!db) return null; return new Promise(res => { try { const r = db.transaction('img').objectStore('img').get(k); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); } }); },
+  async put(k, v) { const db = await this.open(); if (!db) return; return new Promise(res => { try { const tx = db.transaction('img', 'readwrite'); tx.objectStore('img').put(v, k); tx.oncomplete = () => res(); tx.onerror = () => res(); } catch (e) { res(); } }); },
+  async clearExcept(keep) { const db = await this.open(); if (!db) return; try { const st = db.transaction('img', 'readwrite').objectStore('img'); const r = st.openCursor(); r.onsuccess = e => { const c = e.target.result; if (!c) return; if (c.key !== keep) c.delete(); c.continue(); }; } catch (e) { } },
+};
+
+/* ---------- state ---------- */
+const mapIsDM = () => isDMish() && !MAP.asPlayer;
+const mapCanEdit = () => isDMish() && !S.readOnly;
+function mapGeom(meta) {
+  meta = meta || MAP.meta;
+  if (!meta || !meta.w) return null;
+  const across = clamp(Math.round(+meta.across || 20), 2, 200);
+  const cell = meta.w / across;
+  const ox = ((+meta.ox || 0) % cell + cell) % cell, oy = ((+meta.oy || 0) % cell + cell) % cell;
+  const cols = Math.max(1, Math.ceil((meta.w - ox) / cell) + (ox > 0.5 ? 1 : 0));
+  const rows = Math.max(1, Math.ceil((meta.h - oy) / cell) + (oy > 0.5 ? 1 : 0));
+  const sx = ox > 0.5 ? ox - cell : ox, sy = oy > 0.5 ? oy - cell : oy;   // where column 0 / row 0 start
+  return { cell, cols, rows, sx, sy, ft: +meta.ft || 5 };
+}
+function mapBits(meta, G) {
+  meta = meta || MAP.meta; G = G || mapGeom(meta);
+  const n = G.cols * G.rows, out = new Uint8Array(Math.ceil(n / 8));
+  if (!meta.reveal || meta.rc !== G.cols + 'x' + G.rows) return out;
+  try { const bin = atob(meta.reveal); for (let i = 0; i < Math.min(bin.length, out.length); i++) out[i] = bin.charCodeAt(i); } catch (e) { }
+  return out;
+}
+function mapBitsEncode(arr) { let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]); return btoa(s); }
+const bitGet = (arr, i) => !!(arr[i >> 3] & (1 << (i & 7)));
+function bitSet(arr, i, on) { if (on) arr[i >> 3] |= (1 << (i & 7)); else arr[i >> 3] &= ~(1 << (i & 7)); }
+function mapSeen(cx, cy) {
+  const meta = MAP.meta; if (!meta || !meta.fog) return true;
+  const G = mapGeom(meta); if (cx < 0 || cy < 0 || cx >= G.cols || cy >= G.rows) return false;
+  return bitGet(mapBits(meta, G), cy * G.cols + cx);
+}
+function monSize(c) { const d = monDef(c); return (d && MAP_SIZES[String(d.size || '').toLowerCase().split(' ')[0]]) || 1; }
+/* what the public turn order may say about a monster's square */
+function mapPubPos(c) {
+  const meta = MAP.meta, p = c && c.pos;
+  if (!meta || !p || p.m !== meta.id) return null;
+  const sz = monSize(c), h = Math.floor(sz / 2);
+  if (meta.fog && !mapSeen(p.x + h, p.y + h)) return null;
+  return { m: p.m, x: p.x, y: p.y };
+}
+function mapSaveMeta(patch, quick) {
+  if (!mapCanEdit() || !MAP.meta) return;
+  MAP.meta = Object.assign({}, MAP.meta, patch);
+  if (S.mode === 'live') queueWrite('campaign/map', patch, quick ? 120 : 350);
+  else LS.set('map', MAP.meta);
+  if ('reveal' in patch || 'fog' in patch || 'across' in patch || 'ox' in patch || 'oy' in patch) mapRepublish();
+  queueRender();
+}
+/* fog or grid changed: refresh what players may know about monster squares */
+function mapRepublish() { if (isDMish() && S.mode === 'live' && S.me.isOwner) { const cb = cbt(); if (cb.list.length) saveInit(publicCombat(cb)); } }
+
+/* ---------- loading ---------- */
+function mapBootLocal() {
+  if (MAP.localBooted || S.mode === 'live' || S.mode === 'starting') return;
+  MAP.localBooted = true;
+  MAP.meta = LS.get('map', null);
+  if (MAP.meta) mapLoadImage(MAP.meta);
+}
+function mapSubscribe(db, onChange) {
+  if (MAP.unsub) { try { MAP.unsub(); } catch (e) { } }
+  MAP.localBooted = true;
+  MAP.unsub = db.doc('campaign/map').onSnapshot(snap => {
+    const q = WQ['campaign/map'];
+    let d = snap.exists ? clone(snap.data()) : null;
+    if (d && q && (q.pending || q.inflight)) d = deepMerge(d, deepMerge(clone(q.inflight || {}), clone(q.pending || {})));
+    if (d && !d.id) d = null;
+    MAP.meta = d;
+    if (d) { S.known['campaign/map'] = true; mapLoadImage(d); }
+    onChange('map');
+  }, () => { });
+}
+async function mapLoadImage(meta) {
+  if (!meta || !meta.id || MAP.imgId === meta.id || MAP.loading === meta.id) return;
+  MAP.loading = meta.id;
+  try {
+    let d = await MAPDB.get('img:' + meta.id);
+    if (!d && S.mode === 'live' && S.db) {
+      const parts = [];
+      for (let i = 0; i < (+meta.parts || 1); i++) {
+        const g = await S.db.doc('campaign/mapimg-' + i).get();
+        const v = g.exists ? g.data() : null;
+        if (!v || v.id !== meta.id) throw new Error('The map picture is still uploading.');
+        parts.push(v.d || '');
+      }
+      d = parts.join('');
+      MAPDB.put('img:' + meta.id, d); MAPDB.clearExcept('img:' + meta.id);
+    }
+    if (!d) throw new Error('The map picture is missing on this device.');
+    if (MAP.meta && MAP.meta.id === meta.id) { MAP.img = d; MAP.imgId = meta.id; }
+  } catch (e) {
+    MAP.err = (e && e.message) || 'The map picture could not be loaded.';
+    setTimeout(() => { if (MAP.meta && MAP.meta.id === meta.id && MAP.imgId !== meta.id) { MAP.loading = ''; mapLoadImage(MAP.meta); } }, 4000);
+  } finally { if (MAP.loading === meta.id) MAP.loading = ''; queueRender(); }
+}
+
+/* ---------- uploading (DM) ---------- */
+function mapGuessAcross(w) {
+  for (const px of [140, 100, 70, 256, 200, 128, 50]) if (w % px === 0 && w / px >= 6 && w / px <= 80) return w / px;
+  return clamp(Math.round(w / 100), 8, 60);
+}
+async function mapUpload(file) {
+  if (!file || !mapCanEdit()) return;
+  if (!/^image\//.test(file.type || '') && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name || '')) { toastMsg('That isn’t a picture. Use a PNG, JPG or WebP map.'); return; }
+  MAP.busy = 'Preparing the map…'; queueRender();
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That picture could not be opened.')); i.src = url; });
+    const ow = img.naturalWidth, oh = img.naturalHeight;
+    let scale = Math.min(1, MAP_MAXDIM / Math.max(ow, oh)), q = 0.85, data = '';
+    for (let tries = 0; tries < 8; tries++) {
+      const w = Math.max(1, Math.round(ow * scale)), h = Math.max(1, Math.round(oh * scale));
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
+      data = cv.toDataURL('image/jpeg', q);
+      if (data.length <= MAP_PART * MAP_MAXPARTS) { URL.revokeObjectURL(url); return await mapPublish(data, w, h, mapGuessAcross(ow), file.name); }
+      if (q > 0.6) q -= 0.12; else scale *= 0.8;
+    }
+    throw new Error('That picture is too large even after shrinking it.');
+  } catch (e) { toastMsg((e && e.message) || 'The map could not be uploaded.'); }
+  finally { MAP.busy = ''; queueRender(); }
+}
+async function mapPublish(data, w, h, across, fname) {
+  const id = uid('map');
+  const parts = Math.ceil(data.length / MAP_PART);
+  const meta = { id, name: String(fname || 'Map').replace(/\.[a-z0-9]+$/i, '').slice(0, 60), w, h, across, ox: 0, oy: 0, lines: true, ft: 5, fog: false, reveal: '', rc: '', parts, at: Date.now() };
+  await MAPDB.put('img:' + id, data);
+  if (S.mode === 'live') {
+    for (let i = 0; i < parts; i++) {
+      MAP.busy = `Uploading the map (${i + 1} of ${parts})…`; queueRender();
+      await S.db.doc('campaign/mapimg-' + i).set({ id, i, d: data.slice(i * MAP_PART, (i + 1) * MAP_PART) });
+    }
+    for (let i = parts; i < MAP_MAXPARTS; i++) S.db.doc('campaign/mapimg-' + i).delete().catch(() => { });
+    delete WQ['campaign/map'];
+    await S.db.doc('campaign/map').set(meta);
+    S.known['campaign/map'] = true;
+  } else LS.set('map', meta);
+  MAP.meta = meta; MAP.img = data; MAP.imgId = id; MAP.view = null; MAP.sel = ''; MAP.tool = 'move';
+  MAPDB.clearExcept('img:' + id);
+  mapRepublish();
+  toastMsg(`Map ready. Set “Squares across” in Map settings so the grid matches the picture.`);
+}
+async function mapRemove() {
+  if (!mapCanEdit()) return;
+  if (S.mode === 'live') {
+    delete WQ['campaign/map'];
+    await S.db.doc('campaign/map').set({ id: null, removed: Date.now() }).catch(() => { });
+    for (let i = 0; i < MAP_MAXPARTS; i++) S.db.doc('campaign/mapimg-' + i).delete().catch(() => { });
+  } else LS.set('map', null);
+  MAP.meta = null; MAP.img = ''; MAP.imgId = ''; MAP.sel = ''; MAP.view = null;
+  mapRepublish(); queueRender();
+}
+
+/* ---------- tokens ---------- */
+function mapLabel(name) { const w = String(name || '?').trim().split(/\s+/); return ((w[0] || '?')[0] + (w.length > 1 ? (w[w.length - 1] || '')[0] : (w[0] || '').slice(1, 2))).toUpperCase(); }
+function mapTokens() {
+  const meta = MAP.meta; if (!meta) return [];
+  const out = [], dm = mapIsDM(), canAll = mapCanEdit();
+  const I = S.init || { list: [] };
+  const turnList = isDMish() ? cbt().list : (I.list || []);
+  const curId = isDMish() ? cbt().cur : I.cur;
+  const curEntry = turnList.find(c => c.id === curId);
+  const at = p => (p && p.m === meta.id ? { x: +p.x || 0, y: +p.y || 0 } : null);
+  for (const x of chars()) {
+    const ch = x.ch; const D = derive(ch);
+    const hp = hpOf(ch, D);
+    out.push({
+      key: 'pc|' + x.owner + '|' + ch.id, kind: 'pc', name: ch.name || 'Adventurer', who: playerName(x.owner), pos: at(ch.play.pos), sz: 1,
+      canMove: !S.readOnly && (canAll || x.owner === S.me.id || S.mode !== 'live'), mine: x.mine,
+      cur: !!(curEntry && curEntry.kind === 'pc' && curEntry.cid === ch.id), pct: D.maxHp ? clamp(hp / D.maxHp * 100, 0, 100) : 100,
+      down: hp <= 0, conds: ch.play.cond || [], hpText: hp + ' / ' + D.maxHp, ac: D.ac,
+    });
+  }
+  if (isDMish()) {
+    for (const c of cbt().list) {
+      if (c.kind !== 'mon') continue;
+      if (MAP.asPlayer && (c.hidden || !mapPubPos(c))) { if (c.hidden || (c.pos && c.pos.m === meta.id)) continue; }
+      out.push({ key: c.id, kind: 'mon', name: c.name, pos: at(c.pos), sz: monSize(c), canMove: canAll, cur: c.id === curId, hidden: !!c.hidden,
+        pct: c.max ? clamp((+c.hp || 0) / c.max * 100, 0, 100) : 100, down: c.hp != null && c.hp <= 0, conds: c.cond || [],
+        hpText: c.hp == null ? '' : c.hp + ' / ' + c.max, ac: c.ac, st: healthWord(c) });
+    }
+  } else {
+    for (const c of I.list || []) {
+      if (c.kind !== 'mon' || !c.pos) continue;
+      out.push({ key: c.id, kind: 'mon', name: c.name, pos: at(c.pos), sz: +c.sz || 1, canMove: false, cur: c.id === curId,
+        pct: MAP_HEALTH[c.st] == null ? 100 : MAP_HEALTH[c.st], down: c.st === 'Down', conds: c.cond || [], st: c.st || '' });
+    }
+  }
+  return out;
+}
+function mapTok(key) { return mapTokens().find(t => t.key === key) || null; }
+function mapMove(t, x, y) {
+  const meta = MAP.meta; if (!meta || !t || !t.canMove) return;
+  const G = mapGeom(meta);
+  const pos = t.kind === 'off' ? null : { m: meta.id, x: clamp(Math.round(x), 0, Math.max(0, G.cols - t.sz)), y: clamp(Math.round(y), 0, Math.max(0, G.rows - t.sz)) };
+  if (t.kind === 'pc' || t.kind === 'pcoff') {
+    const [, owner, cid] = t.key.split('|'); const x2 = findChar(cid, owner); if (!x2) return;
+    savePlay(x2.ch, { pos });
+  } else {
+    const cb = cbt(), c = cb.list.find(c => c.id === t.key); if (!c) return;
+    c.pos = pos; saveCombat(cb);
+  }
+  queueRender();
+}
+function mapOff(key) {
+  const t = mapTok(key); if (!t || !t.canMove) return;
+  if (t.kind === 'pc') { const [, owner, cid] = key.split('|'); const x = findChar(cid, owner); if (x) savePlay(x.ch, { pos: null }); }
+  else { const cb = cbt(), c = cb.list.find(c => c.id === key); if (c) { c.pos = null; saveCombat(cb); } }
+  if (MAP.sel === key) MAP.sel = '';
+  queueRender();
+}
+/* first free square near a point, so dropped tokens don't stack */
+function mapFree(cx, cy, sz, taken) {
+  const G = mapGeom(); const ok = (x, y) => { if (x < 0 || y < 0 || x + sz > G.cols || y + sz > G.rows) return false; for (let i = 0; i < sz; i++) for (let j = 0; j < sz; j++) if (taken.has((x + i) + ',' + (y + j))) return false; return true; };
+  for (let r = 0; r < 30; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    if (ok(cx + dx, cy + dy)) return { x: cx + dx, y: cy + dy };
+  }
+  return { x: clamp(cx, 0, G.cols - 1), y: clamp(cy, 0, G.rows - 1) };
+}
+function mapTaken(except) { const s = new Set(); for (const t of mapTokens()) if (t.pos && t.key !== except) for (let i = 0; i < t.sz; i++) for (let j = 0; j < t.sz; j++) s.add((t.pos.x + i) + ',' + (t.pos.y + j)); return s; }
+function mapCenterCell() {
+  const G = mapGeom(); const el = MAP.el, v = MAP.view;
+  if (!el || !v) return { x: Math.floor(G.cols / 2), y: Math.floor(G.rows / 2) };
+  const r = el.root.getBoundingClientRect();
+  const ix = (r.width / 2 - v.tx) / v.s, iy = (r.height / 2 - v.ty) / v.s;
+  return { x: Math.floor((ix - G.sx) / G.cell), y: Math.floor((iy - G.sy) / G.cell) };
+}
+
+/* ---------- the drawing surface (built once, kept across redraws) ---------- */
+function mapBusy() { return !!MAP.g; }
+function mapEnsureEl() {
+  if (MAP.el) return MAP.el;
+  const root = document.createElement('div'); root.className = 'mapview';
+  root.innerHTML = `<div class="mapstage"><img class="mapimg" alt="" draggable="false"><canvas class="mapgrid"></canvas><canvas class="mapfog"></canvas><div class="maptoks"></div><svg class="mapover" xmlns="http://www.w3.org/2000/svg"></svg></div><div class="maphud" hidden></div>`;
+  const el = { root, stage: root.querySelector('.mapstage'), img: root.querySelector('.mapimg'), grid: root.querySelector('.mapgrid'), fog: root.querySelector('.mapfog'), toks: root.querySelector('.maptoks'), over: root.querySelector('.mapover'), hud: root.querySelector('.maphud'), tokEls: new Map() };
+  MAP.el = el;
+  root.addEventListener('pointerdown', mapDown);
+  root.addEventListener('wheel', e => { e.preventDefault(); const f = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)); mapZoomAt(e.clientX, e.clientY, f); }, { passive: false });
+  root.addEventListener('dblclick', e => { if (e.target.closest('.tok') || !MAP.meta) return; const p = mapToImg(e.clientX, e.clientY); mapSendPing(p.x, p.y); });
+  root.addEventListener('dragover', e => { if (mapCanEdit()) { e.preventDefault(); root.classList.add('drop'); } });
+  root.addEventListener('dragleave', () => root.classList.remove('drop'));
+  root.addEventListener('drop', e => { root.classList.remove('drop'); if (!mapCanEdit()) return; e.preventDefault(); const f = (e.dataTransfer.files || [])[0]; if (f) mapUpload(f); });
+  root.addEventListener('contextmenu', e => e.preventDefault());
+  /* a fitted map stays fitted when the window or phone turns */
+  try { new ResizeObserver(() => { if (MAP.view && MAP.view.fitted && root.isConnected) mapFit(); }).observe(root); } catch (e) { }
+  return el;
+}
+function mapToImg(cx, cy) { const r = MAP.el.root.getBoundingClientRect(), v = MAP.view; return { x: (cx - r.left - v.tx) / v.s, y: (cy - r.top - v.ty) / v.s }; }
+function mapCellOf(p) { const G = mapGeom(); return { x: Math.floor((p.x - G.sx) / G.cell), y: Math.floor((p.y - G.sy) / G.cell) }; }
+function mapApplyView() { const v = MAP.view; if (v && MAP.el) MAP.el.stage.style.transform = `translate(${v.tx}px, ${v.ty}px) scale(${v.s})`; }
+function mapFit() {
+  const meta = MAP.meta, el = MAP.el; if (!meta || !el) return;
+  const r = el.root.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const s = Math.min(r.width / meta.w, r.height / meta.h) * 0.98;
+  MAP.view = { id: meta.id, s, tx: (r.width - meta.w * s) / 2, ty: (r.height - meta.h * s) / 2, fitted: true };
+  mapApplyView();
+}
+function mapZoomAt(cx, cy, f) {
+  if (!MAP.view || !MAP.el) return;
+  const r = MAP.el.root.getBoundingClientRect(), v = MAP.view;
+  const s = clamp(v.s * f, 0.05, 8); const k = s / v.s;
+  const px = cx - r.left, py = cy - r.top;
+  v.tx = px - (px - v.tx) * k; v.ty = py - (py - v.ty) * k; v.s = s; v.fitted = false;
+  mapApplyView();
+}
+function mapAfterRender() {
+  const mount = document.getElementById('mapmount');
+  if (!mount) return;
+  mapBootLocal();
+  const el = mapEnsureEl();
+  if (el.root.parentNode !== mount) mount.appendChild(el.root);
+  el.root.className = 'mapview tool-' + MAP.tool + (MAP.placing ? ' placing' : '');
+  const meta = MAP.meta;
+  el.stage.hidden = !meta || !MAP.img;
+  if (!meta || !MAP.img) return;
+  if (el.img.dataset.id !== meta.id) { el.img.src = MAP.img; el.img.dataset.id = meta.id; }
+  for (const c of [el.img, el.grid, el.fog]) { c.style.width = meta.w + 'px'; c.style.height = meta.h + 'px'; }
+  el.toks.style.width = meta.w + 'px'; el.toks.style.height = meta.h + 'px';
+  el.over.setAttribute('width', meta.w); el.over.setAttribute('height', meta.h); el.over.setAttribute('viewBox', `0 0 ${meta.w} ${meta.h}`);
+  if (!MAP.view || MAP.view.id !== meta.id) mapFit(); else mapApplyView();
+  mapDrawGrid(); mapDrawFog(); mapDrawTokens(); mapDrawOverlay();
+}
+function mapDrawGrid() {
+  const meta = MAP.meta, G = mapGeom(meta), cv = MAP.el.grid;
+  const key = [meta.id, meta.w, meta.h, meta.across, meta.ox, meta.oy, meta.lines, meta.alpha].join('|');
+  if (MAP.gridKey === key) return; MAP.gridKey = key;
+  cv.width = meta.w; cv.height = meta.h;
+  const cx = cv.getContext('2d'); cx.clearRect(0, 0, meta.w, meta.h);
+  if (meta.lines === false) return;
+  const a = meta.alpha == null ? 0.35 : clamp(+meta.alpha, 0.05, 1);
+  cx.lineWidth = Math.max(1, G.cell / 45);
+  cx.strokeStyle = `rgba(0,0,0,${a})`;
+  cx.beginPath();
+  for (let i = 0; i <= G.cols; i++) { const x = Math.round(G.sx + i * G.cell) + 0.5; cx.moveTo(x, 0); cx.lineTo(x, meta.h); }
+  for (let j = 0; j <= G.rows; j++) { const y = Math.round(G.sy + j * G.cell) + 0.5; cx.moveTo(0, y); cx.lineTo(meta.w, y); }
+  cx.stroke();
+}
+function mapDrawFog() {
+  const meta = MAP.meta, cv = MAP.el.fog;
+  const player = !mapIsDM();
+  const key = [meta.id, meta.w, meta.h, meta.across, meta.ox, meta.oy, meta.fog, meta.reveal, meta.rc, player].join('|');
+  if (MAP.fogKey === key) return; MAP.fogKey = key;
+  cv.width = meta.w; cv.height = meta.h;
+  const cx = cv.getContext('2d'); cx.clearRect(0, 0, meta.w, meta.h);
+  if (!meta.fog) return;
+  const G = mapGeom(meta), bits = mapBits(meta, G);
+  cx.fillStyle = player ? '#0e1311' : 'rgba(8,12,10,0.55)';
+  cx.fillRect(0, 0, meta.w, meta.h);
+  for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++) if (bitGet(bits, y * G.cols + x)) cx.clearRect(Math.floor(G.sx + x * G.cell), Math.floor(G.sy + y * G.cell), Math.ceil(G.cell) + 1, Math.ceil(G.cell) + 1);
+}
+function mapDrawTokens() {
+  const meta = MAP.meta, G = mapGeom(meta), el = MAP.el;
+  const list = mapTokens().filter(t => t.pos && (t.kind === 'pc' || mapIsDM() || !meta.fog || mapSeen(t.pos.x + Math.floor(t.sz / 2), t.pos.y + Math.floor(t.sz / 2))));
+  const seen = new Set();
+  for (const t of list) {
+    seen.add(t.key);
+    let d = el.tokEls.get(t.key);
+    if (!d) { d = document.createElement('div'); d.className = 'tok'; d.innerHTML = '<span class="tl"></span><i class="thp"><b></b></i><span class="tc"></span><span class="tn"></span>'; el.toks.appendChild(d); el.tokEls.set(t.key, d); }
+    d.dataset.key = t.key;
+    d.className = 'tok ' + t.kind + (t.cur ? ' cur' : '') + (t.hidden ? ' hid' : '') + (t.down ? ' down' : '') + (MAP.sel === t.key ? ' sel' : '') + (t.canMove ? ' movable' : '') + (t.mine ? ' mine' : '');
+    const size = t.sz * G.cell, pad = G.cell * 0.06;
+    if (!(MAP.g && MAP.g.key === t.key)) { d.style.left = (G.sx + t.pos.x * G.cell + pad) + 'px'; d.style.top = (G.sy + t.pos.y * G.cell + pad) + 'px'; }
+    d.style.width = d.style.height = (size - pad * 2) + 'px';
+    d.style.fontSize = (G.cell * 0.36) + 'px';
+    d.style.borderWidth = Math.max(1.5, G.cell * 0.07) + 'px';
+    d.querySelector('.tl').textContent = mapLabel(t.name);
+    d.querySelector('.thp b').style.width = t.pct + '%';
+    d.querySelector('.thp b').className = t.pct <= 25 ? 'low' : t.pct <= 50 ? 'mid' : '';
+    d.querySelector('.tc').textContent = t.conds.length ? String(t.conds.length) : '';
+    d.querySelector('.tc').hidden = !t.conds.length;
+    d.querySelector('.tn').textContent = t.name + (t.kind === 'mon' && !mapIsDM() && t.st ? ' · ' + t.st : '');
+    d.title = t.name + (t.conds.length ? ' · ' + t.conds.join(', ') : '');
+  }
+  for (const [k, d] of el.tokEls) if (!seen.has(k)) { d.remove(); el.tokEls.delete(k); }
+}
+function mapDrawOverlay() {
+  const el = MAP.el; if (!el || !MAP.meta) return;
+  const G = mapGeom(), g = MAP.g, now = Date.now();
+  let s = '';
+  if (g && g.kind === 'ruler' && g.b) {
+    const a = mapCellOf(g.a), b = mapCellOf(g.b);
+    const c = p => ({ x: G.sx + (p.x + 0.5) * G.cell, y: G.sy + (p.y + 0.5) * G.cell });
+    const A = c(a), B = c(b);
+    s += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="ruler" style="stroke-width:${G.cell * 0.08}px"/><circle cx="${A.x}" cy="${A.y}" r="${G.cell * 0.12}" class="rdot"/><circle cx="${B.x}" cy="${B.y}" r="${G.cell * 0.12}" class="rdot"/>`;
+  }
+  if (g && g.kind === 'fog' && g.b) {
+    const a = mapCellOf(g.a), b = mapCellOf(g.b);
+    const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y), x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+    s += `<rect x="${G.sx + x0 * G.cell}" y="${G.sy + y0 * G.cell}" width="${(x1 - x0 + 1) * G.cell}" height="${(y1 - y0 + 1) * G.cell}" class="fogsel ${MAP.tool}" style="stroke-width:${G.cell * 0.06}px"/>`;
+  }
+  if (g && g.kind === 'tok' && g.moved) {
+    const c0 = { x: G.sx + (g.c0.x + g.sz / 2) * G.cell, y: G.sy + (g.c0.y + g.sz / 2) * G.cell }, c1 = { x: G.sx + (g.cell.x + g.sz / 2) * G.cell, y: G.sy + (g.cell.y + g.sz / 2) * G.cell };
+    s += `<line x1="${c0.x}" y1="${c0.y}" x2="${c1.x}" y2="${c1.y}" class="ruler path" style="stroke-width:${G.cell * 0.06}px"/>`;
+  }
+  MAP.pings = MAP.pings.filter(p => p.until > now && p.m === MAP.meta.id);
+  for (const p of MAP.pings) s += `<g class="ping"><circle cx="${p.x}" cy="${p.y}" r="${G.cell * 0.9}" style="stroke-width:${G.cell * 0.1}px"/><circle cx="${p.x}" cy="${p.y}" r="${G.cell * 0.18}" class="pc"/><text x="${p.x}" y="${p.y - G.cell * 1.05}" style="font-size:${G.cell * 0.4}px">${esc(p.who || '')}</text></g>`;
+  el.over.innerHTML = s;
+}
+function mapHud(text, cx, cy) {
+  const h = MAP.el.hud; if (!text) { h.hidden = true; return; }
+  const r = MAP.el.root.getBoundingClientRect();
+  h.hidden = false; h.textContent = text; h.style.left = (cx - r.left + 14) + 'px'; h.style.top = (cy - r.top - 30) + 'px';
+}
+const mapFeet = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * (mapGeom().ft || 5);
+
+/* ---------- pointer gestures: pan, pinch, drag a token, measure, fog, place ---------- */
+const MAP_PTRS = new Map();
+function mapDown(e) {
+  if (e.button === 1 || e.button === 2 || !MAP.meta || !MAP.img) return;
+  MAP_PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  window.addEventListener('pointermove', mapMoveEv); window.addEventListener('pointerup', mapUp); window.addEventListener('pointercancel', mapUp);
+  if (MAP_PTRS.size === 2) {
+    if (MAP.g && MAP.g.kind === 'tok' && MAP.g.el) { MAP.g.el.classList.remove('drag'); }
+    const [p1, p2] = Array.from(MAP_PTRS.values());
+    MAP.g = { kind: 'pinch', d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, s0: MAP.view.s, m0: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, tx0: MAP.view.tx, ty0: MAP.view.ty };
+    mapDrawTokens(); return;
+  }
+  if (MAP_PTRS.size > 2) return;
+  const p = mapToImg(e.clientX, e.clientY);
+  const tokEl = e.target.closest && e.target.closest('.tok');
+  if (MAP.placing) { MAP.g = { kind: 'place', sx: e.clientX, sy: e.clientY, tx0: MAP.view.tx, ty0: MAP.view.ty, moved: false }; return; }
+  if (tokEl && MAP.tool === 'move') {
+    const t = mapTok(tokEl.dataset.key);
+    if (t && t.canMove && t.pos) {
+      const G = mapGeom();
+      MAP.g = { kind: 'tok', key: t.key, el: tokEl, t, sz: t.sz, c0: { x: t.pos.x, y: t.pos.y }, cell: { x: t.pos.x, y: t.pos.y }, off: { x: p.x - (G.sx + t.pos.x * G.cell), y: p.y - (G.sy + t.pos.y * G.cell) }, sx: e.clientX, sy: e.clientY, moved: false };
+      return;
+    }
+    MAP.g = { kind: 'click', key: tokEl.dataset.key, sx: e.clientX, sy: e.clientY }; return;
+  }
+  if (MAP.tool === 'measure') { MAP.g = { kind: 'ruler', a: p, b: p }; mapDrawOverlay(); return; }
+  if ((MAP.tool === 'reveal' || MAP.tool === 'hide') && mapIsDM() && mapCanEdit()) { MAP.g = { kind: 'fog', a: p, b: p }; mapDrawOverlay(); return; }
+  MAP.g = { kind: 'pan', sx: e.clientX, sy: e.clientY, tx0: MAP.view.tx, ty0: MAP.view.ty, moved: false };
+}
+function mapMoveEv(e) {
+  if (!MAP_PTRS.has(e.pointerId)) return;
+  MAP_PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const g = MAP.g; if (!g) return;
+  if (g.kind === 'pinch') {
+    if (MAP_PTRS.size < 2) return;
+    const [p1, p2] = Array.from(MAP_PTRS.values());
+    const d = Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, m = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    const r = MAP.el.root.getBoundingClientRect();
+    const s = clamp(g.s0 * d / g.d0, 0.05, 8), k = s / g.s0;
+    const px = g.m0.x - r.left, py = g.m0.y - r.top;
+    MAP.view.s = s; MAP.view.tx = px - (px - g.tx0) * k + (m.x - g.m0.x); MAP.view.ty = py - (py - g.ty0) * k + (m.y - g.m0.y); MAP.view.fitted = false;
+    mapApplyView(); return;
+  }
+  const dist = Math.hypot(e.clientX - (g.sx || 0), e.clientY - (g.sy || 0));
+  if (g.kind === 'pan' || g.kind === 'place') {
+    if (dist > 4) g.moved = true;
+    if (g.moved) { MAP.view.tx = g.tx0 + e.clientX - g.sx; MAP.view.ty = g.ty0 + e.clientY - g.sy; MAP.view.fitted = false; mapApplyView(); }
+    return;
+  }
+  if (g.kind === 'tok') {
+    if (!g.moved && dist < 5) return;
+    if (!g.moved) { g.moved = true; g.el.classList.add('drag'); }
+    const G = mapGeom(), p = mapToImg(e.clientX, e.clientY);
+    const pad = G.cell * 0.06;
+    g.el.style.left = (p.x - g.off.x + pad) + 'px'; g.el.style.top = (p.y - g.off.y + pad) + 'px';
+    g.cell = { x: clamp(Math.round((p.x - g.off.x - G.sx) / G.cell), 0, G.cols - g.sz), y: clamp(Math.round((p.y - g.off.y - G.sy) / G.cell), 0, G.rows - g.sz) };
+    mapHud(mapFeet(g.c0, g.cell) + ' ft', e.clientX, e.clientY);
+    mapDrawOverlay(); return;
+  }
+  if (g.kind === 'ruler') { g.b = mapToImg(e.clientX, e.clientY); mapHud(mapFeet(mapCellOf(g.a), mapCellOf(g.b)) + ' ft', e.clientX, e.clientY); mapDrawOverlay(); return; }
+  if (g.kind === 'fog') { g.b = mapToImg(e.clientX, e.clientY); mapDrawOverlay(); }
+}
+function mapUp(e) {
+  const had = MAP_PTRS.delete(e.pointerId);
+  if (MAP_PTRS.size) { if (MAP.g && MAP.g.kind === 'pinch') { const [p] = Array.from(MAP_PTRS.values()); MAP.g = { kind: 'pan', sx: p.x, sy: p.y, tx0: MAP.view.tx, ty0: MAP.view.ty, moved: true }; } return; }
+  window.removeEventListener('pointermove', mapMoveEv); window.removeEventListener('pointerup', mapUp); window.removeEventListener('pointercancel', mapUp);
+  const g = MAP.g; MAP.g = null; mapHud('');
+  if (!g || !had) { mapLater(); return; }
+  const cancel = e.type === 'pointercancel';
+  if (g.kind === 'tok') {
+    g.el.classList.remove('drag');
+    if (g.moved && !cancel && (g.cell.x !== g.c0.x || g.cell.y !== g.c0.y)) { const t = mapTok(g.key); if (t) { t.pos = g.cell; mapMove(t, g.cell.x, g.cell.y); } }
+    else if (!g.moved) MAP.sel = MAP.sel === g.key ? '' : g.key;
+    mapDrawOverlay(); mapDrawTokens(); MAP.later = true;
+  } else if (g.kind === 'click') { MAP.sel = MAP.sel === g.key ? '' : g.key; MAP.later = true; }
+  else if (g.kind === 'pan') { if (!g.moved && MAP.sel) { MAP.sel = ''; MAP.later = true; } }
+  else if (g.kind === 'place' && !g.moved && !cancel) {
+    const t = mapTokens().find(t => t.key === MAP.placing), c = mapCellOf(mapToImg(e.clientX, e.clientY));
+    if (t) { const f = mapFree(c.x, c.y, t.sz, mapTaken(t.key)); mapMove(t, f.x, f.y); MAP.sel = t.key; }
+    const next = mapTokens().find(x => !x.pos && x.canMove && x.kind === (t && t.kind) && x.key !== (t && t.key));
+    MAP.placing = ''; MAP.later = true;
+    if (next && t && t.kind === 'mon' && MAP.chain) { MAP.placing = next.key; toastMsg('Now tap where ' + next.name + ' goes.'); }
+  } else if (g.kind === 'ruler') { setTimeout(() => { if (!MAP.g) mapDrawOverlay(); }, 1400); MAP.later = true; }
+  else if (g.kind === 'fog' && !cancel) {
+    const a = mapCellOf(g.a), b = mapCellOf(g.b ?? g.a), G = mapGeom(), bits = mapBits(MAP.meta, G);
+    const x0 = clamp(Math.min(a.x, b.x), 0, G.cols - 1), x1 = clamp(Math.max(a.x, b.x), 0, G.cols - 1), y0 = clamp(Math.min(a.y, b.y), 0, G.rows - 1), y1 = clamp(Math.max(a.y, b.y), 0, G.rows - 1);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) bitSet(bits, y * G.cols + x, MAP.tool === 'reveal');
+    mapSaveMeta({ reveal: mapBitsEncode(bits), rc: G.cols + 'x' + G.rows }, true);
+    mapDrawOverlay();
+  }
+  mapLater();
+}
+function mapLater() { if (MAP.later) { MAP.later = false; queueRender(); } }
+function mapSendPing(x, y) {
+  const who = S.mode === 'live' ? (S.me.isOwner ? 'DM' : (LS.get('pname', '') || 'Player')) : 'You';
+  sendMsg({ kind: 'ping', m: MAP.meta.id, x: Math.round(x), y: Math.round(y), who, priv: false });
+}
+function mapPing(m) {
+  if (!MAP.meta || m.m !== MAP.meta.id || !isFinite(+m.x) || !isFinite(+m.y)) return;
+  MAP.pings.push({ m: m.m, x: +m.x, y: +m.y, who: String(m.who || '').slice(0, 24), until: Date.now() + 2600 });
+  if (UI.view !== 'map' && !m.isMe) toastMsg((m.who || 'Someone') + ' pinged the map.');
+  mapDrawOverlay(); setTimeout(() => mapDrawOverlay(), 2700);
+}
+document.addEventListener('keydown', e => {
+  if (UI.view !== 'map' || UI.modal) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+  if (e.key === 'Escape') { if (MAP.placing || MAP.sel || MAP.tool !== 'move') { MAP.placing = ''; MAP.sel = ''; MAP.tool = 'move'; queueRender(); } return; }
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (d && MAP.sel) { const t = mapTok(MAP.sel); if (t && t.canMove && t.pos) { e.preventDefault(); mapMove(t, t.pos.x + d[0], t.pos.y + d[1]); } }
+});
+
+/* ---------- the view ---------- */
+function viewMap() {
+  mapBootLocal();
+  const meta = MAP.meta, edit = mapCanEdit(), dm = mapIsDM(), tv = MAP.tv;
+  const mount = `<div id="mapmount" class="mapmount${tv ? ' tv' : ''}">${!meta ? `<div class="mapempty">${edit ? `<div class="stack" style="align-items:center;text-align:center;max-width:420px">${svgIcon('map', 40)}<h3>Put up a battle map</h3><p class="small muted">Drop a picture of your map here, or choose one. Players see it on their own screens, and each of them moves their own token.</p><label class="btn pri">Choose a map picture<input class="hidden-input" type="file" id="f-mapfile" accept="image/*"></label><span class="small muted">PNG, JPG or WebP. Big pictures are shrunk to 2400 pixels so everyone can load them.</span>${MAP.busy ? `<b class="small">${esc(MAP.busy)}</b>` : ''}</div>` : `<div class="stack" style="align-items:center;text-align:center;max-width:360px">${svgIcon('map', 40)}<h3>No map yet</h3><p class="small muted">Your DM hasn't put up a battle map. It appears here as soon as they do.</p></div>`}</div>` : !MAP.img ? `<div class="mapempty"><div class="stack" style="align-items:center"><div class="bar-prog" style="width:200px"><i style="width:55%"></i></div><span class="small muted">${esc(MAP.err && !MAP.loading ? MAP.err : 'Loading the map…')}</span></div></div>` : ''}</div>`;
+  if (tv) return mount;
+  const I = S.init || { list: [] };
+  const turnList = isDMish() ? cbt().list : (I.list || []);
+  const curId = isDMish() ? cbt().cur : I.cur;
+  const cur = turnList.find(c => c.id === curId);
+  const round = isDMish() ? cbt().round : I.round;
+  const toks = meta ? mapTokens() : [];
+  const sel = toks.find(t => t.key === MAP.sel);
+  const off = toks.filter(t => !t.pos && t.canMove);
+  const tools = [['move', 'Move', 'Drag tokens and the map']].concat([['measure', 'Measure', 'Drag to measure in feet']]).concat(dm && edit && meta && meta.fog ? [['reveal', 'Reveal', 'Drag a box to show squares to players'], ['hide', 'Hide', 'Drag a box to cover squares again']] : []);
+  const bar = meta ? `<div class="mapbar row">
+      <div class="seg" role="group" aria-label="Tool">${tools.map(([k, l, t]) => `<button data-act="maptool" data-v="${k}" title="${esc(t)}"${pressed(MAP.tool === k)}>${l}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Zoom"><button data-act="mapzoom" data-v="out" aria-label="Zoom out">−</button><button data-act="mapzoom" data-v="fit">Fit</button><button data-act="mapzoom" data-v="in" aria-label="Zoom in">+</button></div>
+      ${isDMish() ? `<button class="btn${MAP.asPlayer ? ' pri' : ''}" data-act="mapasplayer" title="See exactly what players see">${MAP.asPlayer ? 'Seeing it as players do' : 'See it as players do'}</button>` : ''}
+      <span class="spacer"></span><span class="small muted">${esc(meta.name || '')}</span>
+    </div>` : '';
+  const G = meta ? mapGeom(meta) : null;
+  const settings = meta && edit ? `<details class="panel mapset" data-k="mapset"><summary class="ph">Map settings</summary><div class="stack">
+      <div class="grid3">
+        <label class="field"><span class="lbl">Squares across</span><input type="number" id="f-map-across" min="2" max="200" data-act="mapgrid" data-k="across" value="${esc(meta.across)}"></label>
+        <label class="field"><span class="lbl">Nudge grid right</span><input type="number" id="f-map-ox" step="1" data-act="mapgrid" data-k="ox" value="${esc(Math.round(+meta.ox || 0))}"></label>
+        <label class="field"><span class="lbl">Nudge grid down</span><input type="number" id="f-map-oy" step="1" data-act="mapgrid" data-k="oy" value="${esc(Math.round(+meta.oy || 0))}"></label>
+        <label class="field"><span class="lbl">Feet per square</span><input type="number" id="f-map-ft" min="1" max="100" data-act="mapgrid" data-k="ft" value="${esc(meta.ft || 5)}"></label>
+      </div>
+      <span class="small muted">Count the squares along the top edge of your picture and type that number. The grid is ${G.cols} × ${G.rows} squares, each ${Math.round(G.cell)} pixels.</span>
+      <div class="row"><label class="chk"><input type="checkbox" data-act="mapgrid" data-k="lines"${meta.lines !== false ? ' checked' : ''}> Draw grid lines</label>
+        <label class="chk"><input type="checkbox" data-act="mapgrid" data-k="fog"${meta.fog ? ' checked' : ''}> Fog of war</label></div>
+      ${meta.fog ? `<div class="row"><button class="btn sm" data-act="mapfogall" data-v="1">Reveal everything</button><button class="btn sm" data-act="mapfogall" data-v="0">Cover everything</button><span class="small muted">Then use Reveal and Hide on the toolbar.</span></div>` : ''}
+      <div class="row"><label class="btn sm">Replace the picture<input class="hidden-input" type="file" id="f-mapfile" accept="image/*"></label><button class="btn sm danger" data-act="mapclear">Take the map down</button>${MAP.busy ? `<b class="small">${esc(MAP.busy)}</b>` : ''}</div>
+    </div></details>` : '';
+  const turn = cur ? `<div class="panel stack mapturn"><div class="lbl">Round ${esc(round || 1)}</div><div class="row"><b class="grow">${esc(cur.name)}’s turn</b>${isDMish() ? `<button class="btn sm pri" data-act="cnext">Next turn</button>` : ''}</div></div>` : '';
+  let info = '';
+  if (sel) {
+    const amt = isDMish() ? `<div class="row"><input type="number" id="f-map-amt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="mapdmg">Damage</button><button class="btn sm" data-act="mapheal">Heal</button></div>` : '';
+    const hp = sel.kind === 'pc' || isDMish() ? (sel.hpText ? `<span class="num"><b>${esc(sel.hpText)}</b> HP</span>` : '') : `<span>${esc(sel.st || '')}</span>`;
+    info = `<div class="panel stack mapinfo"><div class="row"><b class="grow">${esc(sel.name)}</b>${sel.hidden ? '<span class="pill">hidden</span>' : ''}<button class="btn ghost sm" data-act="mapsel" data-v="" aria-label="Close">×</button></div>
+      <div class="row small">${hp}${sel.ac != null && (sel.kind === 'pc' || isDMish()) ? `<span class="num">AC ${esc(sel.ac)}</span>` : ''}${sel.kind === 'pc' ? `<span class="muted">${esc(sel.who || '')}</span>` : ''}</div>
+      ${sel.conds.length ? `<div class="row small">${sel.conds.map(c => `<span class="pill bad">${esc(c)}</span>`).join('')}</div>` : ''}
+      ${amt}
+      <div class="row">${sel.canMove ? `<button class="btn sm" data-act="mapoff" data-v="${esc(sel.key)}">Take off the map</button>` : ''}${isDMish() && sel.kind === 'mon' ? `<button class="btn sm" data-act="chide" data-v="${esc(sel.key)}">${sel.hidden ? 'Show to players' : 'Hide from players'}</button>` : ''}</div>
+      ${sel.canMove ? '<span class="small muted">Arrow keys move it one square.</span>' : ''}</div>`;
+  }
+  const tray = meta ? `<div class="panel stack"><div class="lbl">Not on the map</div>
+      ${off.length ? off.map(t => `<div class="row"><span class="tdot ${t.kind}">${esc(mapLabel(t.name))}</span><span class="grow small">${esc(t.name)}${t.hidden ? ' <span class="muted">(hidden)</span>' : ''}</span><button class="btn sm${MAP.placing === t.key ? ' pri' : ''}" data-act="mapplace" data-v="${esc(t.key)}">${MAP.placing === t.key ? 'Tap the map' : 'Place'}</button></div>`).join('') : '<span class="small muted">Everyone is on the map.</span>'}
+      ${isDMish() && off.filter(t => t.kind === 'pc').length > 1 ? `<button class="btn sm" data-act="mapparty">Put the whole party in the middle</button>` : ''}
+      ${isDMish() && !cbt().list.some(c => c.kind === 'mon') ? '<span class="small muted">Monsters come from the Combat tab. Add them there and they show up here.</span>' : ''}
+    </div>` : '';
+  const help = meta ? `<p class="small muted maphelp">Drag the map to move around, scroll or pinch to zoom, double-click to ping everyone. ${isDMish() ? 'You can move every token; players move their own.' : 'You can move your own character.'}</p>` : '';
+  return `<div class="row" style="margin-bottom:10px"><h2 style="font-family:var(--f-display);font-size:26px">Battle map</h2>${isDMish() && window.PL_SITE && meta ? `<a class="btn sm ghost" href="?v=map&pv=1${location.hash}" target="_blank" rel="noopener">Open a TV view</a>` : ''}</div>
+    ${bar}
+    <div class="maplay"><div class="mapmain">${mount}${help}</div><aside class="maptray stack">${turn}${info}${tray}${settings}</aside></div>`;
+}
+function svgIcon(n, s) {
+  if (n === 'map') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`;
+  return '';
+}
+
+/* ---------- actions ---------- */
+Object.assign(ACT, {
+  maptool(el) { MAP.tool = el.dataset.v; MAP.placing = ''; queueRender(); },
+  mapzoom(el) { const v = el.dataset.v; if (v === 'fit') mapFit(); else if (MAP.el) { const r = MAP.el.root.getBoundingClientRect(); mapZoomAt(r.left + r.width / 2, r.top + r.height / 2, v === 'in' ? 1.25 : 0.8); } },
+  mapasplayer() { MAP.asPlayer = !MAP.asPlayer; MAP.tool = 'move'; MAP.fogKey = ''; queueRender(); },
+  mapsel(el) { MAP.sel = el.dataset.v || ''; queueRender(); },
+  mapplace(el) { const k = el.dataset.v; MAP.placing = MAP.placing === k ? '' : k; MAP.chain = true; if (MAP.placing) { const t = mapTok(k); toastMsg('Tap the map where ' + ((t && t.name) || 'it') + ' should go.'); } queueRender(); },
+  mapparty() {
+    const c = mapCenterCell(); const taken = mapTaken();
+    for (const t of mapTokens().filter(t => t.kind === 'pc' && !t.pos && t.canMove)) { const f = mapFree(c.x, c.y, 1, taken); taken.add(f.x + ',' + f.y); mapMove(t, f.x, f.y); }
+  },
+  mapoff(el) { mapOff(el.dataset.v); },
+  mapdmg() { const v = Math.round(+((document.getElementById('f-map-amt') || {}).value) || 0); const t = MAP.sel && findTarget(MAP.sel.startsWith('pc|') ? MAP.sel : MAP.sel); if (!v || !t || !isDMish()) return; const r = hurt(t, v); toastMsg(`${t.name} takes ${r.dealt}${r.note}.`); queueRender(); },
+  mapheal() { const v = Math.round(+((document.getElementById('f-map-amt') || {}).value) || 0); const t = MAP.sel && findTarget(MAP.sel); if (!v || !t || !isDMish()) return; mend(t, v); toastMsg(`${t.name} regains ${v} HP.`); queueRender(); },
+  mapgrid(el) {
+    const k = el.dataset.k; if (!MAP.meta) return;
+    if (k === 'lines' || k === 'fog') { const p = { [k]: !!el.checked }; if (k === 'fog' && el.checked && !MAP.meta.reveal) { const G = mapGeom(); p.reveal = mapBitsEncode(new Uint8Array(Math.ceil(G.cols * G.rows / 8))); p.rc = G.cols + 'x' + G.rows; } if (k === 'fog' && !el.checked && (MAP.tool === 'reveal' || MAP.tool === 'hide')) MAP.tool = 'move'; mapSaveMeta(p); return; }
+    let v = +el.value; if (!isFinite(v)) return;
+    if (k === 'across') v = clamp(Math.round(v), 2, 200);
+    if (k === 'ft') v = clamp(Math.round(v), 1, 100);
+    mapSaveMeta({ [k]: v });
+  },
+  mapfogall(el) {
+    const G = mapGeom(); const arr = new Uint8Array(Math.ceil(G.cols * G.rows / 8));
+    if (el.dataset.v === '1') for (let i = 0; i < G.cols * G.rows; i++) bitSet(arr, i, true);
+    mapSaveMeta({ reveal: mapBitsEncode(arr), rc: G.cols + 'x' + G.rows });
+  },
+  mapclear() { confirmBox('Take the map down?', 'Players stop seeing it, and every token goes back off the map. Your fight on the Combat tab stays as it is.', 'Take it down', () => mapRemove(), true); },
+});
 </script>
 </body>
 </html>
