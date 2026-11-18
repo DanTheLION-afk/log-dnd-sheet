@@ -363,7 +363,7 @@ button.vital:hover { border-color: var(--accent); }
 }
 
 
-/* Build 11: battle map. The board keeps a dark backdrop in both themes so map art reads the same everywhere. */
+/* Build 12: battle map. The board keeps a dark backdrop in both themes so map art reads the same everywhere. */
 .maplay { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; align-items: start; }
 @media (max-width: 960px) { .maplay { grid-template-columns: minmax(0, 1fr); } }
 .mapmain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -571,7 +571,9 @@ function registry(rs) {
   for (const p of PACKS) {
     if (p.ruleset && p.ruleset !== 'any' && p.ruleset !== rs) continue;
     for (const t of TYPES) for (const e of (p.entries && p.entries[t]) || []) {
-      if (t === 'subspecies') subsp.push([e, p]); else put(t, e, p.name, p.id);
+      if (t === 'subspecies') subsp.push([e, p]);
+      else if (t === 'feats') { const f = featFix(e, R, p.id); if (f) { put(t, f, p.name, p.id); R._fnames.set(slug(f.name), R.feats.get(f.id)); } }
+      else put(t, e, p.name, p.id);
     }
   }
   for (const [e, p] of subsp) {
@@ -3078,8 +3080,11 @@ function parseAurora(files, rs) {
   for (const f of of('Feat')) {
     if (srdNames.feats.get(slug(f.name))) continue;
     const d = descOf(f);
-    const e = { id: newId('feats', f.name), name: f.name, type: 'general', d, src: f.source || 'Aurora' };
+    if (/^ability score improvement$/i.test(String(f.name || '').trim())) continue;   // the builder has its own
+    const ftk = supportsTokens(f);
+    const e = { id: newId('feats', f.name), name: f.name, type: ftk.includes('origin') ? 'origin' : ftk.includes('fighting style') ? 'fighting-style' : ftk.includes('epic boon') ? 'epic-boon' : 'general', d, src: f.source || 'Aurora' };
     if (f.prereq) e.prereq = f.prereq;
+    { const lm = String(f.prereq || '').match(/level (\d+)\s*\+/i); if (lm) e.lvl = +lm[1]; else if (e.type === 'epic-boon') e.lvl = 19; }
     const ab = abilityStats(f.rules);
     const asel = (f.rules || []).find(x => x.tag === 'select' && /ability score improvement/i.test(String(x.a.type)));
     let from = Object.keys(ab);
@@ -3197,7 +3202,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 11</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 12</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -5342,6 +5347,31 @@ Object.assign(ACT, {
   },
   mapclear() { confirmBox('Take the map down?', 'Players stop seeing it, and every token goes back off the map. Your fight on the Combat tab stays as it is.', 'Take it down', () => mapRemove(), true); },
 });
+
+/* ===== imported feats: keep each feat's kind =====
+   A book's copy of a free-rules feat (Alert, Archery…) used to replace the free-rules one as a plain
+   general feat, which emptied the origin feat and Fighting Style lists. The free-rules copy now stays,
+   and feats imported before this fix get their kind worked out from what was saved. */
+const ORIGIN_2024 = new Set(['alert', 'crafter', 'healer', 'lucky', 'magic-initiate', 'musician', 'savage-attacker', 'skilled', 'tavern-brawler', 'tough']);
+function featFix(e, R, pk) {
+  if (!e || !e.id) return null;
+  const nm = String(e.name || ''), sn = slug(nm), pre = String(e.prereq || ''), src = String(e.src || '');
+  const plain = !e.type || e.type === 'general';
+  if (/^ability-score-improvement(-\d+)?$/.test(sn) && !e.asiFeat) return null;
+  const names = R._fnames || (R._fnames = new Map(Array.from(R.feats.values()).map(f => [slug(f.name), f])));
+  const same = names.get(sn);
+  /* the free-rules copy already has the right kind and numbers; a book's variants of the same feat add nothing */
+  if (same && !same.pack && same.type && same.type !== 'general' && (plain || e.type === same.type)) return null;
+  if (same && same.pack && same.pack === pk) return null;
+  const out = Object.assign({}, e);
+  if (plain) {
+    if (/fighting style/i.test(pre)) out.type = 'fighting-style';
+    else if (/^boon of /i.test(nm) || /level 19\s*\+/i.test(pre)) out.type = 'epic-boon';
+    else if (/2024/.test(src) && ORIGIN_2024.has(sn)) out.type = 'origin';
+  }
+  if (!out.lvl) { const m = pre.match(/level (\d+)\s*\+/i); if (m) out.lvl = +m[1]; else if (out.type === 'epic-boon') out.lvl = 19; }
+  return out;
+}
 </script>
 </body>
 </html>
