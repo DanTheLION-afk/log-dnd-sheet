@@ -47,30 +47,31 @@ img { max-width: 100%; }
   --line: #c4cec5;
   --ink: #16201c;
   --ink-2: #4a5852;
-  --accent: #22705e;
+  --accent: #216d5c;
   --accent-soft: #cfe3dc;
   --accent-ink: #ffffff;
-  --brass: #94701c;
+  --brass: #7d5f17;
   --danger: #b03636;
   --good: #2c7a3c;
-  --warn: #a2650f;
+  --warn: #8d580c;
   --shadow: 0 1px 0 rgba(22, 32, 28, .06), 0 6px 18px -10px rgba(22, 32, 28, .25);
   --f-display: "Spectral SC", "Palatino Linotype", Georgia, serif;
   --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --f-label: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
   --r: 6px;
+  --tst-crit: #f0cf7a; --tst-fail: #ff9b94; --ph: #5f6b66;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f1513; --surface: #161e1b; --surface-2: #1f2925; --line: #2e3a35; --ink: #e1e9e4; --ink-2: #9aaba3;
-    --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b;
+    --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b; --tst-crit: #6e5312; --tst-fail: #9c2b2b; --ph: #869690;
     --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 22px -12px rgba(0, 0, 0, .7);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1513; --surface: #161e1b; --surface-2: #1f2925; --line: #2e3a35; --ink: #e1e9e4; --ink-2: #9aaba3;
-  --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b;
+  --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b; --tst-crit: #6e5312; --tst-fail: #9c2b2b; --ph: #869690;
   --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 22px -12px rgba(0, 0, 0, .7);
   color-scheme: dark;
 }
@@ -83,6 +84,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--ink); }
+html { scrollbar-color: color-mix(in srgb, var(--ink-2) 55%, transparent) transparent; }
+input, textarea, [contenteditable] { caret-color: var(--accent); }
+::placeholder { color: var(--ph); opacity: 1; }
+p { text-wrap: pretty; }
+a { text-underline-offset: .18em; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 .num { font-family: var(--f-label); font-variant-numeric: tabular-nums; }
@@ -107,6 +115,18 @@ a { color: var(--accent); }
 .tab { border: 0; background: none; padding: 6px 10px; border-radius: var(--r); cursor: pointer; font-family: var(--f-label); font-weight: 600; font-size: 15px; letter-spacing: .04em; color: var(--ink-2); }
 .tab:hover { background: var(--surface-2); color: var(--ink); }
 .tab[aria-current="true"] { background: var(--ink); color: var(--surface); }
+@media (max-width: 600px) {
+  .bar { padding-block: 6px 4px; }
+  .bar-in { gap: 4px 8px; }
+  .brand { flex: 1 1 100%; min-width: 0; align-items: center; gap: 6px; }
+  .brand h1 { font-size: 19px; white-space: nowrap; }
+  .brand .sync.live { display: none; }
+  .campbtn { margin-left: auto; min-width: 0; max-width: 42vw; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabs { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; margin-inline: -4px; padding-inline: 4px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs { -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
+  .tab { flex: none; white-space: nowrap; }
+}
 
 /* shell */
 .wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 48px; }
@@ -120,6 +140,9 @@ a { color: var(--accent); }
 .who:hover { background: var(--surface); border-color: var(--line); }
 .who[aria-current="true"] { background: var(--surface); border-color: var(--accent); box-shadow: var(--shadow); }
 .who .nm { font-weight: 600; line-height: 1.2; }
+.who.addnew { display: none; }
+@media (max-width: 860px) { .rail.has-cur { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; scrollbar-width: thin; } .rail.has-cur > .stack { flex: none; } .rail.has-cur .lbl { display: none; } .rail.has-cur .roster { overflow: visible; flex-wrap: nowrap; } .rail.has-cur .roster .who { min-width: 168px; } .who.addnew { min-width: 0 !important; } .who.addnew .nm { white-space: nowrap; } }
+@media (max-width: 860px) { .rail.has-cur .newpanel { display: none; } .who.addnew { display: flex; min-width: 0; } .rail { gap: 10px; } }
 .who .sub { font-size: 12.5px; color: var(--ink-2); line-height: 1.2; }
 .sigil { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-size: 15px; background: var(--accent-soft); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
 
@@ -131,14 +154,15 @@ a { color: var(--accent); }
 .btn.ghost { background: none; border-color: transparent; }
 .btn.ghost:hover { background: var(--surface-2); }
 .btn.danger { color: var(--danger); }
-.btn.sm { padding: 3px 8px; font-size: 13px; }
+.btn.sm { padding: 3px 8px; font-size: 13px; min-height: 28px; justify-content: center; }
+@media (pointer: coarse) { .btn.sm { min-height: 34px; } .tab { min-height: 40px; } }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 input[type=text], input[type=number], input[type=search], select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; min-width: 0; }
 input[type=number] { width: 72px; }
 textarea { width: 100%; min-height: 80px; resize: vertical; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
-label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 1px var(--accent); }
+label.chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-height: 28px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field > input[type=text], .field > select, .field > textarea { width: 100%; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -149,7 +173,7 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 .panel > h3, .ph { font-family: var(--f-label); font-weight: 700; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 .ph .spacer { flex: 1; }
 .empty { border: 1px dashed var(--line); border-radius: 8px; padding: 28px 20px; text-align: center; color: var(--ink-2); }
-.note { border-left: 3px solid var(--brass); background: color-mix(in srgb, var(--brass) 9%, var(--surface)); padding: 8px 12px; border-radius: 0 var(--r) var(--r) 0; font-size: 14px; }
+.note { border: 1px solid color-mix(in srgb, var(--brass) 45%, var(--line)); background: color-mix(in srgb, var(--brass) 9%, var(--surface)); padding: 8px 12px; border-radius: var(--r); font-size: 14px; }
 .warnline { color: var(--warn); font-size: 13px; }
 .errline { color: var(--danger); font-size: 13px; }
 
@@ -166,6 +190,9 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 .seg button { border: 0; background: var(--surface); padding: 5px 12px; cursor: pointer; font-family: var(--f-label); font-weight: 600; letter-spacing: .04em; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.seg button.mini { padding: 4px 9px; font-size: 13px; min-height: 28px; }
+@media (pointer: coarse) { .seg button.mini { min-height: 34px; } }
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); flex: none; }
 
 /* build steps */
 .build { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -175,7 +202,7 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 .step { counter-increment: st; display: flex; gap: 8px; align-items: center; border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: var(--r); cursor: pointer; white-space: nowrap; font-weight: 500; }
 .step::before { content: counter(st); font-family: var(--f-label); font-weight: 700; font-size: 12px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); color: var(--ink-2); flex: none; }
 .step:hover { background: var(--surface); }
-.step[aria-current="true"] { background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
+.step[aria-current="true"] { background: var(--surface); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .step[aria-current="true"]::before { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .step.done::before { content: "\2713"; color: var(--good); border-color: var(--good); }
 
@@ -184,7 +211,7 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 .choice:hover { border-color: var(--ink-2); }
 .choice[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 .choice b { font-weight: 600; }
-.choice .src { font-size: 11.5px; color: var(--ink-2); font-family: var(--f-label); letter-spacing: .05em; text-transform: uppercase; }
+.choice .src { font-size: 12px; color: var(--ink-2); font-family: var(--f-label); letter-spacing: .05em; text-transform: uppercase; }
 
 /* rules text */
 .rt { font-size: 14.5px; max-width: 72ch; }
@@ -208,7 +235,7 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 @media (max-width: 700px) { .abils { grid-template-columns: repeat(3, 1fr); } }
 .ab { border: 1px solid var(--line); border-radius: 10px 10px 18px 18px; background: var(--surface); text-align: center; padding: 6px 4px 0; cursor: pointer; position: relative; }
 .ab:hover { border-color: var(--accent); }
-.ab .lbl { font-size: 11px; }
+.ab .lbl { font-size: 12px; }
 .ab .mod { font-family: var(--f-label); font-weight: 700; font-size: 30px; line-height: 1.1; }
 .ab .score { display: inline-block; transform: translateY(50%); background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 0 10px; font-family: var(--f-label); font-weight: 600; font-size: 14px; }
 .ab-wrap { padding-bottom: 12px; }
@@ -216,7 +243,7 @@ label.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer
 .ln { display: grid; grid-template-columns: 16px 34px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 3px 4px; border-radius: 4px; cursor: pointer; border: 0; background: none; text-align: left; width: 100%; }
 .ln:hover { background: var(--surface-2); }
 .ln .b { font-family: var(--f-label); font-weight: 700; text-align: right; }
-.ln .a { font-family: var(--f-label); font-size: 11.5px; color: var(--ink-2); letter-spacing: .06em; }
+.ln .a { font-family: var(--f-label); font-size: 12px; color: var(--ink-2); letter-spacing: .06em; }
 .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-2); display: inline-block; }
 .dot.on { background: var(--ink); border-color: var(--ink); }
 .dot.exp { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
@@ -234,10 +261,16 @@ button.vital:hover { border-color: var(--accent); }
 .hpbar > i.low { background: var(--danger); }
 .hpbar > s { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 55%, transparent); text-decoration: none; }
 .hpnum { font-family: var(--f-label); font-weight: 700; font-size: 32px; line-height: 1; }
-.pips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.pip { width: 15px; height: 15px; transform: rotate(45deg); border: 1.5px solid var(--accent); background: var(--accent); cursor: pointer; padding: 0; border-radius: 2px; }
-.pip.used { background: transparent; border-color: var(--line); }
-.pip.circ { transform: none; border-radius: 50%; }
+.hp.down { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, var(--surface)); }
+.hp.down .hpnum { color: var(--danger); }
+.pip.big { width: 36px; height: 36px; }
+.pip.big.circ::before { width: 22px; height: 22px; border-width: 2px; }
+.pips { display: inline-flex; gap: 0; flex-wrap: wrap; align-items: center; }
+.pip { width: 24px; height: 24px; display: inline-grid; place-items: center; border: 0; background: none; cursor: pointer; padding: 0; border-radius: 4px; }
+.pip::before { content: ""; width: 13px; height: 13px; box-sizing: border-box; transform: rotate(45deg); border: 1.5px solid var(--pc, var(--accent)); background: var(--pc, var(--accent)); border-radius: 2px; }
+.pip.used::before { background: transparent; border-color: var(--pcu, var(--ink-2)); }
+.pip.circ::before { transform: none; border-radius: 50%; width: 15px; height: 15px; }
+.pip:disabled { cursor: default; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl th { text-align: left; font-family: var(--f-label); font-weight: 600; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .tbl td { padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -245,9 +278,13 @@ button.vital:hover { border-color: var(--accent); }
 .scroll-x { overflow-x: auto; }
 .roll { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 2px 8px; cursor: pointer; font-family: var(--f-label); font-weight: 700; white-space: nowrap; }
 .roll:hover { border-color: var(--accent); color: var(--accent); }
-.cond { display: flex; flex-wrap: wrap; gap: 4px; }
-.cond button { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 1px 9px; font-size: 12.5px; cursor: pointer; color: var(--ink-2); }
+.cond { display: flex; flex-wrap: wrap; gap: 6px; }
+.cond button { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 3px 11px; min-height: 28px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+@media (pointer: coarse) { .cond button { min-height: 34px; } }
+.btn.exh { min-width: 28px; padding-inline: 6px; }
 .cond button[aria-pressed="true"] { background: var(--danger); border-color: var(--danger); color: #fff; }
+.crules { display: flex; flex-direction: column; gap: 6px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); border-radius: var(--r); padding: 8px 12px; font-size: 14px; }
+.crules p { margin: 0; max-width: 70ch; }
 .spl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); align-items: start; }
 .spl:last-child { border-bottom: 0; }
 .spl .nm { font-weight: 600; cursor: pointer; }
@@ -264,22 +301,27 @@ button.vital:hover { border-color: var(--accent); }
 .stats4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .stat { text-align: center; border: 1px solid var(--line); border-radius: 6px; padding: 3px 2px; }
 .stat .v { font-family: var(--f-label); font-weight: 700; font-size: 20px; line-height: 1.1; }
-.stat .lbl { font-size: 10.5px; }
+.stat .lbl { font-size: 12px; }
 
 /* initiative */
 .init { display: flex; flex-direction: column; gap: 6px; }
 .irow { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-.irow.cur { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+.irow.cur { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .irow .iv { font-family: var(--f-label); font-weight: 700; font-size: 24px; text-align: center; }
 
 /* dice */
 .toast { position: fixed; z-index: 30; right: max(16px, calc(env(safe-area-inset-right, 0px) + 16px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
-.tst { pointer-events: auto; background: var(--ink); color: var(--surface); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); min-width: 200px; max-width: min(360px, calc(100vw - 32px)); animation: tin .18s ease-out; }
+.tst { pointer-events: auto; cursor: pointer; background: var(--ink); color: var(--surface); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); min-width: 200px; max-width: min(360px, calc(100vw - 32px)); animation: tin .18s ease-out; }
 .tst .t { font-family: var(--f-label); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
 .tst .big { font-family: var(--f-label); font-weight: 700; font-size: 34px; line-height: 1; }
 .tst .det { font-size: 12.5px; opacity: .8; }
-.tst.crit .big { color: var(--brass); }
-.tst.fail .big { color: var(--danger); }
+.tst.crit .big { color: var(--tst-crit); }
+.tst.fail .big { color: var(--tst-fail); }
+.tst.crit { box-shadow: 0 0 0 2px var(--tst-crit), 0 10px 26px -10px rgba(0, 0, 0, .55); animation: tcrit .26s cubic-bezier(.2, .9, .25, 1); }
+.tst.fail { box-shadow: 0 0 0 2px var(--tst-fail), 0 10px 26px -10px rgba(0, 0, 0, .55); animation: tfail .3s cubic-bezier(.3, .7, .3, 1); }
+.tst.crit .big, .tst.fail .big { font-size: 42px; }
+@keyframes tcrit { from { transform: translateY(6px) scale(.92); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } to { transform: none; } }
+@keyframes tfail { from { opacity: 0; } 30% { transform: translateX(-5px); opacity: 1; } 55% { transform: translateX(4px); } 80% { transform: translateX(-2px); } to { transform: none; } }
 .tst.msg { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 @keyframes tin { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 .log { display: flex; flex-direction: column; gap: 6px; }
@@ -308,15 +350,15 @@ button.vital:hover { border-color: var(--accent); }
 
 /* Build 8: pickers, checklist, sources */
 .picked { display: flex; gap: 12px; align-items: center; border: 1px solid var(--accent); border-radius: var(--r); padding: 10px 12px; background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
-.picked .src, .choice .src { font-size: 11.5px; color: var(--ink-2); font-family: var(--f-label); letter-spacing: .05em; text-transform: uppercase; }
+.picked .src, .choice .src { font-size: 12px; color: var(--ink-2); font-family: var(--f-label); letter-spacing: .05em; text-transform: uppercase; }
 .pillbtn { border: 0; cursor: pointer; }
 .pillbtn:hover { filter: brightness(.95); }
-.step .cnt { font-family: var(--f-label); font-weight: 700; font-size: 12px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: grid; place-items: center; background: color-mix(in srgb, var(--warn) 18%, var(--surface)); color: var(--warn); }
+.step .cnt { font-family: var(--f-label); font-weight: 700; font-size: 12px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: grid; place-items: center; background: color-mix(in srgb, var(--warn) 11%, var(--surface)); color: var(--warn); }
 .step.todo::before { content: "!"; color: var(--warn); border-color: var(--warn); }
 .step.bad::before { content: "!"; color: var(--danger); border-color: var(--danger); }
 .step.bad .cnt { background: color-mix(in srgb, var(--danger) 16%, var(--surface)); color: var(--danger); }
 .step[aria-current="true"]::before { content: counter(st); background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.todo-box { border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); padding: 8px 12px; border-radius: 0 var(--r) var(--r) 0; font-size: 14px; }
+.todo-box { border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); padding: 8px 12px; border-radius: var(--r); font-size: 14px; }
 .todo-box.bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
 .todo-box ul { margin: 4px 0 0; padding-left: 1.2em; }
 .tbl tr.grp td { font-family: var(--f-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; color: var(--ink-2); background: var(--surface-2); padding: 3px 6px; }
@@ -328,7 +370,7 @@ button.vital:hover { border-color: var(--accent); }
 @media (max-width: 1100px) { .run { grid-template-columns: minmax(0, 1fr); } }
 .clist { display: flex; flex-direction: column; gap: 6px; }
 .crow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-.crow.cur { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+.crow.cur { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .crow.sel { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .crow.hid { border-style: dashed; opacity: .75; }
 .crow .ini { width: 56px; text-align: center; font-family: var(--f-label); font-weight: 700; font-size: 18px; }
@@ -341,9 +383,18 @@ button.vital:hover { border-color: var(--accent); }
 .crow .cx { gap: 2px; flex-wrap: nowrap; }
 .mact { border-top: 1px solid var(--line); padding: 6px 0; }
 .turnbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--surface); }
+@media (max-width: 700px) { .sec-top > .turnbar, .sec-top > .todo-box { order: -2; } .sec-top > .hp { order: -1; } }
 .turnbar.on { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 13%, var(--surface)); }
 .reqbar { background: color-mix(in srgb, var(--brass) 16%, var(--surface)); border-bottom: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px; }
 .reqbar-in { max-width: 1480px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+.bar > .reqbar { margin: 8px calc(-1 * max(16px, env(safe-area-inset-left, 0px))) -8px; border-top: 1px solid var(--line); border-bottom: 0; }
+@media (max-width: 600px) { .bar > .reqbar { margin-bottom: -4px; } }
+.live { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.live:empty { display: none; }
+.lchip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 12px; border-radius: 99px; border: 1px solid; font-family: var(--f-label); font-weight: 700; font-size: 14px; letter-spacing: .04em; cursor: pointer; background: var(--surface); color: var(--ink); }
+.lchip.turn { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 16%, var(--surface)); }
+.lchip.adv { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+@media (max-width: 600px) { .brand { flex-wrap: wrap; } .brand:has(.lchip) > .pill, .brand:has(.lchip) .campbtn { display: none; } .lchip .lg { display: none; } }
 .lg.txt { grid-template-columns: minmax(0, 1fr) auto; }
 .lg.priv { border-style: dashed; }
 .roll.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 44px; }
@@ -398,8 +449,12 @@ button.vital:hover { border-color: var(--accent); }
 .tok.movable { cursor: grab; }
 .tok.mon { background: #f3d2cf; border-color: #a33a34; color: #3a1210; }
 .tok.mine { background: #ffffff; }
-.tok.cur { box-shadow: 0 0 0 .14em #f4c95d, 0 0 .9em .2em rgba(244, 201, 93, .75); }
+.tok.cur { box-shadow: 0 0 0 .14em #f4c95d, 0 .3em .7em rgba(0, 0, 0, .55); }
 .tok.sel { outline: .09em dashed #ffffff; outline-offset: .12em; }
+.tok:focus-visible { outline: max(2px, .1em) solid #ffffff; outline-offset: .14em; box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #16201c; }
+.maphint { position: absolute; z-index: 6; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px); background: #16201c; color: #f3f6f4; padding: 6px 6px 6px 14px; border-radius: 99px; font-size: 14px; box-shadow: 0 6px 18px -6px rgba(0,0,0,.6); cursor: default; }
+.maphint span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.maphint .btn { background: #f3f6f4; color: #16201c; border-color: transparent; flex: none; }
 .tok.hid { opacity: .55; border-style: dashed; }
 .tok.down { filter: grayscale(1); opacity: .6; }
 .tok.down .tl::after { content: "×"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.6em; color: #a33a34; }
@@ -1155,7 +1210,31 @@ const FX_LIB = [
   { id: 'haste', n: 'Haste', ac: 2, note: 'Advantage on Dexterity saves, doubled speed, one extra limited action.' },
   { id: 'cover', n: 'Half cover', ac: 2 },
 ];
-const COND_FX = { Poisoned: { disAtk: 1, disCheck: 1 }, Blinded: { disAtk: 1 }, Frightened: { disAtk: 1, disCheck: 1 }, Prone: { disAtk: 1 }, Restrained: { disAtk: 1 }, Invisible: { advAtk: 1 } };
+const COND_FX = { Poisoned: { disAtk: 1, disCheck: 1 }, Blinded: { disAtk: 1 }, Frightened: { disAtk: 1, disCheck: 1 }, Prone: { disAtk: 1 }, Restrained: { disAtk: 1, disDex: 1 }, Invisible: { advAtk: 1 },
+  Paralyzed: { failSD: 1 }, Petrified: { failSD: 1 }, Stunned: { failSD: 1 }, Unconscious: { failSD: 1 } };
+/* what each condition does, in short (System Reference Document 5.2, CC BY 4.0); "2024:" marks a rule only the 2024 rules add */
+const COND_RULES = {
+  Blinded: 'You can’t see and fail any check that needs sight. Attacks against you have advantage; your attacks have disadvantage.',
+  Charmed: 'You can’t attack the charmer or target them with harmful abilities or magic. The charmer has advantage on social checks with you.',
+  Deafened: 'You can’t hear and fail any check that needs hearing.',
+  Frightened: 'Disadvantage on ability checks and attacks while the source of your fear is in sight. You can’t willingly move closer to it.',
+  Grappled: 'Your speed is 0. 2024: disadvantage on attacks against anyone but the grappler, who can move you with them.',
+  Incapacitated: 'You can’t take actions, bonus actions or reactions. 2024: you also can’t speak, your concentration ends, and you roll initiative with disadvantage.',
+  Invisible: 'You can’t be seen without magic or a special sense. Your attacks have advantage; attacks against you have disadvantage.',
+  Paralyzed: 'Incapacitated, and you can’t move or speak. You fail Strength and Dexterity saves. Attacks against you have advantage, and a hit from within 5 feet is a critical hit.',
+  Petrified: 'Turned to stone: incapacitated, can’t move or speak, unaware of what’s around you. You fail Strength and Dexterity saves, attacks against you have advantage, and you resist all damage.',
+  Poisoned: 'Disadvantage on attack rolls and ability checks.',
+  Prone: 'You can only crawl until you stand up, which costs half your speed. Your attacks have disadvantage. Attacks against you have advantage from within 5 feet and disadvantage from farther away.',
+  Restrained: 'Your speed is 0. Your attacks and Dexterity saves have disadvantage; attacks against you have advantage.',
+  Stunned: 'Incapacitated. You fail Strength and Dexterity saves, and attacks against you have advantage.',
+  Unconscious: 'Incapacitated, can’t move or speak, unaware of what’s around you; you drop what you hold and fall prone. You fail Strength and Dexterity saves. Attacks against you have advantage, and a hit from within 5 feet is a critical hit.',
+};
+function exhRule(n, rs) {
+  if (!n) return '';
+  if (rs === '2024') return n >= 6 ? 'Exhaustion 6: you die.' : `Exhaustion ${n}: −${2 * n} to every d20 test and −${5 * n} ft. speed. A long rest removes one level; at 6 you die.`;
+  const L = ['', 'disadvantage on ability checks', 'speed halved', 'disadvantage on attacks and saves', 'hit point maximum halved', 'speed 0', 'death'];
+  return `Exhaustion ${n}: ` + L.slice(1, n + 1).join('; ') + '. A long rest removes one level.';
+}
 function fxAvailable(ch, D) {
   const names = (D.features || []).map(x => x.n);
   const lib = FX_LIB.filter(f => !f.need || names.some(n => f.need.test(n)));
@@ -1163,10 +1242,10 @@ function fxAvailable(ch, D) {
 }
 function fxMods(ch, D) {
   const p = ch.play || {};
-  const M = { defs: [], ac: 0, advAtk: false, disAtk: false, disCheck: false, disSave: false, flat: 0, why: [] };
+  const M = { defs: [], ac: 0, advAtk: false, disAtk: false, disCheck: false, disSave: false, disDex: false, failSD: false, flat: 0, why: [] };
   const on = new Set(p.fx || []);
   for (const f of fxAvailable(ch, D)) { if (!on.has(f.id)) continue; M.defs.push(f); M.ac += +f.ac || 0; }
-  for (const c of p.cond || []) { const e = COND_FX[c]; if (!e) continue; if (e.disAtk) M.disAtk = true; if (e.disCheck) M.disCheck = true; if (e.advAtk) M.advAtk = true; M.why.push(c); }
+  for (const c of p.cond || []) { const e = COND_FX[c]; if (!e) continue; if (e.disAtk) M.disAtk = true; if (e.disCheck) M.disCheck = true; if (e.advAtk) M.advAtk = true; if (e.disDex) M.disDex = true; if (e.failSD) M.failSD = true; M.why.push(c); }
   const ex = +p.exh || 0;
   if (ex) { if (ch.ruleset === '2024') M.flat -= 2 * ex; else { M.disCheck = true; if (ex >= 3) { M.disAtk = true; M.disSave = true; } } M.why.push('Exhaustion ' + ex); }
   return M;
@@ -1192,18 +1271,26 @@ function joinExpr(base, extras) {
 const critExpr = expr => String(expr).replace(/(\d*)d(\d+)/g, (m, n, d) => (2 * (+n || 1)) + 'd' + d);
 function critAt(D) { const n = (D.features || []).map(x => x.n).join('|'); return /superior critical/i.test(n) ? 18 : /improved critical/i.test(n) ? 19 : 20; }
 /* one d20 test with effects, conditions and the advantage switch folded in */
+/* advantage and disadvantage apply to the next d20 roll (or one batch of rolls), then the switch goes back to Normal */
+function takeAdv() {
+  const a = UI.adv === 'adv' || UI.adv === 'dis' ? UI.adv : 'normal';
+  if (a !== 'normal' && !UI.advReset) UI.advReset = setTimeout(() => { UI.adv = 'normal'; UI.advReset = 0; queueRender(); }, 0);
+  return a;
+}
 function d20Roll(o) {
   const M = o.M, t = o.type;
   const dice = M ? M.defs.filter(f => f[t] && (t !== 'atk' || fxApplies(f, o.a) || !f.strMelee)).map(f => f[t]) : [];
-  let adv = UI.adv === 'adv', dis = UI.adv === 'dis';
+  const um = o.type === 'death' ? 'normal' : takeAdv(); let adv = um === 'adv', dis = um === 'dis';
   if (M) {
     if (t === 'atk') { if (M.advAtk || M.defs.some(f => f.advAtk && fxApplies(f, o.a))) adv = true; if (M.disAtk) dis = true; }
     if (t === 'check' && M.disCheck) dis = true;
     if (t === 'save' && M.disSave) dis = true;
+    if (t === 'save' && M.disDex && o.ab === 'dex') dis = true;
   }
   const mode = adv && !dis ? 'adv' : dis && !adv ? 'dis' : 'normal';
   const b = (+o.bonus || 0) + (M && t !== 'death' ? M.flat : 0);
   const r = rollExpr(joinExpr('1d20' + (b ? (b > 0 ? '+' : '-') + Math.abs(b) : ''), dice), mode);
+  if (t === 'save' && M && M.failSD && (o.ab === 'str' || o.ab === 'dex')) return { total: 0, nat: null, detail: 'fails automatically (' + M.why.filter(c => COND_FX[c] && COND_FX[c].failSD).join(', ') + ')', crit: false, fail: true, mode: 'normal', auto: true };
   return { total: r.total, nat: r.nat, detail: r.detail, crit: r.nat != null && r.nat >= (t === 'atk' ? (o.critAt || 20) : 20), fail: r.nat === 1, mode };
 }
 function scaleCantrip(dmg, lvl) {
@@ -1796,9 +1883,9 @@ function viewBar() {
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
-    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${window.PL_SITE && !S.fbSetup ? `<button class="btn sm" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
+    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
     <nav class="tabs" aria-label="Views">${tabs.map(([k, l]) => `<button class="tab" data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</nav>
-  </div></header>${requestBanner()}`;
+  </div>${requestBanner()}</header>`;
 }
 
 /* ===== characters view ===== */
@@ -1808,17 +1895,17 @@ function viewChars() {
   const e = curEntry();
   const item = x => `<button class="who" data-act="open" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}" aria-current="${!!(e && e.ch.id === x.ch.id && e.owner === x.owner)}">
       <span class="sigil">${initials(x.ch.name)}</span><span class="grow"><span class="nm">${esc(x.ch.name)}</span><br><span class="sub">${esc(classLine(x.ch))}${x.mine ? '' : ' · ' + esc(playerName(x.owner))}</span></span></button>`;
-  const rail = `<aside class="rail">
-    <div class="stack"><div class="lbl">Your characters</div><div class="roster">${mine.map(item).join('') || '<div class="small muted">None yet.</div>'}</div></div>
+  const rail = `<aside class="rail${e ? ' has-cur' : ''}">
+    <div class="stack"><div class="lbl">Your characters</div><div class="roster">${mine.map(item).join('') || '<div class="small muted">None yet.</div>'}${e && !S.readOnly ? `<button class="who addnew" data-act="newopen"><span class="sigil">${svgIcon('plus', 16)}</span><span class="grow"><span class="nm">New character</span></span></button>` : ''}</div></div>
     ${S.mode === 'live' && others.length ? `<div class="stack"><div class="lbl">Rest of the party</div><div class="roster">${others.map(item).join('')}</div></div>` : ''}
-    <div class="panel stack"><div class="lbl">New character</div>
+    <div class="panel stack newpanel"><div class="lbl">New character</div>
       <div class="seg" role="group" aria-label="Rules">${['2024', '2014'].map(r => `<button data-act="newrs" data-v="${r}"${pressed(UI.newRs === r)}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</button>`).join('')}</div>
       <button class="btn pri" data-act="newchar"${dis(S.readOnly)}>Create character</button>
       <button class="btn" data-act="pastecode"${dis(S.readOnly)}>Paste a character code</button>
     </div>
   </aside>`;
   let main;
-  if (!e) main = `<div class="empty"><h3 style="font-family:var(--f-display);font-size:22px;margin-bottom:6px">Pick a character or start a new one</h3><p>Characters you make here ${S.mode === 'live' ? 'save to the campaign, so the DM can see them in Party.' : (window.PL_SITE ? 'save in this browser. Join a campaign with the button at the top to share them with your DM.' : 'save in this browser. Open the published page from claude.ai to share them with your DM.')}</p>${S.readOnly ? '' : '<div class="row" style="justify-content:center;margin-top:10px"><button class="btn pri" data-act="newchar">Create character</button><button class="btn" data-act="sample">Load an example character</button></div>'}</div>`;
+  if (!e) main = `<div class="empty"><h2 style="font-family:var(--f-display);font-size:22px;margin-bottom:6px">Pick a character or start a new one</h2><p>Characters you make here ${S.mode === 'live' ? 'save to the campaign, so the DM can see them in Party.' : (window.PL_SITE ? 'save in this browser. Join a campaign with the button at the top to share them with your DM.' : 'save in this browser. Open the published page from claude.ai to share them with your DM.')}</p>${S.readOnly ? '' : '<div class="row" style="justify-content:center;margin-top:10px"><button class="btn pri" data-act="newchar">Create character</button><button class="btn" data-act="sample">Load an example character</button></div>'}</div>`;
   else main = charEditor(e);
   return (S.fbSetup && typeof fbSetupNote === 'function' ? fbSetupNote() : '') + `<div class="shell">${rail}<section style="min-width:0">${main}</section></div>`;
 }
@@ -1832,10 +1919,10 @@ function charEditor(e) {
   const ch = e.ch, ro = !canEditChar(e.owner);
   const D = derive(ch);
   const hdr = `<div class="chead">
-    <div class="grow" style="min-width:220px"><input class="cname" id="f-name" data-in="name" value="${esc(ch.name)}" aria-label="Character name"${dis(ro)}>
+    <div class="grow" style="min-width:220px"><h2 class="sr-only">${esc(ch.name || 'Character')}</h2><input class="cname" id="f-name" data-in="name" value="${esc(ch.name)}" aria-label="Character name"${dis(ro)}>
       <div class="meta row" style="margin-top:4px"><span class="pill ${ch.ruleset === '2024' ? 'acc' : 'brass'}">${ch.ruleset === '2024' ? '2024 rules' : '2014 rules'}</span><span>${esc([speciesName(ch), classLine(ch)].filter(Boolean).join(' · '))}</span>${D.level ? `<span class="pill">Level ${D.level}</span>` : ''}${e.mine ? '' : `<span class="pill">${esc(playerName(e.owner))}</span>`}${issuePill(D)}${D.flags.length ? `<span class="pill" title="${esc(D.flags.join('\n'))}">${D.flags.length} house-rule item${D.flags.length === 1 ? '' : 's'}</span>` : ''}</div></div>
     <div class="row">
-      <div class="seg" role="tablist">${[['sheet', 'Sheet'], ['build', 'Build']].map(([k, l]) => `<button data-act="tab" data-v="${k}"${pressed(UI.tab === k)}>${l}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Sheet or builder">${[['sheet', 'Sheet'], ['build', 'Build']].map(([k, l]) => `<button data-act="tab" data-v="${k}"${pressed(UI.tab === k)}>${l}</button>`).join('')}</div>
       <button class="btn ghost sm" data-act="copycode">Copy code</button>
       <button class="btn ghost sm" data-act="exportchar">Save JSON</button>
       ${ro ? '' : `<button class="btn ghost sm danger" data-act="delchar">Delete</button>`}
@@ -2027,7 +2114,7 @@ function stepAbilities(ch, D, ro) {
   } else {
     ctl = `<div class="abgrid">${ABIL.map(a => `<label class="field"><span class="lbl">${a}</span><input type="number" id="f-base-${a}" min="1" max="${ch.free ? 30 : 20}" data-f="abil.base.${a}" data-t="num" value="${esc(ch.abil.base[a])}"${dis(ro)}></label>`).join('')}</div><div class="small muted">Type in scores your DM gave you (1 to ${ch.free ? 30 : 20}). The DM sees that this sheet uses typed-in scores.</div>`;
   }
-  const table = `<div class="scroll-x"><table class="tbl"><thead><tr><th>Ability</th><th>Breakdown</th><th>Items</th><th>Score</th><th>Mod</th></tr></thead><tbody>${ABIL.map(a => `<tr><td><b>${ABN[a]}</b></td><td class="small">${D.parts[a].map(([s, v], i) => i === 0 ? v : `${sgn(v)} ${esc(s)}`).join(' ')}</td><td><input type="number" id="f-misc-${a}" data-f="abil.misc.${a}" data-t="num" value="${esc((ch.abil.misc || {})[a] || 0)}" style="width:60px"${dis(ro)}></td><td class="num" style="font-size:18px">${D.sc[a]}</td><td class="num" style="font-size:18px">${sgn(D.m[a])}</td></tr>`).join('')}</tbody></table></div>`;
+  const table = `<div class="scroll-x"><table class="tbl"><thead><tr><th>Ability</th><th>Breakdown</th><th>Items</th><th>Score</th><th>Mod</th></tr></thead><tbody>${ABIL.map(a => `<tr><td><b>${ABN[a]}</b></td><td class="small">${D.parts[a].map(([s, v], i) => i === 0 ? v : `${sgn(v)} ${esc(s)}`).join(' ')}</td><td><input type="number" id="f-misc-${a}" aria-label="${ABN[a]} bonus from items" data-f="abil.misc.${a}" data-t="num" value="${esc((ch.abil.misc || {})[a] || 0)}" style="width:60px"${dis(ro)}></td><td class="num" style="font-size:18px">${D.sc[a]}</td><td class="num" style="font-size:18px">${sgn(D.m[a])}</td></tr>`).join('')}</tbody></table></div>`;
   return `<div class="panel stack"><h3>Ability scores</h3>${seg}${ctl}</div><div class="panel"><h3>Final scores</h3>${table}<p class="small muted" style="margin-top:8px">Scores from your build cap at 20 (30 with an Epic Boon). The Items column is added after the cap, for things like a Belt of Giant Strength.</p></div>`;
 }
 
@@ -2144,7 +2231,7 @@ function extraSpellsPanel(ch, D, ro, R) {
   const q = UI.xspQ.trim().toLowerCase();
   const hits = q.length >= 2 ? R.list('spells').filter(s => s.name.toLowerCase().includes(q) && !list.includes(s.id)).slice(0, 14) : [];
   return `<div class="panel stack"><h3>Other spells</h3><p class="small muted">Spells from feats, species or items. They don't count against class limits, and the DM sees them listed.</p>
-    <div class="row">${list.map((id, i) => { const s = look(ch, 'spells', id); return `<span class="pill">${esc(s ? s.name : id)} <button class="btn ghost sm" style="padding:0 2px" data-act="rmextra" data-i="${i}" aria-label="Remove"${dis(ro)}>×</button></span>`; }).join('') || '<span class="small muted">None.</span>'}</div>
+    <div class="row">${list.map((id, i) => { const s = look(ch, 'spells', id); return `<span class="pill">${esc(s ? s.name : id)} <button class="btn ghost sm" style="padding:0 2px" data-act="rmextra" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></span>`; }).join('') || '<span class="small muted">None.</span>'}</div>
     <div class="row"><input type="search" id="f-xspq" data-act="xspq" placeholder="Search all spells to add" value="${esc(UI.xspQ)}" style="max-width:260px"${dis(ro)}>
     <label class="field" style="width:160px"><span class="small muted">Casting ability</span><select data-f="extraAb"${dis(ro)}>${['int', 'wis', 'cha'].map(a => opt(a, ABN[a], (ch.extraAb || D.extraAb) === a)).join('')}</select></label></div>
     ${hits.length ? `<div class="row">${hits.map(s => `<button class="btn sm" data-act="addextra" data-v="${esc(s.id)}"${dis(ro)}>+ ${esc(s.name)} <span class="muted">${s.lvl ? 'L' + s.lvl : 'C'}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No spells match.</div>' : '')}</div>`;
@@ -2191,7 +2278,7 @@ function stepEquipment(ch, D, ro) {
         <td><input type="number" id="f-q-${i}" min="0" data-act="invq" data-i="${i}" value="${esc(it.q || 1)}" style="width:62px"${dis(ro)}></td>
         <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Use</label>${d.att ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
         <td><span class="row" style="gap:3px;flex-wrap:nowrap">${['ac', 'atk', 'dmg'].map(k => `<input type="number" id="f-ib-${k}-${i}" data-act="invb" data-k="${k}" data-i="${i}" value="${esc(it[k] || 0)}" style="width:46px" aria-label="${k} bonus"${dis(ro)}>`).join('')}</span></td>
-        <td><button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>×</button></td></tr>`;
+        <td><button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></td></tr>`;
     }).join('') || '<tr><td colspan="5" class="muted">Nothing carried yet.</td></tr>'}</tbody></table></div>
     <div class="row"><input type="search" id="f-itemq" data-act="itemq" placeholder="Search items to add" value="${esc(UI.itemQ)}" style="max-width:260px"${dis(ro)}><span class="small muted">Weight ${Math.round(D.weight * 10) / 10} / ${D.capacity} lb.</span></div>
     ${results.length ? `<div class="row">${results.map(i => `<button class="btn sm" data-act="invadd" data-v="${esc(i.id)}"${dis(ro)}>+ ${esc(i.name)}</button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No items match.</div>' : '')}
@@ -2222,7 +2309,7 @@ function hpBar(ch, D) {
   return `<div class="hpbar"><i class="${cls}" style="width:${pct}%"></i>${tmp ? `<s style="left:${pct}%;width:${clamp(tmp / max * 100, 0, 100 - pct)}%"></s>` : ''}</div>`;
 }
 function advSeg() {
-  return `<span class="seg" role="group" aria-label="Roll mode" style="text-transform:none;letter-spacing:0">${[['dis', 'Disadv.'], ['normal', 'Normal'], ['adv', 'Adv.']].map(([k, l]) => `<button data-act="adv" data-v="${k}"${pressed(UI.adv === k)} style="padding:2px 8px;font-size:12.5px">${l}</button>`).join('')}</span>`;
+  return `<span class="seg" role="group" aria-label="Roll mode" style="text-transform:none;letter-spacing:0">${[['dis', 'Disadv.'], ['normal', 'Normal'], ['adv', 'Adv.']].map(([k, l]) => `<button data-act="adv" data-v="${k}"${pressed(UI.adv === k)} class="mini">${l}</button>`).join('')}</span>`;
 }
 const SECS = [['actions', 'Actions'], ['spells', 'Spells'], ['skills', 'Skills'], ['features', 'Features'], ['gear', 'Gear'], ['notes', 'Notes']];
 function sheetView(ch, D, ro, e) {
@@ -2246,11 +2333,11 @@ function sheetView(ch, D, ro, e) {
     <button class="vital" data-act="insp"${dis(ro)} aria-pressed="${!!p.insp}" style="${p.insp ? 'border-color:var(--brass);color:var(--brass)' : ''}"><div class="lbl">Inspiration</div><div class="v">${p.insp ? '★' : '☆'}</div></button>
     <div class="vital"><div class="lbl">Hit dice</div><div class="v" style="font-size:18px;padding-top:4px">${Object.entries(D.hdPool).map(([d, n]) => `${n - (+(p.hd || {})[d] || 0)}d${d}`).join(' ') || '—'}</div></div>
   </div>`;
-  const hpBox = `<div class="hp"><div class="row"><span class="lbl">Hit points</span><span class="spacer"></span>${D.dv ? `<span class="pill">Darkvision ${D.dv} ft.</span>` : ''}</div>
+  const hpBox = `<div class="hp${hp <= 0 ? ' down' : ''}"><div class="row"><span class="lbl">Hit points</span>${hp <= 0 ? '<span class="pill bad">Down</span>' : ''}<span class="spacer"></span>${D.dv ? `<span class="pill">Darkvision ${D.dv} ft.</span>` : ''}</div>
     <div class="row" style="align-items:flex-end"><span class="hpnum">${hp}</span><span class="muted num" style="font-size:20px">/ ${D.maxHp}</span>${p.temp ? `<span class="pill acc">+${p.temp} temp</span>` : ''}<span class="spacer"></span></div>
     ${hpBar(ch, D)}
     ${ro ? '' : `<div class="row"><input type="number" id="f-hpamt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="dmg">Damage</button><button class="btn sm" data-act="heal">Heal</button><button class="btn sm" data-act="temp">Set temp</button></div>`}
-    ${hp <= 0 ? `<div class="row" style="margin-top:8px"><span class="lbl">Death saves</span>${[0, 1].map(k => `<span class="row" style="gap:4px"><span class="small">${k ? 'Failures' : 'Successes'}</span>${[1, 2, 3].map(n => `<button class="pip circ${(p.ds || [0, 0])[k] >= n ? '' : ' used'}" style="${k ? 'background:' + ((p.ds || [0, 0])[k] >= n ? 'var(--danger)' : 'transparent') + ';border-color:var(--danger)' : ''}" data-act="ds" data-k="${k}" data-n="${n}" aria-label="${k ? 'Failure' : 'Success'} ${n}"${dis(ro)}></button>`).join('')}</span>`).join('')}<button class="roll" ${roll('Death save', 0, 'death')}>Roll</button></div>` : ''}
+    ${hp <= 0 ? `<div class="row" style="margin-top:8px"><span class="lbl">Death saves</span>${[0, 1].map(k => `<span class="row" style="gap:2px"><span class="small">${k ? 'Failures' : 'Successes'}</span>${[1, 2, 3].map(n => `<button class="pip big circ${(p.ds || [0, 0])[k] >= n ? '' : ' used'}" style="${k ? '--pc:var(--danger);--pcu:var(--danger)' : ''}" data-act="ds" data-k="${k}" data-n="${n}" aria-label="Death save ${k ? 'failure' : 'success'} ${n}, ${(p.ds || [0, 0])[k] >= n ? 'marked' : 'not marked'}"${dis(ro)}></button>`).join('')}</span>`).join('')}<button class="roll" ${roll('Death save', 0, 'death')}>Roll</button></div>` : ''}
   </div>`;
   const cap = S.mode === 'live' && !S.me.isOwner ? (+(S.settings || {}).maxLevel || 20) : 20;
   const rest = ro ? '' : `<div class="row"><button class="btn" data-act="shortrest">Short rest</button><button class="btn" data-act="longrest">Long rest</button>${Object.keys(D.hdPool).map(d => `<button class="btn sm" data-act="spendhd" data-d="${d}"${dis(((+(p.hd || {})[d]) || 0) >= D.hdPool[d])}>Spend d${d}</button>`).join('')}${last ? `<button class="btn sm" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 22))}</button>` : ''}<span class="spacer"></span><button class="btn sm" data-act="levelup"${dis(D.level >= cap)} title="${D.level >= cap ? 'At the level cap' : 'Gain a level'}">Level up</button></div>`;
@@ -2262,7 +2349,7 @@ function sheetView(ch, D, ro, e) {
   const fx = `<div class="panel stack"><div class="ph">Effects<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Switch on what's affecting you; rolls change to match.</span></div>
     <div class="cond fxrow">${avail.map(f => `<button data-act="fx" data-v="${esc(f.id)}"${pressed(on.has(f.id))}${dis(ro)} title="${esc([f.atk && 'attacks ' + f.atk, f.dmg && 'damage ' + f.dmg, f.save && 'saves ' + f.save, f.check && 'checks ' + f.check, f.ac && 'AC +' + f.ac, f.note].filter(Boolean).join(' · '))}">${esc(f.n)}</button>`).join('')}</div>
     ${M.defs.filter(f => f.note).map(f => `<div class="small muted"><b>${esc(f.n)}:</b> ${esc(f.note)}</div>`).join('')}
-    ${M.why.length ? `<div class="small warnline">${esc(M.why.join(', '))}: ${[M.disAtk && 'disadvantage on attacks', M.disCheck && 'disadvantage on ability checks', M.disSave && 'disadvantage on saves', M.advAtk && 'advantage on attacks', M.flat && M.flat + ' to d20 rolls'].filter(Boolean).join(', ') || 'no change to rolls'}.</div>` : ''}
+    ${M.why.length ? `<div class="small warnline">${esc(M.why.join(', '))}: ${[M.failSD && 'Strength and Dexterity saves fail', M.disAtk && 'disadvantage on attacks', M.disCheck && 'disadvantage on ability checks', M.disSave && 'disadvantage on saves', M.disDex && !M.disSave && 'disadvantage on Dexterity saves', M.advAtk && 'advantage on attacks', M.flat && M.flat + ' to d20 rolls'].filter(Boolean).join(', ') || 'no change to rolls'}.</div>` : ''}
     ${ro ? '' : `<details data-k="fxadd"><summary class="small" style="cursor:pointer">Add your own effect</summary><div class="row" style="margin-top:6px"><input type="text" id="f-fxn" placeholder="Name" style="width:140px"><input type="text" id="f-fxa" placeholder="Attacks, e.g. -5 or 1d4" style="width:170px"><input type="text" id="f-fxd" placeholder="Damage, e.g. +10 or 1d6" style="width:170px"><input type="text" id="f-fxs" placeholder="Saves" style="width:90px"><input type="number" id="f-fxc" placeholder="AC" style="width:70px"><button class="btn sm" data-act="fxadd">Add</button></div>${(ch.customFx || []).map(f => `<div class="row small" style="margin-top:4px"><span>${esc(f.n)}</span><button class="btn ghost sm danger" data-act="fxrm" data-v="${esc(f.id)}">Remove</button></div>`).join('')}</details>`}</div>`;
   const xa = infoVal(D, 'Extra attacks');
   const atk = `<div class="panel"><div class="ph">Attacks${xa ? `<span class="pill" style="text-transform:none;letter-spacing:0">${1 + (+xa || 0)} per Attack action</span>` : ''}<span class="spacer"></span>${advSeg()}</div>
@@ -2275,11 +2362,12 @@ function sheetView(ch, D, ro, e) {
     </tbody></table></div><p class="small muted" style="margin-top:6px">The big button rolls to hit and damage together, doubling the dice on a critical hit. Equip weapons under Gear.</p></div>`;
   const res = (D.res.length || D.info.length) ? `<div class="panel stack"><h3>Class resources</h3>
     ${D.info.length ? `<div class="row small">${D.info.map(([k, v]) => `<span class="pill">${esc(k)}: <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
-    ${D.res.map(r => { const u = +(p.res || {})[r.key] || 0; const left = Math.max(0, r.max - u); return `<div class="row"><span class="grow"><b>${esc(r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}" data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`}</div>`; }).join('')}
+    ${D.res.map(r => { const u = +(p.res || {})[r.key] || 0; const left = Math.max(0, r.max - u); return `<div class="row"><span class="grow"><b>${esc(r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}" data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)} ${i + 1} of ${r.max}, ${i < left ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`}</div>`; }).join('')}
     ${ro ? '' : `<details data-k="resadd"><summary class="small" style="cursor:pointer">Track something else</summary><div class="row" style="margin-top:6px"><input type="text" id="f-crn" placeholder="Name (e.g. Superiority dice)"><input type="text" id="f-crm" placeholder="Max (e.g. 4 or proficiency)" style="width:170px"><select id="f-crr">${opt('short', 'Short rest')}${opt('long', 'Long rest')}</select><button class="btn sm" data-act="addres">Add</button></div>${(ch.customRes || []).map((r, i) => `<div class="row small" style="margin-top:4px"><span>${esc(r.n)} (${esc(r.max)})</span><button class="btn ghost sm danger" data-act="rmres" data-i="${i}">Remove</button></div>`).join('')}</details>`}
   </div>` : '';
-  const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm" style="padding:1px 6px" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
-    <div class="cond">${CONDITIONS.map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)}>${c}</button>`).join('')}</div>
+  const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm exh" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
+    <div class="cond">${CONDITIONS.map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>
+    ${(p.cond || []).length || +p.exh ? `<div class="crules">${(p.cond || []).filter(c => COND_RULES[c]).map(c => `<p><b>${esc(c)}.</b> ${esc(COND_RULES[c])}</p>`).join('')}${+p.exh ? `<p><b>Exhaustion.</b> ${esc(exhRule(+p.exh, ch.ruleset).replace(/^Exhaustion \d+: /, ''))}</p>` : ''}</div>` : '<p class="small muted">Tap a condition to see what it does. Rolls change to match where the rules say so.</p>'}
     <label class="row small"><span class="lbl">Concentrating on</span><input type="text" id="f-conc" data-play="conc" value="${esc(p.conc || '')}" placeholder="Nothing" style="flex:1"${dis(ro)}></label></div>`;
   const actions = `<div class="stack sec sec-actions">${fx}${atk}${res}${conds}</div>`;
 
@@ -2309,11 +2397,11 @@ function sheetView(ch, D, ro, e) {
     for (let i = 1; i <= 9; i++) if (D.slots[i - 1] && !lv.includes(i)) lv.push(i);
     lv.sort((a, b) => a - b);
     spells = `<div class="panel"><div class="ph">Spells<span class="spacer"></span>${D.casters.map(c => `<span class="pill acc" style="text-transform:none;letter-spacing:0">${esc(c.name)} DC ${c.dc} · ${sgn(c.atk)}</span>`).join(' ')}</div>
-      ${D.pact ? `<div class="splv"><h4>Pact slots · level ${D.pact.lvl}</h4><span class="pips">${Array.from({ length: D.pact.n }, (_, i) => `<button class="pip${i < D.pact.n - (+p.pact || 0) ? '' : ' used'}" data-act="pact" data-n="${i < D.pact.n - (+p.pact || 0) ? (+p.pact || 0) + 1 : (+p.pact || 0) - 1}" aria-label="Pact slot"${dis(ro)}></button>`).join('')}</span></div>` : ''}
+      ${D.pact ? `<div class="splv"><h4>Pact slots · level ${D.pact.lvl}</h4><span class="pips">${Array.from({ length: D.pact.n }, (_, i) => `<button class="pip${i < D.pact.n - (+p.pact || 0) ? '' : ' used'}" data-act="pact" data-n="${i < D.pact.n - (+p.pact || 0) ? (+p.pact || 0) + 1 : (+p.pact || 0) - 1}" aria-label="Pact slot ${i + 1} of ${D.pact.n}, ${i < D.pact.n - (+p.pact || 0) ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span></div>` : ''}
       ${lv.map(l => {
         const n = l ? D.slots[l - 1] || 0 : 0, u = +(p.slots || {})[l] || 0;
         const list = known.filter(x => x.s.lvl === l).sort((a, b) => a.s.name.localeCompare(b.s.name));
-        return `<div class="splv"><h4>${l ? ORD(l) + ' level' : 'Cantrips'}</h4>${n ? `<span class="pips">${Array.from({ length: n }, (_, i) => `<button class="pip${i < n - u ? '' : ' used'}" data-act="slot" data-l="${l}" data-n="${i < n - u ? u + 1 : u - 1}" aria-label="Level ${l} slot"${dis(ro)}></button>`).join('')}</span><span class="small muted">${n - u} left</span>` : ''}</div>
+        return `<div class="splv"><h4>${l ? ORD(l) + ' level' : 'Cantrips'}</h4>${n ? `<span class="pips">${Array.from({ length: n }, (_, i) => `<button class="pip${i < n - u ? '' : ' used'}" data-act="slot" data-l="${l}" data-n="${i < n - u ? u + 1 : u - 1}" aria-label="Level ${l} slot ${i + 1} of ${n}, ${i < n - u ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span><span class="small muted">${n - u} left</span>` : ''}</div>
           ${list.map(({ s, c }) => { const m = spellMath(s, s.lvl, D.level, D.m[c.ab]); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name].filter(Boolean).join(' · '))}</div></div>
               <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(m.dmg)}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
       }).join('')}</div>`;
@@ -2516,15 +2604,15 @@ function viewHomebrew() {
   const isDM = S.mode === 'live' && S.me.isOwner;
   const left = `<aside class="rail"><div class="stack"><div class="lbl">Content packs</div><div class="roster">${packs.map(p => `<button class="who" data-act="hbpack" data-v="${esc(p.id)}" aria-current="${!!(sel && sel.id === p.id)}"><span class="sigil" style="border-radius:8px">${initials(p.name)}</span><span class="grow"><span class="nm">${esc(p.name)}</span><br><span class="sub">${p.shared ? 'Shared with party' : 'This device'} · ${p.ruleset === 'any' ? 'both rulesets' : p.ruleset}</span></span></button>`).join('') || '<div class="small muted">No homebrew yet.</div>'}</div></div>
     <div class="panel stack"><div class="lbl">New pack</div>
-      <input type="text" id="f-pkname" placeholder="Pack name, e.g. Our table's homebrew">
-      <select id="f-pkrs">${RULESET_OPTS.map(([v, l]) => opt(v, l)).join('')}</select>
-      ${isDM ? `<select id="f-pkwhere">${opt('shared', 'Share with the party')}${opt('local', 'Keep on this device')}</select>` : ''}
+      <input type="text" id="f-pkname" placeholder="Pack name" aria-label="Pack name, for example Our table’s homebrew">
+      <select id="f-pkrs" aria-label="Rules this pack is for">${RULESET_OPTS.map(([v, l]) => opt(v, l)).join('')}</select>
+      ${isDM ? `<select id="f-pkwhere" aria-label="Who gets this pack">${opt('shared', 'Share with the party')}${opt('local', 'Keep on this device')}</select>` : ''}
       <button class="btn pri" data-act="hbnewpack">Create pack</button>
       <button class="btn" data-act="hbimport">Import files…</button>
       <button class="btn ghost sm" data-act="hbtemplate">Get a JSON template</button>
     </div></aside>`;
   let main;
-  if (!sel) main = `<div class="empty"><h3 style="font-family:var(--f-display);font-size:22px;margin-bottom:6px">Add your own content</h3><p>Make a pack, then add classes, subclasses, species, backgrounds, feats, spells and items with the forms. You can also import JSON packs or Aurora Builder XML files (single files, a folder, or a zip).</p>${isDM ? '<p>Packs you share appear for every player in this campaign.</p>' : S.mode === 'live' ? '<p>Only the DM can add shared packs. Packs you make stay on this device, and characters that use them carry a copy so the DM can still read them.</p>' : ''}</div>`;
+  if (!sel) main = `<div class="empty"><h2 style="font-family:var(--f-display);font-size:22px;margin-bottom:6px">Add your own content</h2><p>Make a pack, then add classes, subclasses, species, backgrounds, feats, spells and items with the forms. You can also import JSON packs or Aurora Builder XML files (single files, a folder, or a zip).</p>${isDM ? '<p>Packs you share appear for every player in this campaign.</p>' : S.mode === 'live' ? '<p>Only the DM can add shared packs. Packs you make stay on this device, and characters that use them carry a copy so the DM can still read them.</p>' : ''}</div>`;
   else {
     const can = canEditPack(sel);
     const counts = Object.fromEntries(TYPES.map(t => [t, ((sel.entries || {})[t] || []).length]));
@@ -2573,7 +2661,7 @@ function hbModal() {
   const can = canEditPack(p);
   const rs = (p && p.ruleset) || 'any';
   const e = m.entry;
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Edit entry"><div class="row"><h2>${m.isNew ? 'New' : can ? 'Edit' : 'View'} ${TYPE_LABEL[m.type].toLowerCase()}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Edit entry"><div class="row"><h2>${m.isNew ? 'New' : can ? 'Edit' : 'View'} ${TYPE_LABEL[m.type].toLowerCase()}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="grid2">${FORMS[m.type].map(f => fieldHTML(m.type, f, getP(e, f[0]), rs)).join('')}</div>
     ${m.err ? `<div class="errline">${esc(m.err)}</div>` : ''}
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button>${can ? `<button class="btn pri" data-act="hbsave">Save</button>` : ''}</div></div>`;
@@ -2618,7 +2706,7 @@ function importModal() {
       ${m.progress ? `<div class="bar-prog"><i style="width:${Math.round(m.progress * 100)}%"></i></div>` : ''}
       <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="impgo"${dis(!total && !(r.chars || []).length || m.busy)}>${m.busy ? 'Importing…' : 'Import ' + total + ' entries'}</button></div></div>`;
   }
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Import content"><div class="row"><h2>Import content</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>${body}</div>`;
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Import content"><div class="row"><h2>Import content</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>${body}</div>`;
 }
 const CAN_FETCH = !!window.PL_SITE;
 function toRawUrl(u) {
@@ -3202,7 +3290,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 13</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 14</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -3233,6 +3321,7 @@ function render() {
   }
   app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER);
   try { mapAfterRender(); } catch (err) { console.error(err); }
+  { const t = document.querySelector('.tabs .tab[aria-current="true"]'), row = t && t.parentNode; if (row && row.scrollWidth > row.clientWidth + 2) row.scrollLeft = Math.max(0, t.offsetLeft - row.offsetLeft - (row.clientWidth - t.offsetWidth) / 2); }
   Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).forEach((el, i) => { const v = scrollers[i]; if (v) { const [t, l] = v.split(':'); el.scrollTop = +t; el.scrollLeft = +l; } });
   for (const id of Object.keys(keep)) {
     const el = document.getElementById(id);
@@ -3258,19 +3347,46 @@ function renderModal() {
   else if (UI.modal.kind === 'camp' && typeof campModal === 'function') inner = campModal();
   else if (MODALS[UI.modal.kind]) inner = MODALS[UI.modal.kind]();
   else if (UI.modal.kind === 'confirm') inner = `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(UI.modal.title)}</h2><p>${esc(UI.modal.body)}</p><div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri ${UI.modal.danger ? 'danger' : ''}" data-act="confirmok">${esc(UI.modal.ok || 'OK')}</button></div></div>`;
+  const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('#modal') ? focusKey(document.activeElement) : null;
   host.innerHTML = `<div class="modal-bg" data-act="bgclose">${inner}</div>`;
+  { const dlg = host.querySelector('.modal'); if (dlg) { dlg.setAttribute('tabindex', '-1'); if (!dlg.getAttribute('aria-label') && !dlg.getAttribute('aria-labelledby')) { const h = dlg.querySelector('h2'); if (h) { h.id = h.id || 'dlg-title'; dlg.setAttribute('aria-labelledby', h.id); } }
+    const back = had && (had.id ? document.getElementById(had.id) : focusFind(had));
+    if (back && dlg.contains(back)) back.focus({ preventScroll: true });
+    else { const first = dlg.querySelector('[autofocus]') || dlg.querySelector('input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])'); (first || dlg).focus({ preventScroll: true }); } } }
   if (UI.modal.kind === 'import') wireDrop();
 }
 function textModal() {
   const m = UI.modal;
-  return `<div class="modal" role="dialog" aria-modal="true"><div class="row"><h2>${esc(m.title)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>
+  return `<div class="modal" role="dialog" aria-modal="true"><div class="row"><h2>${esc(m.title)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     ${m.html ? `<div class="rt">${m.html}</div>` : ''}
     ${m.text != null ? `<textarea id="f-modaltext" style="min-height:${m.tall ? 260 : 140}px;font-family:ui-monospace,monospace;font-size:12px"${m.readonly ? ' readonly' : ''}>${esc(m.text)}</textarea>` : ''}
     ${m.err ? `<div class="errline">${esc(m.err)}</div>` : ''}
     <div class="row"><span class="spacer"></span>${(m.buttons || []).map(([act, l, pri]) => `<button class="btn${pri ? ' pri' : ''}" data-act="${act}">${esc(l)}</button>`).join('')}<button class="btn" data-act="closemodal">Close</button></div></div>`;
 }
-function openModal(m) { UI.modal = m; renderModal(); }
-function closeModal() { UI.modal = null; renderModal(); }
+function openModal(m) {
+  const a = document.activeElement;
+  if (!UI.modal && a && a !== document.body && !a.closest('#modal')) UI.modalFrom = focusKey(a);
+  UI.modal = m; renderModal();
+}
+function closeModal() {
+  const back = UI.modalFrom; UI.modalFrom = null;
+  UI.modal = null; renderModal();
+  if (back) setTimeout(() => { const el = focusFind(back); if (el && !UI.modal) el.focus({ preventScroll: true }); }, 80);
+}
+/* a way back to the control that opened a pop-up, even after the page redraws it */
+function focusKey(el) {
+  if (el.id) return { id: el.id };
+  const d = el.dataset || {};
+  return { act: d.act || '', v: d.v, cid: d.cid, k: d.k, text: (el.textContent || '').trim().slice(0, 40) };
+}
+function focusFind(k) {
+  if (k.id) return document.getElementById(k.id);
+  if (!k.act) return null;
+  const all = Array.from(document.querySelectorAll('[data-act="' + k.act + '"]'));
+  return all.find(el => (k.v == null || el.dataset.v === k.v) && (k.cid == null || el.dataset.cid === k.cid) && (k.k == null || el.dataset.k === k.k) && (el.textContent || '').trim().slice(0, 40) === k.text)
+    || all.find(el => (k.v == null || el.dataset.v === k.v) && (k.cid == null || el.dataset.cid === k.cid)) || all[0] || null;
+}
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 function confirmBox(title, body, ok, fn, danger) { openModal({ kind: 'confirm', title, body, ok, fn, danger }); }
 
 /* ===== toasts & dice ===== */
@@ -3282,8 +3398,9 @@ function toastMsg(text) {
 function showRoll(r) {
   const host = document.getElementById('toasts'); if (!host) return;
   const el = document.createElement('div'); el.className = 'tst' + (r.crit ? ' crit' : r.fail ? ' fail' : ''); el.setAttribute('role', 'status');
-  el.innerHTML = `<div class="t">${esc(r.who ? r.who + ' · ' : '')}${esc(r.label)}</div><div class="big">${r.total}</div><div class="det">${esc(r.detail)}${r.crit ? ' · natural 20' : r.fail ? ' · natural 1' : ''}</div>`;
-  host.appendChild(el); while (host.children.length > 4) host.firstChild.remove();
+  el.innerHTML = `<div class="t">${esc(r.who ? r.who + ' · ' : '')}${esc(r.label)}</div><div class="big">${r.total}</div><div class="det">${esc(r.detail)}${r.crit ? ' · natural 20!' : r.fail && !/automatically/.test(r.detail || '') ? ' · natural 1' : ''}</div>`;
+  el.title = 'Tap to dismiss'; el.addEventListener('click', () => el.remove());
+  host.appendChild(el); while (host.children.length > 3) host.firstChild.remove();
   setTimeout(() => el.remove(), 4800);
 }
 
@@ -3718,6 +3835,17 @@ function onClick(ev) {
 }
 function onKey(ev) {
   if (ev.key === 'Escape' && UI.modal) { closeModal(); return; }
+  if (ev.key === 'Tab' && UI.modal) {
+    const dlg = document.querySelector('#modal .modal');
+    if (dlg) {
+      const f = Array.from(dlg.querySelectorAll(FOCUSABLE)).filter(x => x.offsetParent !== null);
+      const a = f[0], z = f[f.length - 1], cur = document.activeElement;
+      if (!a) { ev.preventDefault(); dlg.focus(); return; }
+      if (!dlg.contains(cur)) { ev.preventDefault(); (ev.shiftKey ? z : a).focus(); return; }
+      if (ev.shiftKey && (cur === a || cur === dlg)) { ev.preventDefault(); z.focus(); return; }
+      if (!ev.shiftKey && cur === z) { ev.preventDefault(); a.focus(); return; }
+    }
+  }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.getAttribute && ev.target.getAttribute('role') === 'button' && ev.target.dataset.act) { ev.preventDefault(); onClick(ev); }
 }
 function wireDrop() {
@@ -3867,7 +3995,7 @@ function handleMsg(m) {
   S.log.unshift(logLine(m)); S.log = S.log.slice(0, 150);
   if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note') showRoll(S.log[0]);
   if (m.kind === 'res' && !m.old) { toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); } }
-  if (m.kind === 'req') { S.reqs[m.rid] = Object.assign({}, m, { answers: {} }); }
+  if (m.kind === 'req') { S.reqs[m.rid] = Object.assign({}, m, { answers: {} }); if (!m.old && !m.isMe && myRequests().some(r => r.q.rid === m.rid)) { toastMsg('The DM asks for ' + m.label + '. Roll from the bar at the top.'); try { navigator.vibrate && navigator.vibrate(40); } catch (e) { } } }
   const q = m.ref && S.reqs[m.ref];
   if (q && m.key && m.total != null) {
     const pass = q.dc ? m.total >= q.dc : null;
@@ -3945,9 +4073,17 @@ function myRequests() {
   }
   return out;
 }
+function liveChips() {
+  let out = '';
+  const I = S.init || {}, cur = (I.list || []).find(c => c.id === I.cur);
+  const mine = cur && cur.kind === 'pc' && chars().find(x => x.mine && x.ch.id === cur.cid);
+  if (mine) out += `<button class="lchip turn" data-act="openfull" data-cid="${esc(mine.ch.id)}" data-owner="${esc(mine.owner)}">Your turn${chars().filter(x => x.mine).length > 1 ? ' · ' + esc(mine.ch.name) : ''}</button>`;
+  if (UI.adv === 'adv' || UI.adv === 'dis') out += `<button class="lchip adv" data-act="adv" data-v="normal" aria-label="Next d20 roll has ${UI.adv === 'adv' ? 'advantage' : 'disadvantage'}. Cancel"><span class="lg">Next roll: </span>${UI.adv === 'adv' ? 'advantage' : 'disadvantage'} ${svgIcon('x', 14)}</button>`;
+  return `<div class="live">${out}</div>`;
+}
 function requestBanner() {
   const list = myRequests(); if (!list.length) return '';
-  return `<div class="reqbar"><div class="reqbar-in">${list.slice(0, 4).map(({ q, key, x }) => `<span class="row"><b>${esc(x.ch.name)}:</b> the DM asks for ${esc(q.label)} <button class="btn pri sm" data-act="reqroll" data-rid="${esc(q.rid)}" data-key="${esc(key)}">Roll</button><button class="btn ghost sm" data-act="reqskip" data-rid="${esc(q.rid)}" data-key="${esc(key)}" aria-label="Dismiss">×</button></span>`).join('')}</div></div>`;
+  return `<div class="reqbar"><div class="reqbar-in">${list.slice(0, 4).map(({ q, key, x }) => `<span class="row"><b>${esc(x.ch.name)}:</b> the DM asks for ${esc(q.label)} <button class="btn pri sm" data-act="reqroll" data-rid="${esc(q.rid)}" data-key="${esc(key)}">Roll</button><button class="btn ghost sm" data-act="reqskip" data-rid="${esc(q.rid)}" data-key="${esc(key)}" aria-label="Dismiss">${svgIcon('x', 16)}</button></span>`).join('')}</div></div>`;
 }
 function restPatch(ch, D, kind) {
   const is24 = ch.ruleset === '2024';
@@ -3992,7 +4128,7 @@ function viewCombat() {
       <div class="chp"><span class="num"><b>${hp == null ? '—' : hp}</b>${max ? ' / ' + max : ''}</span><div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div></div>
       <span class="num cac" title="Armor Class">AC ${ac == null || ac === '' ? '?' : ac}</span>
       <span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
-      <span class="row cx">${c.kind === 'mon' ? `<button class="btn ghost sm" data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">×</button></span>
+      <span class="row cx">${c.kind === 'mon' ? `<button class="btn ghost sm" data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span>
     </div>`;
   }).join('');
   const last = UNDO[UNDO.length - 1];
@@ -4008,10 +4144,10 @@ function viewCombat() {
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
-      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
-      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Dmg on fail" style="width:110px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div>
+      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button>${picks.length ? '' : '<span class="small muted">Tick rows above to use these.</span>'}<span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
+      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:150px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div>
       <span class="small muted">Players get a Roll button on their screen. Monsters you selected roll by themselves. Damage is applied when each result comes in.</span></div>
-    <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} style="padding:2px 8px;font-size:12.5px">${r}</button>`).join('')}</span></div>
+    <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
       <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
       <div class="row"><input type="text" id="f-cn" placeholder="Quick add: name" style="max-width:170px"><input type="number" id="f-cib" placeholder="Init +" style="width:80px"><input type="number" id="f-chp" placeholder="HP" style="width:70px"><input type="number" id="f-cac" placeholder="AC" style="width:70px"><button class="btn sm" data-act="cquick">Add</button></div>
@@ -4122,7 +4258,8 @@ Object.assign(ACT, {
     queueRender();
   },
   chide(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.hidden = !c.hidden; saveCombat(cb); queueRender(); },
-  crm(el) { const cb = cbt(); const i = cb.list.findIndex(x => x.id === el.dataset.v); if (i < 0) return; if (cb.cur === el.dataset.v) cb.cur = (cb.list[i + 1] || cb.list[0] || {}).id || null; cb.list.splice(i, 1); delete RUN.picks[el.dataset.v]; saveCombat(cb); queueRender(); },
+  crm(el) { const cb = cbt(); const i = cb.list.findIndex(x => x.id === el.dataset.v); if (i < 0) return;
+    { const gone = JSON.parse(JSON.stringify(cb.list[i])), at = i; pushUndo('removed ' + gone.name, () => { const c2 = cbt(); if (!c2.list.some(x => x.id === gone.id)) { c2.list.splice(Math.min(at, c2.list.length), 0, gone); saveCombat(c2); } }); toastMsg('Removed ' + gone.name + '. Undo is in the toolbar.'); } if (cb.cur === el.dataset.v) cb.cur = (cb.list[i + 1] || cb.list[0] || {}).id || null; cb.list.splice(i, 1); delete RUN.picks[el.dataset.v]; saveCombat(cb); queueRender(); },
   cend() { confirmBox('End combat?', 'This clears the turn order for everyone. Saved encounters stay.', 'End combat', () => { RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [] }); queueRender(); }); },
   cparty() {
     const cb = cbt();
@@ -4185,7 +4322,7 @@ Object.assign(ACT, {
     const q = S.reqs[el.dataset.rid]; if (!q) return; const [owner, cid] = el.dataset.key.split('|');
     const x = findChar(cid, owner); if (!x) return; const D = derive(x.ch), M = fxMods(x.ch, D);
     const bonus = q.t === 'save' ? D.save[q.ab] : q.t === 'skill' ? D.skill[q.skill] : D.m[q.ab];
-    const r = d20Roll({ M, bonus, type: q.t === 'save' ? 'save' : 'check' });
+    const r = d20Roll({ M, bonus, type: q.t === 'save' ? 'save' : 'check', ab: q.t === 'save' ? q.ab : null });
     sendMsg({ kind: 'roll', ref: q.rid, key: el.dataset.key, who: x.ch.name, label: q.label.replace(/^an? /, ''), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail });
   },
   reqskip(el) { (S.reqDone = S.reqDone || {})[el.dataset.rid + el.dataset.key] = 1; queueRender(); },
@@ -4301,7 +4438,7 @@ MODALS.cast = () => {
   const pickers = !needs ? '' : s.atk
     ? `<label class="field"><span class="lbl">Target</span><select id="f-ctgt">${opt('', 'No target: just roll')}${all.map(t => opt(t.id, t.name, UI.tgt === t.id)).join('')}</select></label>`
     : `<div class="stack"><span class="lbl">${math.heal ? 'Who is healed' : 'Who is caught in it'}</span><div class="row">${math.heal ? `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="self"${tg.self ? ' checked' : ''}> Yourself</label>` : ''}${all.map(t => `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="${esc(t.id)}"${tg[t.id] ? ' checked' : ''}> ${esc(t.name)}</label>`).join('')}</div>${all.length ? '' : '<span class="small muted">No fight is running, so this just rolls.</span>'}</div>`;
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Cast a spell"><div class="row"><h2>Cast ${esc(s.name)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Cast a spell"><div class="row"><h2>Cast ${esc(s.name)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="stack"><span class="lbl">Spell slot</span>${opts.length ? `<div class="row">${opts.map(o => `<button class="btn sm" data-act="castslot" data-v="${o.k}"${pressed(m.slot === o.k)}>${esc(o.label)}${o.left != null ? ` <span class="muted">${o.left} left</span>` : ''}</button>`).join('')}</div>` : '<div class="errline">No spell slots left for this spell. Take a rest, or ask the DM for an exception.</div>'}</div>
     <div class="row small">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${math.save ? `<span class="pill">${ABN[math.save]} save DC ${c.dc}${math.half ? ', half on a success' : ''}</span>` : ''}${math.dmg ? `<span class="pill">${esc(math.dmg)} ${esc(math.dt || '')}</span>` : ''}${math.heal ? `<span class="pill acc">heals ${esc(math.heal)}</span>` : ''}${s.conc ? `<span class="pill brass">Concentration${ch.play.conc && ch.play.conc !== s.name ? ': ends ' + esc(ch.play.conc) : ''}</span>` : ''}</div>
     ${pickers}
@@ -4309,6 +4446,7 @@ MODALS.cast = () => {
 };
 function doLevel(e, i) {
   const ch = e.ch, before = getD(ch), c = ch.classes[i], def = look(ch, 'classes', c.id); if (!c || !def) return;
+  { const snap = JSON.stringify(ch.classes), id = ch.id; pushUndo(`level up to ${def.name} ${c.lvl + 1}`, () => { const x = chars().find(y => y.ch.id === id && y.mine) || chars().find(y => y.ch.id === id); if (!x) return; x.ch.classes = JSON.parse(snap); saveChar(x.ch); }); }
   c.lvl++;
   let rolled = null;
   if (ch.hpMode === 'roll') { c.hp = c.hp || []; rolled = rnd(def.hd); c.hp[c.lvl - 1] = rolled; }
@@ -4321,17 +4459,18 @@ MODALS.lvlpick = () => { const e = E(); if (!e) return ''; return `<div class="m
 MODALS.lvl = () => {
   const m = UI.modal, e = E(); if (!e) return ''; const D = getD(e.ch);
   const fresh = D.features.filter(x => x.cls === m.cls && x.l === m.lvl);
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Level up"><div class="row"><h2>${esc(e.ch.name)} reaches ${esc(m.name)} ${m.lvl}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Level up"><div class="row"><h2>${esc(e.ch.name)} reaches ${esc(m.name)} ${m.lvl}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="row"><span class="pill acc">+${m.gain} hit points</span><span class="pill">Max ${m.max}</span><span class="pill">Character level ${D.level}</span><span class="pill">Proficiency ${sgn(D.pb)}</span></div>
     <div class="stack"><span class="lbl">New at this level</span>${fresh.length ? `<div>${featureList(fresh.map(x => ({ n: x.n, d: x.d, from: x.from })))}</div>` : '<span class="small muted">No new class features. Check your spells and hit points.</span>'}</div>
     ${D.issues.length ? `<div class="todo-box"><div class="lbl">Choices to make</div>${D.issues.map(i => `<div class="row" style="margin-top:4px"><span class="grow">${esc(i.msg)}</span><button class="btn sm" data-act="lvlgo" data-v="${i.step}">Go</button></div>`).join('')}</div>` : '<div class="note">Nothing left to choose.</div>'}
-    <div class="row"><span class="spacer"></span><button class="btn pri" data-act="closemodal">Done</button></div></div>`;
+    <div class="row"><button class="btn ghost" data-act="lvlundo">Undo this level</button><span class="spacer"></span><button class="btn pri" data-act="closemodal">Done</button></div></div>`;
 };
 Object.assign(ACT, {
   roll(el) {
     const e = E(), ch = e && e.ch; if (!ch) return; const D = getD(ch), M = fxMods(ch, D);
     const kind = el.dataset.kind || 'check';
-    const r = d20Roll({ M, bonus: +el.dataset.b || 0, type: kind === 'save' ? 'save' : kind === 'death' ? 'death' : 'check' });
+    const abk = kind === 'save' ? ABIL.find(a => String(el.dataset.label || '').startsWith(ABN[a])) : null;
+    const r = d20Roll({ M, bonus: +el.dataset.b || 0, type: kind === 'save' ? 'save' : kind === 'death' ? 'death' : 'check', ab: abk });
     sendMsg({ kind: kind === 'init' ? 'init' : 'roll', who: ch.name, label: el.dataset.label + modeTag(r), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, cid: ch.id, owner: e.owner, priv: privOn() });
     if (kind === 'death' && canEditChar(e.owner)) {
       if (r.nat === 20) { play(ch, { hp: 1, ds: [0, 0] }, 'death save'); return; }
@@ -4374,7 +4513,7 @@ Object.assign(ACT, {
   used(el) { const ch = C(); const u = Object.assign({ a: 0, b: 0, r: 0 }, ch.play.used || {}); u[el.dataset.k] = u[el.dataset.k] ? 0 : 1; play(ch, { used: u }); },
   concroll() {
     const e = E(), ch = e.ch, D = getD(ch), dc = +ch.play.concDC || 10;
-    const r = d20Roll({ M: fxMods(ch, D), bonus: D.save.con, type: 'save' }); const pass = r.total >= dc;
+    const r = d20Roll({ M: fxMods(ch, D), bonus: D.save.con, type: 'save', ab: 'con' }); const pass = r.total >= dc;
     sendMsg({ kind: 'roll', who: ch.name, label: `Concentration save (DC ${dc})` + modeTag(r), total: r.total, nat: r.nat, detail: r.detail + (pass ? ' · held' : ' · lost ' + (ch.play.conc || 'concentration')), crit: r.crit, fail: r.fail, priv: privOn() });
     play(ch, pass ? { concDC: 0 } : { concDC: 0, conc: '' });
   },
@@ -4400,10 +4539,10 @@ Object.assign(ACT, {
   },
   lvlclass(el) { const e = E(); if (e) doLevel(e, +el.dataset.i); },
   lvlgo(el) { closeModal(); UI.tab = 'build'; UI.step = el.dataset.v; queueRender(); },
-  quick(el) { const x = el.dataset.x; const r = rollExpr(x, x === '1d20' ? UI.adv : 'normal'); sendMsg({ kind: 'roll', who: isDMish() && S.mode === 'live' ? 'DM' : 'Quick roll', label: x, total: r.total, nat: r.nat, detail: r.detail, crit: r.nat === 20, fail: r.nat === 1, priv: privOn() }); },
+  quick(el) { const x = el.dataset.x; const r = rollExpr(x, x === '1d20' ? takeAdv() : 'normal'); sendMsg({ kind: 'roll', who: isDMish() && S.mode === 'live' ? 'DM' : 'Quick roll', label: x, total: r.total, nat: r.nat, detail: r.detail, crit: r.nat === 20, fail: r.nat === 1, priv: privOn() }); },
   quickx() {
     const v = ($('#f-expr').value || '').replace(/\s+/g, ''); if (!/^[+-]?(\d*d\d+(k[hl]\d+)?|\d+)([+-](\d*d\d+(k[hl]\d+)?|\d+))*$/i.test(v)) { toastMsg('Try something like 2d6+3.'); return; }
-    const r = rollExpr(v, /^1?d20([+-]\d+)?$/i.test(v) ? UI.adv : 'normal');
+    const r = rollExpr(v, /^1?d20([+-]\d+)?$/i.test(v) ? takeAdv() : 'normal');
     sendMsg({ kind: 'roll', who: isDMish() && S.mode === 'live' ? 'DM' : 'Quick roll', label: v, total: r.total, nat: r.nat, detail: r.detail, crit: r.nat === 20, fail: r.nat === 1, priv: privOn() });
   },
   spendhd(el) {
@@ -4648,7 +4787,7 @@ function viewJoin() {
 }
 function campModal() {
   const c = S.campaign || {};
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Campaign"><div class="row"><h2>${esc(c.name || 'Campaign')}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">×</button></div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Campaign"><div class="row"><h2>${esc(c.name || 'Campaign')}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="stack"><span class="lbl">Invite players with this link</span><div class="row"><input type="text" id="f-camplink" readonly value="${esc(campaignLink())}" style="flex:1"><button class="btn" data-act="copylink">Copy</button></div><div class="small muted">Code <b class="num" style="font-size:16px">${esc(FB.code || '')}</b>. Anyone with it can join and edit their own sheet.</div></div>
     <div class="stack"><span class="lbl">Your name</span><div class="row"><input type="text" id="f-pname" value="${esc(LS.get('pname', ''))}" style="flex:1"><button class="btn" data-act="savepname">Save</button></div></div>
     ${FB.isDM ? `<div class="stack"><span class="lbl">DM key</span><div class="row"><input type="text" readonly value="${esc(FB.dmKey)}" style="flex:1;font-family:ui-monospace,monospace"><button class="btn" data-act="copydmkey">Copy</button></div><div class="small muted">Keep this private. Enter it on another device or browser to be DM there too.</div></div>`
@@ -5087,17 +5226,28 @@ function mapEnsureEl() {
   root.addEventListener('drop', e => { root.classList.remove('drop'); if (!mapCanEdit()) return; e.preventDefault(); const f = (e.dataTransfer.files || [])[0]; if (f) mapUpload(f); });
   root.addEventListener('contextmenu', e => e.preventDefault());
   /* a fitted map stays fitted when the window or phone turns */
-  try { new ResizeObserver(() => { if (MAP.view && MAP.view.fitted && root.isConnected) mapFit(); }).observe(root); } catch (e) { }
+  try { new ResizeObserver(() => { if (MAP.view && MAP.view.fitted && root.isConnected) mapFit(MAP.view.fitted === 'whole'); }).observe(root); } catch (e) { }
   return el;
 }
 function mapToImg(cx, cy) { const r = MAP.el.root.getBoundingClientRect(), v = MAP.view; return { x: (cx - r.left - v.tx) / v.s, y: (cy - r.top - v.ty) / v.s }; }
 function mapCellOf(p) { const G = mapGeom(); return { x: Math.floor((p.x - G.sx) / G.cell), y: Math.floor((p.y - G.sy) / G.cell) }; }
 function mapApplyView() { const v = MAP.view; if (v && MAP.el) MAP.el.stage.style.transform = `translate(${v.tx}px, ${v.ty}px) scale(${v.s})`; }
-function mapFit() {
+function mapFit(whole) {
   const meta = MAP.meta, el = MAP.el; if (!meta || !el) return;
   const r = el.root.getBoundingClientRect(); if (!r.width || !r.height) return;
-  const s = Math.min(r.width / meta.w, r.height / meta.h) * 0.98;
-  MAP.view = { id: meta.id, s, tx: (r.width - meta.w * s) / 2, ty: (r.height - meta.h * s) / 2, fitted: true };
+  let s = Math.min(r.width / meta.w, r.height / meta.h) * 0.98;
+  let tx = (r.width - meta.w * s) / 2, ty = (r.height - meta.h * s) / 2;
+  const close = !whole && !MAP.tv && r.width < 640;
+  if (close) {
+    const G = mapGeom(meta), cover = Math.max(r.width / meta.w, r.height / meta.h);
+    s = Math.max(s, Math.min(cover, 30 / G.cell));
+    const toks = mapTokens(), t = toks.find(x => x.pos && x.mine) || toks.find(x => x.pos && x.cur) || toks.find(x => x.pos && x.kind === 'pc');
+    const W = meta.w * s, H = meta.h * s;
+    const cx = t ? (G.sx + (t.pos.x + t.sz / 2) * G.cell) * s : W / 2, cy = t ? (G.sy + (t.pos.y + t.sz / 2) * G.cell) * s : H / 2;
+    tx = W <= r.width ? (r.width - W) / 2 : clamp(r.width / 2 - cx, r.width - W, 0);
+    ty = H <= r.height ? (r.height - H) / 2 : clamp(r.height / 2 - cy, r.height - H, 0);
+  }
+  MAP.view = { id: meta.id, s, tx, ty, fitted: whole ? 'whole' : true };
   mapApplyView();
 }
 function mapZoomAt(cx, cy, f) {
@@ -5124,7 +5274,20 @@ function mapAfterRender() {
   el.over.setAttribute('width', meta.w); el.over.setAttribute('height', meta.h); el.over.setAttribute('viewBox', `0 0 ${meta.w} ${meta.h}`);
   if (!MAP.view || MAP.view.id !== meta.id) mapFit(); else mapApplyView();
   if (!meta.auto && !meta.cell && mapCanEdit() && !MAP.detecting) { MAP.detecting = meta.id; setTimeout(() => mapDetectNow(true).finally(() => { MAP.detecting = ''; }), 50); }
-  mapDrawGrid(); mapDrawFog(); mapDrawTokens(); mapDrawOverlay();
+  mapDrawGrid(); mapDrawFog(); mapDrawTokens(); mapDrawOverlay(); mapDrawHint();
+  if (MAP.kbTok) { const d = el.tokEls.get(MAP.kbTok); if (d && document.activeElement !== d) d.focus({ preventScroll: true }); }
+}
+document.addEventListener('focusin', e => { if (!(e.target.classList && e.target.classList.contains('tok'))) MAP.kbTok = ''; });
+document.addEventListener('pointerdown', () => { MAP.kbTok = ''; }, true);
+function mapDrawHint() {
+  const el = MAP.el; if (!el) return;
+  let h = el.root.querySelector('.maphint');
+  if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('role', 'status'); el.root.appendChild(h); }
+  const st = MAP.sel && mapTok(MAP.sel), pl = MAP.placing && mapTok(MAP.placing);
+  let html = '';
+  if (pl) html = `<span>Tap the map where <b>${esc(pl.name)}</b> goes</span><button class="btn sm" data-act="mapplace" data-v="${esc(pl.key)}">Cancel</button>`;
+  else if (st && st.canMove && st.pos && MAP.tool === 'move' && !MAP.tv) html = `<span>Tap a square to move <b>${esc(st.name)}</b></span><button class="btn sm" data-act="mapsel" data-v="">Done</button>`;
+  h.hidden = !html; if (h.dataset.html !== html) { h.innerHTML = html; h.dataset.html = html; }
 }
 function mapDrawGrid() {
   const meta = MAP.meta, G = mapGeom(meta), cv = MAP.el.grid;
@@ -5161,7 +5324,7 @@ function mapDrawTokens() {
   for (const t of list) {
     seen.add(t.key);
     let d = el.tokEls.get(t.key);
-    if (!d) { d = document.createElement('div'); d.className = 'tok'; d.innerHTML = '<span class="tl"></span><i class="thp"><b></b></i><span class="tc"></span><span class="tn"></span>'; el.toks.appendChild(d); el.tokEls.set(t.key, d); }
+    if (!d) { d = document.createElement('div'); d.className = 'tok'; d.innerHTML = '<span class="tl"></span><i class="thp"><b></b></i><span class="tc"></span><span class="tn"></span>'; d.tabIndex = 0; d.setAttribute('role', 'button'); el.toks.appendChild(d); el.tokEls.set(t.key, d); }
     d.dataset.key = t.key;
     d.className = 'tok ' + t.kind + (t.cur ? ' cur' : '') + (t.hidden ? ' hid' : '') + (t.down ? ' down' : '') + (MAP.sel === t.key ? ' sel' : '') + (t.canMove ? ' movable' : '') + (t.mine ? ' mine' : '');
     const size = t.sz * G.cell, pad = G.cell * 0.06;
@@ -5176,6 +5339,8 @@ function mapDrawTokens() {
     d.querySelector('.tc').hidden = !t.conds.length;
     d.querySelector('.tn').textContent = t.name + (t.kind === 'mon' && !mapIsDM() && t.st ? ' · ' + t.st : '');
     d.title = t.name + (t.conds.length ? ' · ' + t.conds.join(', ') : '');
+    d.setAttribute('aria-pressed', String(MAP.sel === t.key));
+    d.setAttribute('aria-label', t.name + (t.kind === 'mon' && !mapIsDM() && t.st ? ', ' + t.st : '') + (t.cur ? ', taking their turn' : '') + (t.down ? ', down' : '') + (t.hidden ? ', hidden from players' : '') + (t.conds.length ? ', ' + t.conds.join(', ') : '') + (t.canMove ? '. Enter selects; arrow keys move it' : ''));
   }
   for (const [k, d] of el.tokEls) if (!seen.has(k)) { d.remove(); el.tokEls.delete(k); }
 }
@@ -5213,6 +5378,7 @@ const mapFeet = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * (
 const MAP_PTRS = new Map();
 function mapDown(e) {
   if (e.button === 1 || e.button === 2 || !MAP.meta || !MAP.img) return;
+  if (e.target.closest && e.target.closest('.maphint')) return;
   MAP_PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
   window.addEventListener('pointermove', mapMoveEv); window.addEventListener('pointerup', mapUp); window.addEventListener('pointercancel', mapUp);
   if (MAP_PTRS.size === 2) {
@@ -5284,7 +5450,16 @@ function mapUp(e) {
     else if (!g.moved) MAP.sel = MAP.sel === g.key ? '' : g.key;
     mapDrawOverlay(); mapDrawTokens(); MAP.later = true;
   } else if (g.kind === 'click') { MAP.sel = MAP.sel === g.key ? '' : g.key; MAP.later = true; }
-  else if (g.kind === 'pan') { if (!g.moved && MAP.sel) { MAP.sel = ''; MAP.later = true; } }
+  else if (g.kind === 'pan') {
+    if (!g.moved && MAP.sel && !cancel) {
+      const t = mapTok(MAP.sel), G = mapGeom(), c = mapCellOf(mapToImg(e.clientX, e.clientY));
+      if (t && t.canMove && t.pos && MAP.tool === 'move' && c.x >= 0 && c.y >= 0 && c.x < G.cols && c.y < G.rows) {
+        const half = Math.floor((t.sz - 1) / 2), f = mapFree(c.x - half, c.y - half, t.sz, mapTaken(t.key));
+        if (f.x !== t.pos.x || f.y !== t.pos.y) { t.pos = f; mapMove(t, f.x, f.y); }
+      } else MAP.sel = '';
+      MAP.later = true;
+    }
+  }
   else if (g.kind === 'place' && !g.moved && !cancel) {
     const t = mapTokens().find(t => t.key === MAP.placing), c = mapCellOf(mapToImg(e.clientX, e.clientY));
     if (t) { const f = mapFree(c.x, c.y, t.sz, mapTaken(t.key)); mapMove(t, f.x, f.y); MAP.sel = t.key; }
@@ -5317,6 +5492,8 @@ document.addEventListener('keydown', e => {
   const tag = (e.target && e.target.tagName) || '';
   if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
   if (e.key === 'Escape') { if (MAP.placing || MAP.sel || MAP.tool !== 'move') { MAP.placing = ''; MAP.sel = ''; MAP.tool = 'move'; queueRender(); } return; }
+  if (e.target && e.target.classList && e.target.classList.contains('tok')) MAP.kbTok = e.target.dataset.key;
+  if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('tok')) { e.preventDefault(); const k = e.target.dataset.key; MAP.sel = MAP.sel === k ? '' : k; queueRender(); return; }
   const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   if (d && MAP.sel) { const t = mapTok(MAP.sel); if (t && t.canMove && t.pos) { e.preventDefault(); mapMove(t, t.pos.x + d[0], t.pos.y + d[1]); } }
 });
@@ -5362,24 +5539,26 @@ function viewMap() {
   if (sel) {
     const amt = isDMish() ? `<div class="row"><input type="number" id="f-map-amt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="mapdmg">Damage</button><button class="btn sm" data-act="mapheal">Heal</button></div>` : '';
     const hp = sel.kind === 'pc' || isDMish() ? (sel.hpText ? `<span class="num"><b>${esc(sel.hpText)}</b> HP</span>` : '') : `<span>${esc(sel.st || '')}</span>`;
-    info = `<div class="panel stack mapinfo"><div class="row"><b class="grow">${esc(sel.name)}</b>${sel.hidden ? '<span class="pill">hidden</span>' : ''}<button class="btn ghost sm" data-act="mapsel" data-v="" aria-label="Close">×</button></div>
+    info = `<div class="panel stack mapinfo"><div class="row"><b class="grow">${esc(sel.name)}</b>${sel.hidden ? '<span class="pill">hidden</span>' : ''}<button class="btn ghost sm" data-act="mapsel" data-v="" aria-label="Close">${svgIcon('x', 16)}</button></div>
       <div class="row small">${hp}${sel.ac != null && (sel.kind === 'pc' || isDMish()) ? `<span class="num">AC ${esc(sel.ac)}</span>` : ''}${sel.kind === 'pc' ? `<span class="muted">${esc(sel.who || '')}</span>` : ''}</div>
       ${sel.conds.length ? `<div class="row small">${sel.conds.map(c => `<span class="pill bad">${esc(c)}</span>`).join('')}</div>` : ''}
       ${amt}
       <div class="row">${sel.canMove ? `<button class="btn sm" data-act="mapoff" data-v="${esc(sel.key)}">Take off the map</button>` : ''}${isDMish() && sel.kind === 'mon' ? `<button class="btn sm" data-act="chide" data-v="${esc(sel.key)}">${sel.hidden ? 'Show to players' : 'Hide from players'}</button>` : ''}</div>
-      ${sel.canMove ? '<span class="small muted">Arrow keys move it one square.</span>' : ''}</div>`;
+      ${sel.canMove ? '<span class="small muted">Tap a square on the map to move it there, or use the arrow keys.</span>' : ''}</div>`;
   }
   const tray = meta ? `<div class="panel stack"><div class="lbl">Not on the map</div>
       ${off.length ? off.map(t => `<div class="row"><span class="tdot ${t.kind}">${esc(mapLabel(t.name))}</span><span class="grow small">${esc(t.name)}${t.hidden ? ' <span class="muted">(hidden)</span>' : ''}</span><button class="btn sm${MAP.placing === t.key ? ' pri' : ''}" data-act="mapplace" data-v="${esc(t.key)}">${MAP.placing === t.key ? 'Tap the map' : 'Place'}</button></div>`).join('') : '<span class="small muted">Everyone is on the map.</span>'}
       ${isDMish() && off.filter(t => t.kind === 'pc').length > 1 ? `<button class="btn sm" data-act="mapparty">Put the whole party in the middle</button>` : ''}
       ${isDMish() && !cbt().list.some(c => c.kind === 'mon') ? '<span class="small muted">Monsters come from the Combat tab. Add them there and they show up here.</span>' : ''}
     </div>` : '';
-  const help = meta ? `<p class="small muted maphelp">Drag the map to move around, scroll or pinch to zoom, double-click to ping everyone. ${isDMish() ? 'You can move every token; players move their own.' : 'You can move your own character.'}</p>` : '';
+  const help = meta ? `<p class="small muted maphelp">Drag the map to look around, scroll or pinch to zoom, double-click or double-tap to ping everyone. To move a token, drag it, or tap it and then tap a square. ${isDMish() ? 'You can move every token; players move their own.' : 'You can move your own character.'}</p>` : '';
   return `<div class="row" style="margin-bottom:10px"><h2 style="font-family:var(--f-display);font-size:26px">Battle map</h2>${isDMish() && window.PL_SITE && meta ? `<a class="btn sm ghost" href="?v=map&pv=1${location.hash}" target="_blank" rel="noopener">Open a TV view</a>` : ''}</div>
     ${bar}
     <div class="maplay"><div class="mapmain">${mount}${help}</div><aside class="maptray stack">${turn}${info}${tray}${settings}</aside></div>`;
 }
 function svgIcon(n, s) {
+  if (n === 'plus') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+  if (n === 'x') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   if (n === 'map') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`;
   return '';
 }
@@ -5387,7 +5566,7 @@ function svgIcon(n, s) {
 /* ---------- actions ---------- */
 Object.assign(ACT, {
   maptool(el) { MAP.tool = el.dataset.v; MAP.placing = ''; queueRender(); },
-  mapzoom(el) { const v = el.dataset.v; if (v === 'fit') mapFit(); else if (MAP.el) { const r = MAP.el.root.getBoundingClientRect(); mapZoomAt(r.left + r.width / 2, r.top + r.height / 2, v === 'in' ? 1.25 : 0.8); } },
+  mapzoom(el) { const v = el.dataset.v; if (v === 'fit') mapFit(true); else if (MAP.el) { const r = MAP.el.root.getBoundingClientRect(); mapZoomAt(r.left + r.width / 2, r.top + r.height / 2, v === 'in' ? 1.25 : 0.8); } },
   mapasplayer() { MAP.asPlayer = !MAP.asPlayer; MAP.tool = 'move'; MAP.fogKey = ''; queueRender(); },
   mapsel(el) { MAP.sel = el.dataset.v || ''; queueRender(); },
   mapplace(el) { const k = el.dataset.v; MAP.placing = MAP.placing === k ? '' : k; MAP.chain = true; if (MAP.placing) { const t = mapTok(k); toastMsg('Tap the map where ' + ((t && t.name) || 'it') + ' should go.'); } queueRender(); },
@@ -5440,6 +5619,10 @@ function featFix(e, R, pk) {
   if (!out.lvl) { const m = pre.match(/level (\d+)\s*\+/i); if (m) out.lvl = +m[1]; else if (out.type === 'epic-boon') out.lvl = 19; }
   return out;
 }
+
+ACT.newopen = function () { UI.cur = null; try { LS.set('cur', null); } catch (e) { } queueRender(); window.scrollTo(0, 0); };
+
+ACT.lvlundo = function () { closeModal(); ACT.undo(); };
 </script>
 </body>
 </html>
