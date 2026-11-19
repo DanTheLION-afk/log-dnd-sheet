@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Party Ledger</title>
 <meta name="description" content="D&amp;D 5e and 5.5e character builder with a live party view for the DM.">
-<meta name="theme-color" content="#16201c">
+<meta name="theme-color" content="#f3efe6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0e19" media="(prefers-color-scheme: dark)">
+<script>try { var t = JSON.parse(localStorage.getItem("pl.theme") || "\"\""); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) { }</script>
 <link rel="manifest" href="party-manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="party-icon-192.png">
 <link rel="apple-touch-icon" href="party-icon-192.png">
@@ -15,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+SC:wght@500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
@@ -41,39 +43,44 @@ img { max-width: 100%; }
 [hidden] { display: none !important; }
 /* Layout: sticky ledger bar on top; roster rail on the left, working sheet on the right; stacks to one column on phones. */
 :root {
-  --bg: #e9eee9;
-  --surface: #f7f9f6;
-  --surface-2: #dfe6df;
-  --line: #c4cec5;
-  --ink: #16201c;
-  --ink-2: #4a5852;
-  --accent: #216d5c;
-  --accent-soft: #cfe3dc;
-  --accent-ink: #ffffff;
-  --brass: #7d5f17;
-  --danger: #b03636;
-  --good: #2c7a3c;
-  --warn: #8d580c;
-  --shadow: 0 1px 0 rgba(22, 32, 28, .06), 0 6px 18px -10px rgba(22, 32, 28, .25);
-  --f-display: "Spectral SC", "Palatino Linotype", Georgia, serif;
+  /* Night Sky, light mode ("dawn"): paper the colour of first light, night-blue ink, sun gold */
+  --bg: #f3efe6;
+  --surface: #fffcf6;
+  --surface-2: #ebe5d8;
+  --line: #d3c9b5;
+  --field: #8a8170;
+  --ink: #141a2e;
+  --ink-2: #4f5568;
+  --accent: #1e2b52;
+  --accent-soft: #dfe3ef;
+  --accent-ink: #f8e7b8;
+  --brass: #7a5a10;
+  --danger: #a8322b;
+  --on-danger: #ffffff;
+  --good: #2a6b3c;
+  --warn: #8a560c;
+  --sun: #b98512;
+  --moon: #5d6b8c;
+  --shadow: 0 1px 0 rgba(20, 26, 46, .05), 0 12px 26px -16px rgba(20, 26, 46, .4);
+  --f-display: "Cormorant SC", "Palatino Linotype", Georgia, serif;
   --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --f-label: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
-  --r: 6px;
-  --tst-crit: #f0cf7a; --tst-fail: #ff9b94; --ph: #5f6b66;
+  --r: 8px;
+  --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #626876;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1513; --surface: #161e1b; --surface-2: #1f2925; --line: #2e3a35; --ink: #e1e9e4; --ink-2: #9aaba3;
-    --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b; --tst-crit: #6e5312; --tst-fail: #9c2b2b; --ph: #869690;
-    --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 22px -12px rgba(0, 0, 0, .7);
+    --bg: #0a0e19; --surface: #11172a; --surface-2: #192038; --line: #29324e; --field: #5b6687; --ink: #eef0f7; --ink-2: #a9b0c6;
+    --accent: #f2c14e; --accent-soft: #2d2715; --accent-ink: #17120a; --brass: #f0b95c; --danger: #ff8579; --on-danger: #1b0d0b; --good: #84d79e; --warn: #f2a95e; --sun: #f2c14e; --moon: #c9d2ea; --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #8e95ab;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 14px 30px -16px rgba(0, 0, 0, .8);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1513; --surface: #161e1b; --surface-2: #1f2925; --line: #2e3a35; --ink: #e1e9e4; --ink-2: #9aaba3;
-  --accent: #5bc2a6; --accent-soft: #1d3a32; --accent-ink: #08110e; --brass: #d6b15b; --danger: #e7716c; --good: #6cc17c; --warn: #e2a64b; --tst-crit: #6e5312; --tst-fail: #9c2b2b; --ph: #869690;
-  --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 22px -12px rgba(0, 0, 0, .7);
-  color-scheme: dark;
+    --bg: #0a0e19; --surface: #11172a; --surface-2: #192038; --line: #29324e; --field: #5b6687; --ink: #eef0f7; --ink-2: #a9b0c6;
+    --accent: #f2c14e; --accent-soft: #2d2715; --accent-ink: #17120a; --brass: #f0b95c; --danger: #ff8579; --on-danger: #1b0d0b; --good: #84d79e; --warn: #f2a95e; --sun: #f2c14e; --moon: #c9d2ea; --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #8e95ab;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 14px 30px -16px rgba(0, 0, 0, .8);
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -475,6 +482,51 @@ button.vital:hover { border-color: var(--accent); }
 .tdot.mon { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
 .maphelp { margin: 0; }
 .tvwrap { max-width: none; padding: 0; }
+
+/* ===== Build 15: Night Sky. Built from the campaign's own world (Legacy of the Gods): a night ground,
+   sun gold for what you act on and whose turn it is, moon silver for what is quiet. Dawn paper in light mode. ===== */
+body { background: radial-gradient(1100px 520px at 88% -8%, color-mix(in srgb, var(--sun) 9%, transparent), transparent 62%), var(--bg); background-attachment: fixed; }
+.bar { border-bottom-color: color-mix(in srgb, var(--sun) 32%, var(--line)); }
+.brand h1 { font-size: 26px; font-weight: 600; letter-spacing: .05em; }
+@media (max-width: 600px) { .brand h1 { font-size: 22px; } .brand:has(.lchip) .themebtn { display: none; } }
+/* small phones: the DM / Player tag gives way so the brand row never wraps, even before the web fonts load */
+@media (max-width: 420px) { .brand > .pill { display: none; } }
+.tab { font-size: 16px; }
+.tab[aria-current="true"], .seg button[aria-pressed="true"], .btn[aria-pressed="true"], .secnav button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.panel { border-radius: 14px; box-shadow: var(--shadow); }
+.panel > h3, .ph { font-family: var(--f-display); font-weight: 600; font-size: 20px; letter-spacing: .05em; text-transform: none; color: var(--ink); }
+.ph .small, .panel > h3 .small, .ph .pill, .ph .seg { font-family: var(--f-body); }
+.ph .seg button { font-family: var(--f-label); }
+.chead { border-bottom: 1px solid color-mix(in srgb, var(--sun) 55%, var(--line)); }
+.chead .cname { font-size: 40px; letter-spacing: .02em; }
+@media (max-width: 600px) { .chead .cname { font-size: 34px; } }
+.sigil { font-family: var(--f-display); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--moon) 35%, var(--surface)), var(--surface-2)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--moon) 40%, var(--line)); }
+.who[aria-current="true"] { border-color: color-mix(in srgb, var(--sun) 70%, var(--line)); }
+.vital, .hp, .modal { border-radius: 14px; }
+.ab { border-radius: 14px 14px 24px 24px; }
+.ab .score { background: var(--surface-2); border-color: color-mix(in srgb, var(--sun) 40%, var(--line)); }
+.hp { box-shadow: var(--shadow); }
+.hpnum { font-size: 40px; }
+.btn, .btn.sm, .roll.pri, .seg { border-radius: 99px; }
+.btn { padding-inline: 14px; }
+input[type=text], input[type=number], input[type=search], select, textarea { border-color: var(--field); }
+.cond button[aria-pressed="true"] { color: var(--on-danger); }
+.lchip.turn { border-color: var(--sun); background: color-mix(in srgb, var(--sun) 20%, var(--surface)); }
+.turnbar.on { border-color: var(--sun); background: color-mix(in srgb, var(--sun) 14%, var(--surface)); }
+.modal-bg { background: rgba(5, 8, 18, .62); }
+/* roll results are a night card in both modes, so a natural 20 always reads gold */
+.tst:not(.msg) { background: #0f1426; color: #eef0f7; border: 1px solid #2a3452; }
+.themebtn { padding: 4px 8px; }
+/* the map board keeps its night backdrop; tokens take the new colours */
+.mapmount { background: #0d1220; }
+.mapempty { color: #e6e9f2; }
+.mapempty .muted { color: #a9b0c6; }
+.tok { color: #141a2e; background: #eef1f8; border-color: #1e2b52; }
+.tok.mine { background: #fff6dc; border-color: #b98512; }
+.maphud, .maphint { background: #0f1426; color: #eef0f7; }
+.maphint .btn { background: #f2c14e; color: #17120a; }
+.tok:focus-visible { box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #0f1426; }
+.mapover .fogsel { fill: rgba(201, 210, 234, .18); stroke: #c9d2ea; }
 </style>
 </head>
 <body>
@@ -1883,7 +1935,7 @@ function viewBar() {
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
-    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
+    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${themeBtn()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
     <nav class="tabs" aria-label="Views">${tabs.map(([k, l]) => `<button class="tab" data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</nav>
   </div>${requestBanner()}</header>`;
 }
@@ -3290,7 +3342,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 14</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 15</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4072,6 +4124,11 @@ function myRequests() {
     }
   }
   return out;
+}
+function themeBtn() {
+  const t = document.documentElement.dataset.theme || '';
+  const now = t === 'dark' ? 'dark' : t === 'light' ? 'light' : 'following your device';
+  return `<button class="btn ghost sm themebtn" data-act="theme" title="Colours: ${now}" aria-label="Colours: ${now}. Change">${svgIcon(t === 'dark' ? 'moon' : t === 'light' ? 'sun' : 'auto', 18)}</button>`;
 }
 function liveChips() {
   let out = '';
@@ -5557,6 +5614,9 @@ function viewMap() {
     <div class="maplay"><div class="mapmain">${mount}${help}</div><aside class="maptray stack">${turn}${info}${tray}${settings}</aside></div>`;
 }
 function svgIcon(n, s) {
+  if (n === 'sun') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>`;
+  if (n === 'moon') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>`;
+  if (n === 'auto') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg>`;
   if (n === 'plus') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
   if (n === 'x') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   if (n === 'map') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`;
@@ -5623,6 +5683,15 @@ function featFix(e, R, pk) {
 ACT.newopen = function () { UI.cur = null; try { LS.set('cur', null); } catch (e) { } queueRender(); window.scrollTo(0, 0); };
 
 ACT.lvlundo = function () { closeModal(); ACT.undo(); };
+
+ACT.theme = function () {
+  const cur = document.documentElement.dataset.theme || '';
+  const next = cur === '' ? 'dark' : cur === 'dark' ? 'light' : '';
+  if (next) document.documentElement.dataset.theme = next; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('pl.theme', JSON.stringify(next)); } catch (e) { }
+  toastMsg(next === 'dark' ? 'Colours: dark, on this device.' : next === 'light' ? 'Colours: light, on this device.' : 'Colours now follow your device.');
+  queueRender();
+};
 </script>
 </body>
 </html>
