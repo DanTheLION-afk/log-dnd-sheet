@@ -764,6 +764,81 @@ function fixChar(ch) {
   return ch;
 }
 
+/* ===== spells granted by species, lineages and feats =====
+   Each source casts with its own ability, adds its spells to the sheet, and tracks its free casts. */
+const LINEAGE_SPELLS = {
+  '2024': {
+    'tiefling': { ab: 'choose', spells: [['thaumaturgy', 1]] },
+    'fiendish-legacy-abyssal': { ab: 'choose', spells: [['poison-spray', 1], ['ray-of-sickness', 3], ['hold-person', 5]] },
+    'fiendish-legacy-chthonic': { ab: 'choose', spells: [['chill-touch', 1], ['false-life', 3], ['ray-of-enfeeblement', 5]] },
+    'fiendish-legacy-infernal': { ab: 'choose', spells: [['fire-bolt', 1], ['hellish-rebuke', 3], ['darkness', 5]] },
+    'elven-lineage-drow': { ab: 'choose', spells: [['dancing-lights', 1], ['faerie-fire', 3], ['darkness', 5]] },
+    'elven-lineage-high-elf': { ab: 'choose', spells: [['prestidigitation', 1, { swap: 'wizard' }], ['detect-magic', 3], ['misty-step', 5]] },
+    'elven-lineage-wood-elf': { ab: 'choose', spells: [['druidcraft', 1], ['longstrider', 3], ['pass-without-trace', 5]] },
+    'gnomish-lineage-forest-gnome': { ab: 'choose', spells: [['minor-illusion', 1], ['speak-with-animals', 1, { uses: 'pb' }]] },
+    'gnomish-lineage-rock-gnome': { ab: 'choose', spells: [['mending', 1], ['prestidigitation', 1]] },
+  },
+  '2014': {
+    'tiefling': { ab: 'cha', spells: [['thaumaturgy', 1], ['hellish-rebuke', 3, { at: 2 }], ['darkness', 5]] },
+    'high-elf': { ab: 'int', spells: [['', 1, { pick: 'wizard' }]] },
+  },
+};
+const MI_LISTS = { '2024': ['cleric', 'druid', 'wizard'], '2014': ['bard', 'cleric', 'druid', 'sorcerer', 'warlock', 'wizard'] };
+const MI_AB14 = { bard: 'cha', cleric: 'wis', druid: 'wis', sorcerer: 'cha', warlock: 'cha', wizard: 'int' };
+const MI_BG = { acolyte: 'cleric', sage: 'wizard', guide: 'druid' };
+const bestMental = D => ['int', 'wis', 'cha'].sort((a, b) => D.m[b] - D.m[a])[0];
+/* homebrew and imported species: a trait named after a spell that says you know or learn it */
+function guessGrants(e, R) {
+  const spells = []; let ab = null;
+  for (const t of e.traits || []) {
+    const d = String(t.d || '');
+    const m = /\b(Intelligence|Wisdom|Charisma) is your spellcasting ability/i.exec(d); if (m) ab = m[1].slice(0, 3).toLowerCase();
+    const s = R.spBySlug && R.spBySlug.get(slug(t.n));
+    if (s && /\b(know|learn|always have)\b/i.test(d)) spells.push([s.id, +t.l || 1]);
+  }
+  return spells.length ? { ab: ab || 'choose', spells } : null;
+}
+function grantsOf(ch, D, feats, sp, sub, bg) {
+  const R = registry(ch.ruleset), is24 = ch.ruleset === '2024', T = LINEAGE_SPELLS[ch.ruleset] || {}, out = [];
+  const lvl = Math.max(1, D.level);
+  const lg = [sp, sub].filter(Boolean).map(e => T[e.id] || (e.pack ? guessGrants(e, R) : null)).filter(Boolean);
+  if (lg.length) {
+    const fixed = lg.map(g => g.ab).find(a => a && a !== 'choose');
+    const chosen = ch.choices['lineage-ab'];
+    const ab = fixed || chosen || bestMental(D);
+    const all = []; let pick = null;
+    for (const g of lg) for (const [id, l, o] of g.spells) {
+      let sid = id;
+      if (o && (o.pick || o.swap)) { pick = { list: o.pick || o.swap, def: id }; sid = ch.choices['lineage-cantrip'] || id; }
+      const s = sid ? look(ch, 'spells', sid) : null;
+      all.push({ id: s ? s.id : '', name: s ? s.name : 'A ' + ((o && o.pick) || '') + ' cantrip of your choice', lvl: s ? s.lvl : 0, l, free: s && s.lvl > 0 ? (o && o.uses === 'pb' ? D.pb : 1) : 0, at: (o && o.at) || (s ? s.lvl : 0), ok: l <= lvl && !!s });
+    }
+    const label = sub ? (sub.name.toLowerCase().includes(sp.name.toLowerCase()) || /^drow$/i.test(sub.name) ? sub.name : sub.name + ' ' + sp.name) : sp.name;
+    out.push({ key: 'lineage', name: label, ab, choose: !fixed, abChosen: !!(fixed || chosen), pick, needPick: !!(pick && !pick.def && !ch.choices['lineage-cantrip']), all, spells: all.filter(x => x.ok) });
+  }
+  feats.forEach(x => {
+    if (!/^magic initiate/i.test(x.f.name || '')) return;
+    const key = 'mi:' + slug(x.from || 'feat');
+    const c = ch.choices[key] || {};
+    const fromName = (/\((bard|cleric|druid|sorcerer|warlock|wizard)\)/i.exec(x.f.name) || [])[1];
+    const fromBg = x.from === 'Background' && bg ? (MI_BG[bg.id] || (bg.featNote ? slug(bg.featNote) : '')) : '';
+    const fixedList = (fromName || fromBg || '').toLowerCase();
+    const list = fixedList || c.list || '';
+    const ab = is24 ? (c.ab || bestMental(D)) : (MI_AB14[list] || bestMental(D));
+    const cs = [(c.c || [])[0] || '', (c.c || [])[1] || ''];
+    const all = [];
+    for (const id of cs) { const s = id ? look(ch, 'spells', id) : null; if (s) all.push({ id: s.id, name: s.name, lvl: 0, l: 1, free: 0, at: 0, ok: true }); }
+    if (c.s) { const s = look(ch, 'spells', c.s); if (s) all.push({ id: s.id, name: s.name, lvl: s.lvl, l: 1, free: 1, at: s.lvl, ok: true }); }
+    out.push({ key, name: 'Magic Initiate' + (list ? ' (' + cap(list) + ')' : ''), from: x.from || '', ab, choose: is24, abChosen: !is24 || !!c.ab, mi: { list, fixedList: !!fixedList, c: cs, s: c.s || '' }, all, spells: all });
+  });
+  for (const g of out) { g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; }
+  return out;
+}
+function grantByRes(D, rk) {
+  for (const g of D.grants || []) for (const x of g.spells) if (x.free && g.id + ':' + x.id === rk) return { g, x };
+  return null;
+}
+
 /* ===== derived sheet ===== */
 function derive(ch) {
   const D = { warn: [] };
@@ -999,11 +1074,14 @@ function derive(ch) {
     D.extraAb = ch.extraAb || best;
   }
 
+  D.grants = grantsOf(ch, D, feats, sp, sub, bg);
+
   /* attacks */
   D.attacks = [];
   const archery = hasChoice(/^archery$/i) || hasFeat('archery');
   const twf = hasChoice(/^two-weapon fighting$/i) || hasFeat('two-weapon-fighting');
   const monkRow = cls.find(x => x.def.id === 'monk');
+  const hasWM = !is24 || cls.some(x => hasFeatureIn(x, /^weapon mastery$/i)) || feats.some(x => /weapon master/i.test(x.f.name || ''));
   const maDie = monkRow ? ((monkRow.def.table[monkRow.c.lvl - 1] || {}).x || {}) : {};
   const martialDie = maDie.martial_arts || (maDie.martial_arts_die ? '1d' + maDie.martial_arts_die : null);
   for (const it of (ch.inv || []).filter(i => i.eq)) {
@@ -1021,7 +1099,7 @@ function derive(ch) {
     let dice = w.dmg || '1';
     if (isMonkW && martialDie && diceAvg(martialDie) > diceAvg(dice)) dice = martialDie;
     const dm = D.m[ab] + bonusDmg;
-    D.attacks.push({ name: it.name || d.name, atk, dmg: dice + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : ''), two: w.two ? w.two + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : '') : null, dt: w.dt || '', props: (w.props || []).join(', '), range: w.range || '', prof, mastery: w.mastery || '', ab, melee: !ranged, weapon: true, light: props.includes('light'), ammo: props.includes('ammunition'), off: !ranged && props.includes('light') ? dice + ((twf ? dm : Math.min(0, dm)) ? ((twf ? dm : Math.min(0, dm)) > 0 ? '+' : '-') + Math.abs(twf ? dm : Math.min(0, dm)) : '') : null });
+    D.attacks.push({ name: it.name || d.name, atk, dmg: dice + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : ''), two: w.two ? w.two + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : '') : null, dt: w.dt || '', props: (w.props || []).join(', '), range: w.range || '', prof, mastery: hasWM ? (w.mastery || '') : '', ab, melee: !ranged, weapon: true, light: props.includes('light'), ammo: props.includes('ammunition'), off: !ranged && props.includes('light') ? dice + ((twf ? dm : Math.min(0, dm)) ? ((twf ? dm : Math.min(0, dm)) > 0 ? '+' : '-') + Math.abs(twf ? dm : Math.min(0, dm)) : '') : null });
   }
   {
     const ab = monkRow && D.m.dex > D.m.str ? 'dex' : 'str';
@@ -1051,7 +1129,7 @@ function derive(ch) {
     if (!is24 && x.def.id === 'paladin' && x.c.lvl >= 3) addRes('pcd', 'Channel Divinity', 1, 'short');
     if (hasFeatureIn(x, /^arcane recovery/i)) addRes('arcrec', 'Arcane Recovery', 1, 'long', 'up to ' + Math.ceil(x.c.lvl / 2) + ' slot levels');
     if (is24 && hasFeatureIn(x, /^action surge/i)) addRes('asurge', 'Action Surge', x.c.lvl >= 17 ? 2 : 1, 'short');
-    if (is24 && hasFeatureIn(x, /^indomitable/i)) addRes('indom', 'Indomitable', x.c.lvl >= 17 ? 3 : x.c.lvl >= 13 ? 2 : 1, 'long');
+    if (is24 && hasFeatureIn(x, /^indomitable$/i)) addRes('indom', 'Indomitable', x.c.lvl >= 17 ? 3 : x.c.lvl >= 13 ? 2 : 1, 'long');
     for (const f of features.filter(z => z.cls === x.def.id && z.f && (z.f.usage || z.f.uses))) {
       if (f.f.uses) { addRes('u:' + f.key, f.n, Math.max(1, evalMax(f.f.uses.max, x.c.lvl, D)), f.f.uses.reset === 'short' ? 'short' : 'long'); continue; }
       const m = String(f.f.usage).match(/^\s*([^/]+)\/\s*(short|long)/i);
@@ -1062,6 +1140,7 @@ function derive(ch) {
   if (trait(/relentless endurance/i)) addRes('relent', 'Relentless Endurance', 1, 'long');
   if (trait(/breath weapon/i)) addRes('breath', 'Breath Weapon', is24 ? D.pb : 1, is24 ? 'long' : 'short');
   if (is24 && trait(/adrenaline rush/i)) addRes('adren', 'Adrenaline Rush', D.pb, 'short');
+  for (const g of D.grants) for (const x of g.spells) if (x.free) addRes(g.id + ':' + x.id, x.name + ', free cast', x.free, 'long', g.name);
   for (const r of ch.customRes || []) addRes('c:' + r.id, r.n || 'Resource', evalMax(r.max, D.level, D), r.reset || 'long');
 
   /* class info chips (non-tracked counters) */
@@ -1168,6 +1247,20 @@ function audit(ch, D) {
     const high = (st.s || []).filter(id => { const s = look(ch, 'spells', id); return s && s.lvl > c.maxLvl; }).length;
     if (high) add('spells', `${c.name}: ${high} spell${high === 1 ? ' is' : 's are'} above the level you can cast.`, !ch.free);
   }
+  for (const g of D.grants || []) {
+    if (g.key === 'lineage') {
+      if (g.choose && !g.abChosen) add('species', `Choose the spellcasting ability for your ${g.name} spells.`);
+      if (g.needPick) add('species', `Choose your ${g.name} cantrip.`);
+    } else if (g.mi) {
+      const m = g.mi, nC = m.c.filter(Boolean).length;
+      if (!m.list) add('spells', `${g.name} (${g.from}): choose a spell list.`);
+      else {
+        if (g.choose && !g.abChosen) add('spells', `${g.name}: choose its spellcasting ability.`);
+        if (nC < 2) add('spells', `${g.name}: choose ${pl(2 - nC, 'cantrip')}.`);
+        if (!m.s) add('spells', `${g.name}: choose a level 1 spell.`);
+      }
+    }
+  }
   if (D.cls.length && !ch.startApplied && !(ch.inv || []).length) add('equipment', 'Add your starting equipment.');
   const att = (ch.inv || []).filter(i => i.att).length;
   if (att > 3) add('equipment', `${att} items are attuned. The limit is three.`, !ch.free);
@@ -1254,6 +1347,7 @@ function embedUsed(ch, localOnly) {
   want('feats', ch.originFeat);
   for (const k of Object.keys(ch.spells || {})) { const s = ch.spells[k]; for (const id of [...(s.c || []), ...(s.s || [])]) want('spells', id); }
   for (const s of ch.extraSpells || []) want('spells', s);
+  for (const [k, v] of Object.entries(ch.choices || {})) { if (k === 'lineage-cantrip') want('spells', v); else if (/^mi:/.test(k) && v) { for (const id of v.c || []) want('spells', id); want('spells', v.s); } }
   for (const it of ch.inv || []) if (!it.custom) want('items', it.id);
   for (const t of Object.keys(out)) { const seen = new Set(); out[t] = out[t].filter(e => !seen.has(e.id) && seen.add(e.id)); }
   return Object.keys(out).length ? out : null;
@@ -2054,6 +2148,7 @@ function stepSpecies(ch, D, ro) {
   if (!sp) return out;
   const subs = (sp.subs || []).filter(s => s.id === ch.sub || !OFF_SRC.has(s.src));
   if (subs.length) out += `<div class="panel"><h3>${ch.ruleset === '2024' ? 'Lineage or ancestry' : 'Subrace'}</h3>${pickerGrid(subs, ch.sub, 'sub', ro, x => Object.entries(x.ab || {}).map(([a, v]) => a.toUpperCase() + ' ' + sgn(v)).join(' '), 'options')}</div>`;
+  out += lineageSpellPanel(ch, D, ro);
   const abTxt = [...Object.entries(sp.ab || {}), ...Object.entries((sub && sub.ab) || {})].map(([a, v]) => ABN[a] + ' ' + sgn(v)).join(', ');
   let picks = '';
   if (sp.abChoice) {
@@ -2247,7 +2342,7 @@ function asiPair(key, p, ro, act) {
 
 function stepSpells(ch, D, ro) {
   const R = registry(ch.ruleset);
-  if (!D.casters.length && !(ch.extraSpells || []).length) return `<div class="panel"><h3>Spells</h3><p class="muted">None of this character's classes cast spells yet. You can still add spells from feats or species below.</p></div>` + extraSpellsPanel(ch, D, ro, R);
+  if (!D.casters.length && !(ch.extraSpells || []).length && !(D.grants || []).length) return `<div class="panel"><h3>Spells</h3><p class="muted">None of this character's classes cast spells yet. You can still add spells from feats or species below.</p></div>` + extraSpellsPanel(ch, D, ro, R);
   let out = '';
   const q = UI.spellQ.toLowerCase();
   for (const c of D.casters) {
@@ -2289,7 +2384,36 @@ function stepSpells(ch, D, ro) {
       <div class="scroll-x" style="max-height:460px;overflow-y:auto"><table class="tbl"><tbody>${rows || '<tr><td class="muted">No spells match.</td></tr>'}</tbody></table></div>
       ${shown.length > cap ? `<div class="row"><button class="btn sm" data-act="spellall">Show all ${shown.length}</button><span class="small muted">Showing the first ${cap}.</span></div>` : ''}</div>`;
   }
-  return out + extraSpellsPanel(ch, D, ro, R);
+  return out + (D.grants || []).map(g => g.mi ? miPanel(ch, D, ro, R, g) : lineageSpellPanel(ch, D, ro)).join('') + extraSpellsPanel(ch, D, ro, R);
+}
+const ABSEL = (act, k, w, g, ro) => `<label class="field" style="width:190px"><span class="lbl">Spellcasting ability</span><select data-act="${act}" data-k="${esc(k)}"${w ? ` data-w="${w}"` : ''}${dis(ro)}>${opt('', 'Choose…', !g.abChosen)}${['int', 'wis', 'cha'].map(a => opt(a, ABN[a], g.abChosen && g.ab === a)).join('')}</select></label>`;
+function lineageSpellPanel(ch, D, ro) {
+  const g = (D.grants || []).find(x => x.key === 'lineage'); if (!g) return '';
+  const R = registry(ch.ruleset);
+  let pick = '';
+  if (g.pick) {
+    const pool = (R.spellsByClass.get(g.pick.list) || []).filter(s => s.lvl === 0);
+    const cur = ch.choices['lineage-cantrip'] || g.pick.def;
+    pick = `<label class="field" style="width:220px"><span class="lbl">${g.pick.def ? 'Cantrip (you can swap it on a Long Rest)' : 'Your cantrip'}</span><select data-act="gchoice" data-k="lineage-cantrip"${dis(ro)}>${g.pick.def ? '' : opt('', 'Choose…', !cur)}${pool.map(s => opt(s.id, s.name, cur === s.id)).join('')}</select></label>`;
+  }
+  const rows = g.all.map(x => `<li${x.ok ? '' : ' class="muted"'}><b>${esc(x.name)}</b> <span class="small muted">${[x.lvl ? 'level ' + x.lvl + ' spell' : 'cantrip', x.l > 1 ? 'from character level ' + x.l : '', x.free ? (x.free > 1 ? x.free + ' free casts' : 'one free cast') + ' per Long Rest' : ''].filter(Boolean).join(' · ')}</span></li>`).join('');
+  return `<div class="panel stack"><div class="ph">${esc(g.name)} spells<span class="spacer"></span>${g.abChosen ? `<span class="pill acc">Save DC ${g.dc}</span><span class="pill acc">Attack ${sgn(g.atk)}</span>` : ''}</div>
+    <div class="row" style="align-items:flex-end">${g.choose ? ABSEL('gchoice', 'lineage-ab', '', g, ro) : `<div class="field"><span class="lbl">Spellcasting ability</span><span class="pill" style="align-self:flex-start;padding:6px 12px">${ABN[g.ab]}</span></div>`}${pick}</div>
+    <ul class="rt" style="margin:0;padding-left:1.2em">${rows}</ul>
+    <p class="small muted">These go on your sheet under Spells with their own save DC and attack bonus.${g.all.some(x => x.free) ? ' Free casts come back when you finish a Long Rest.' : ''}</p></div>`;
+}
+function miPanel(ch, D, ro, R, g) {
+  const m = g.mi, k = g.key;
+  const lists = MI_LISTS[ch.ruleset] || MI_LISTS['2024'];
+  const pool = m.list ? (R.spellsByClass.get(m.list) || []) : [];
+  const cants = pool.filter(s => s.lvl === 0), ones = pool.filter(s => s.lvl === 1);
+  const listSel = m.fixedList ? `<div class="field"><span class="lbl">Spell list</span><span class="pill" style="align-self:flex-start;padding:6px 12px">${esc(cap(m.list))}</span></div>` : `<label class="field" style="width:190px"><span class="lbl">Spell list</span><select data-act="michoice" data-k="${esc(k)}" data-w="list"${dis(ro)}>${opt('', 'Choose…', !m.list)}${lists.map(l => opt(l, cap(l), m.list === l)).join('')}</select></label>`;
+  const cSel = i => `<label class="field" style="width:200px"><span class="lbl">Cantrip ${i + 1}</span><select data-act="michoice" data-k="${esc(k)}" data-w="c${i}"${dis(ro || !m.list)}>${opt('', 'Choose…', !m.c[i])}${cants.filter(s => s.id === m.c[i] || !m.c.includes(s.id)).map(s => opt(s.id, s.name, m.c[i] === s.id)).join('')}</select></label>`;
+  const sSel = `<label class="field" style="width:200px"><span class="lbl">Level 1 spell</span><select data-act="michoice" data-k="${esc(k)}" data-w="s"${dis(ro || !m.list)}>${opt('', 'Choose…', !m.s)}${ones.map(s => opt(s.id, s.name, m.s === s.id)).join('')}</select></label>`;
+  return `<div class="panel stack"><div class="ph">${esc(g.name)}<span class="spacer"></span><span class="small muted">${esc(g.from)}</span>${m.list ? `<span class="pill acc">Save DC ${g.dc}</span><span class="pill acc">Attack ${sgn(g.atk)}</span>` : ''}</div>
+    <p class="small muted">Two cantrips and one level 1 spell from one list. The level 1 spell has one free cast per Long Rest${ch.ruleset === '2024' ? ', and you can also cast it with any spell slot you have' : ''}.</p>
+    <div class="row" style="align-items:flex-end">${listSel}${g.choose ? (m.list ? ABSEL('michoice', k, 'ab', g, ro) : '') : (m.list ? `<div class="field"><span class="lbl">Spellcasting ability</span><span class="pill" style="align-self:flex-start;padding:6px 12px">${ABN[g.ab]}</span></div>` : '')}</div>
+    <div class="row">${cSel(0)}${cSel(1)}${sSel}</div></div>`;
 }
 function extraSpellsPanel(ch, D, ro, R) {
   const list = ch.extraSpells || [];
@@ -2457,17 +2581,18 @@ function sheetView(ch, D, ro, e) {
   }
   const xab = D.extraAb || 'cha';
   for (const id of ch.extraSpells || []) { const s = look(ch, 'spells', id); if (s) known.push({ s, c: { id: '', name: 'Other', ab: xab, dc: 8 + D.pb + D.m[xab], atk: D.pb + D.m[xab] } }); }
+  for (const g of D.grants || []) for (const x of g.spells) { const s = look(ch, 'spells', x.id); if (!s) continue; const r = x.free ? D.res.find(z => z.key === g.id + ':' + x.id) : null; known.push({ s, c: { id: g.id, name: g.name, ab: g.ab, dc: g.dc, atk: g.atk, freeTxt: r ? `free ${Math.max(0, r.max - (+(p.res || {})[r.key] || 0))} of ${r.max}` : '' } }); }
   if (known.length || D.slots.some(Boolean) || D.pact) {
     const lv = Array.from(new Set(known.map(x => x.s.lvl)));
     for (let i = 1; i <= 9; i++) if (D.slots[i - 1] && !lv.includes(i)) lv.push(i);
     lv.sort((a, b) => a - b);
-    spells = `<div class="panel"><div class="ph">Spells<span class="spacer"></span>${D.casters.map(c => `<span class="pill acc" style="text-transform:none;letter-spacing:0">${esc(c.name)} DC ${c.dc} · ${sgn(c.atk)}</span>`).join(' ')}</div>
+    spells = `<div class="panel"><div class="ph">Spells<span class="spacer"></span>${[...D.casters, ...(D.grants || []).filter(g => g.spells.length)].map(c => `<span class="pill acc" style="text-transform:none;letter-spacing:0">${esc(c.name)} DC ${c.dc} · ${sgn(c.atk)}</span>`).join(' ')}</div>
       ${D.pact ? `<div class="splv"><h4>Pact slots · level ${D.pact.lvl}</h4><span class="pips">${Array.from({ length: D.pact.n }, (_, i) => `<button class="pip${i < D.pact.n - (+p.pact || 0) ? '' : ' used'}" data-act="pact" data-n="${i < D.pact.n - (+p.pact || 0) ? (+p.pact || 0) + 1 : (+p.pact || 0) - 1}" aria-label="Pact slot ${i + 1} of ${D.pact.n}, ${i < D.pact.n - (+p.pact || 0) ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span></div>` : ''}
       ${lv.map(l => {
         const n = l ? D.slots[l - 1] || 0 : 0, u = +(p.slots || {})[l] || 0;
         const list = known.filter(x => x.s.lvl === l).sort((a, b) => a.s.name.localeCompare(b.s.name));
         return `<div class="splv"><h4>${l ? ORD(l) + ' level' : 'Cantrips'}</h4>${n ? `<span class="pips">${Array.from({ length: n }, (_, i) => `<button class="pip${i < n - u ? '' : ' used'}" data-act="slot" data-l="${l}" data-n="${i < n - u ? u + 1 : u - 1}" aria-label="Level ${l} slot ${i + 1} of ${n}, ${i < n - u ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span><span class="small muted">${n - u} left</span>` : ''}</div>
-          ${list.map(({ s, c }) => { const m = spellMath(s, s.lvl, D.level, D.m[c.ab]); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name].filter(Boolean).join(' · '))}</div></div>
+          ${list.map(({ s, c }) => { const m = spellMath(s, s.lvl, D.level, D.m[c.ab]); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name, c.freeTxt || ''].filter(Boolean).join(' · '))}</div></div>
               <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(m.dmg)}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
       }).join('')}</div>`;
   }
@@ -3355,7 +3480,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 16</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 17</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4451,8 +4576,9 @@ function hpChange(ch, delta) {
   patch.hp = hp; patch.temp = temp; if (hp > 0) patch.ds = [0, 0];
   play(ch, patch, `${Math.abs(delta)} ${delta < 0 ? 'damage to' : 'healing on'} ${ch.name}`);
 }
-function slotOptions(ch, D, s) {
+function slotOptions(ch, D, s, cid) {
   const p = ch.play, out = [];
+  if (cid && /^g:/.test(cid)) { const r = D.res.find(z => z.key === cid + ':' + s.id); const gx = r && grantByRes(D, r.key); const left = r ? r.max - (+(p.res || {})[r.key] || 0) : 0; if (r && left > 0) out.push({ k: 'res:' + r.key, l: (gx && gx.x.at) || s.lvl, label: 'Free cast (' + gx.g.name + ')', left }); }
   for (let l = s.lvl; l <= 9; l++) { const left = (D.slots[l - 1] || 0) - (+(p.slots || {})[l] || 0); if (left > 0) out.push({ k: String(l), l, label: ORD(l) + ' level', left }); }
   if (D.pact && D.pact.lvl >= s.lvl && D.pact.n - (+p.pact || 0) > 0) out.push({ k: 'pact', l: D.pact.lvl, label: 'Pact slot (level ' + D.pact.lvl + ')', left: D.pact.n - (+p.pact || 0) });
   if (s.rit) out.push({ k: 'ritual', l: s.lvl, label: 'Ritual (no slot, 10 minutes longer)', left: null });
@@ -4461,6 +4587,7 @@ function slotOptions(ch, D, s) {
 }
 function casterFor(ch, D, cid) {
   const c = D.casters.find(x => x.id === cid); if (c) return c;
+  const g = (D.grants || []).find(x => x.id === cid); if (g) return { id: g.id, name: g.name, ab: g.ab, dc: g.dc, atk: g.atk };
   const ab = D.extraAb || 'cha'; return { id: '', name: 'Other', ab, dc: 8 + D.pb + D.m[ab], atk: D.pb + D.m[ab] };
 }
 function castNow(e, s, c, key, tgts) {
@@ -4468,6 +4595,7 @@ function castNow(e, s, c, key, tgts) {
   let slotLvl = s.lvl;
   if (s.lvl > 0) {
     if (key === 'pact') { slotLvl = D.pact.lvl; patch.pact = (+p.pact || 0) + 1; }
+    else if (/^res:/.test(key)) { const rk = key.slice(4), gx = grantByRes(D, rk); slotLvl = (gx && gx.x.at) || s.lvl; patch.res = Object.assign({}, p.res || {}, { [rk]: (+(p.res || {})[rk] || 0) + 1 }); }
     else if (key !== 'ritual' && key !== 'free') { slotLvl = +key; patch.slots = Object.assign({}, p.slots || {}, { [slotLvl]: (+(p.slots || {})[slotLvl] || 0) + 1 }); }
   }
   if (s.conc) { patch.conc = s.name; patch.concDC = 0; }
@@ -4500,7 +4628,7 @@ function castNow(e, s, c, key, tgts) {
 MODALS.cast = () => {
   const m = UI.modal, e = E(); if (!e) return '';
   const ch = e.ch, D = getD(ch), s = look(ch, 'spells', m.sid); if (!s) return '';
-  const c = casterFor(ch, D, m.cid), opts = slotOptions(ch, D, s);
+  const c = casterFor(ch, D, m.cid), opts = slotOptions(ch, D, s, m.cid);
   if (!opts.some(o => o.k === m.slot)) m.slot = opts.length ? opts[0].k : '';
   const cur = opts.find(o => o.k === m.slot), math = spellMath(s, cur ? cur.l : s.lvl, D.level, D.m[c.ab]);
   const all = targetsFor(ch), needs = s.atk || math.save || math.dmg || math.heal;
@@ -5704,6 +5832,17 @@ ACT.theme = function () {
   try { localStorage.setItem('pl.theme', JSON.stringify(next)); } catch (e) { }
   toastMsg(next === 'dark' ? 'Colours: dark, on this device.' : next === 'light' ? 'Colours: light, on this device.' : 'Colours now follow your device.');
   queueRender();
+};
+
+ACT.gchoice = function (el) { const ch = C(); if (!ch) return; const k = el.dataset.k; if (el.value) ch.choices[k] = el.value; else delete ch.choices[k]; commit(ch); };
+ACT.michoice = function (el) {
+  const ch = C(); if (!ch) return; const k = el.dataset.k, w = el.dataset.w;
+  const c = Object.assign({}, ch.choices[k] || {}); c.c = [(c.c || [])[0] || '', (c.c || [])[1] || ''];
+  if (w === 'list') { if (c.list !== el.value) { c.c = ['', '']; c.s = ''; } c.list = el.value; }
+  else if (w === 'ab') c.ab = el.value;
+  else if (w === 'c0' || w === 'c1') c.c[+w[1]] = el.value;
+  else if (w === 's') c.s = el.value;
+  ch.choices[k] = c; commit(ch);
 };
 </script>
 </body>
