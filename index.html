@@ -631,6 +631,211 @@ const allPacks = () => BUILTIN_PACKS.concat(PACKS);
 let OFF_SRC = new Set(); // sources the DM switched off: hidden from pickers, still readable on sheets
 function setOffSources(arr) { OFF_SRC = new Set(arr || []); packsVersion++; regCache.clear(); }
 
+/* ===== 2024 class choices the free rules describe but the data left as text ===== */
+const INVOCATIONS_24 = [
+  { n: 'Agonizing Blast', lvl: 2, rep: 1, d: 'Pick one of your Warlock cantrips that deals damage. Add your Charisma modifier to its damage rolls. (On this sheet it applies to Eldritch Blast.)' },
+  { n: 'Armor of Shadows', d: 'You can cast Mage Armor on yourself without a spell slot.' },
+  { n: 'Ascendant Step', lvl: 5, d: 'You can cast Levitate on yourself without a spell slot.' },
+  { n: "Devil's Sight", lvl: 2, d: 'You can see normally in Dim Light and Darkness, magical or not, within 120 feet.' },
+  { n: 'Devouring Blade', lvl: 12, req: 'Thirsting Blade', d: 'Thirsting Blade gives you two extra attacks instead of one.' },
+  { n: 'Eldritch Mind', d: 'You have Advantage on Constitution saving throws to keep Concentration.' },
+  { n: 'Eldritch Smite', lvl: 5, req: 'Pact of the Blade', d: 'Once per turn when you hit with your pact weapon, you can spend a Pact Magic slot to deal an extra 1d8 Force damage plus 1d8 per slot level, and knock a Huge or smaller target Prone.' },
+  { n: 'Eldritch Spear', lvl: 2, rep: 1, d: 'Pick one of your Warlock cantrips that deals damage and has a range of 10 feet or more. Its range grows by 30 feet times your Warlock level.' },
+  { n: 'Fiendish Vigor', lvl: 2, d: 'You can cast False Life on yourself without a spell slot, and you take the highest number on the dice instead of rolling.' },
+  { n: 'Gaze of Two Minds', lvl: 5, d: 'As a Bonus Action, touch a willing creature and perceive through its senses until the end of your next turn. You can keep it going with a Bonus Action each turn.' },
+  { n: 'Gift of the Depths', lvl: 5, d: 'You can breathe underwater and have a Swim Speed equal to your Speed. You can also cast Water Breathing once without a spell slot each Long Rest.' },
+  { n: 'Gift of the Protectors', lvl: 9, req: 'Pact of the Tome', d: 'Creatures who write their name in your Book of Shadows drop to 1 Hit Point instead of 0 the first time each Long Rest.' },
+  { n: 'Investment of the Chain Master', lvl: 5, req: 'Pact of the Chain', d: 'Your familiar gains a flying or swimming speed, can attack as a Bonus Action you command, deals Necrotic or Radiant damage if you like, uses your spell save DC, and you can give it Resistance to damage as a Reaction.' },
+  { n: 'Lessons of the First Ones', lvl: 2, rep: 1, d: 'You gain one Origin feat of your choice. Add it under Bonus feats.' },
+  { n: 'Lifedrinker', lvl: 9, req: 'Pact of the Blade', d: 'Once per turn when you hit with your pact weapon, deal an extra 1d6 Necrotic, Psychic or Radiant damage, and you can spend a Hit Point Die to heal.' },
+  { n: 'Mask of Many Faces', lvl: 2, d: 'You can cast Disguise Self without a spell slot.' },
+  { n: 'Master of Myriad Forms', lvl: 5, d: 'You can cast Alter Self without a spell slot.' },
+  { n: 'Misty Visions', lvl: 2, d: 'You can cast Silent Image without a spell slot.' },
+  { n: 'One with Shadows', lvl: 5, d: 'While you are in Dim Light or Darkness, you can take a Magic action to become Invisible until you move or take an action, Bonus Action or Reaction.' },
+  { n: 'Otherworldly Leap', lvl: 2, d: 'You can cast Jump on yourself without a spell slot.' },
+  { n: 'Pact of the Blade', d: 'Conjure or bond a pact weapon as a Bonus Action. You are proficient with it and can use Charisma for its attack and damage rolls (this sheet uses Charisma for your melee weapons when it is higher), and its damage can be Necrotic, Psychic or Radiant.' },
+  { n: 'Pact of the Chain', d: 'You learn Find Familiar and can cast it as a Magic action without a slot, with extra forms such as an imp, pseudodragon, quasit, skeleton, slaad tadpole, sphinx of wonder, sprite or venomous snake. Your familiar can attack with your Reaction when you take the Attack action.' },
+  { n: 'Pact of the Tome', d: 'You conjure a Book of Shadows holding three cantrips and two level 1 Ritual spells of your choice from any class. You always have them prepared while you hold the book, and it is your spellcasting focus.' },
+  { n: 'Repelling Blast', lvl: 2, rep: 1, d: 'Pick one of your Warlock cantrips that deals damage with an attack roll. When it hits a Large or smaller creature, you can push it up to 10 feet straight away from you.' },
+  { n: 'Thirsting Blade', lvl: 5, req: 'Pact of the Blade', d: 'You can attack twice with your pact weapon when you take the Attack action.' },
+  { n: 'Visions of Distant Realms', lvl: 9, d: 'You can cast Arcane Eye without a spell slot.' },
+  { n: 'Whispers of the Grave', lvl: 7, d: 'You can cast Speak with Dead without a spell slot.' },
+  { n: 'Witch Sight', lvl: 15, d: 'You have Truesight with a range of 30 feet.' },
+];
+const INV_SPELLS = { 'Armor of Shadows': 'mage-armor', 'Ascendant Step': 'levitate', 'Fiendish Vigor': 'false-life', 'Mask of Many Faces': 'disguise-self', 'Master of Myriad Forms': 'alter-self', 'Misty Visions': 'silent-image', 'Otherworldly Leap': 'jump', 'Visions of Distant Realms': 'arcane-eye', 'Whispers of the Grave': 'speak-with-dead' };
+const METAMAGIC_24 = [
+  { n: 'Careful Spell', d: '1 Sorcery Point. When you cast a spell that forces saves, pick up to your Charisma modifier (minimum 1) creatures; they succeed automatically and take no damage if they would take half.' },
+  { n: 'Distant Spell', d: '1 Sorcery Point. Double the range of a spell with a range of 5 feet or more, or give a Touch spell a range of 30 feet.' },
+  { n: 'Empowered Spell', d: '1 Sorcery Point. Reroll up to your Charisma modifier (minimum 1) damage dice and use the new rolls. Works alongside another Metamagic option.' },
+  { n: 'Extended Spell', d: '1 Sorcery Point. Double the duration of a spell lasting 1 minute or longer (up to 24 hours), and have Advantage on saves to keep Concentration on it.' },
+  { n: 'Heightened Spell', d: '2 Sorcery Points. One target of the spell has Disadvantage on its saves against it.' },
+  { n: 'Quickened Spell', d: '2 Sorcery Points. Cast a spell with a casting time of an action as a Bonus Action, if you have not already cast a level 1+ spell this turn.' },
+  { n: 'Seeking Spell', d: '1 Sorcery Point. If you miss with a spell attack roll, reroll the d20 and use the new roll. Works alongside another Metamagic option.' },
+  { n: 'Subtle Spell', d: '1 Sorcery Point. Cast a spell without Verbal, Somatic or non-costly Material components.' },
+  { n: 'Transmuted Spell', d: '1 Sorcery Point. Change a spell\'s Acid, Cold, Fire, Lightning, Poison or Thunder damage to another type from that list.' },
+  { n: 'Twinned Spell', d: '1 Sorcery Point. Cast a spell that can target one more creature when cast with a higher slot as if it were one level higher.' },
+];
+const LAND_SPELLS = {
+  Arid: [[3, 'blur', 'Blur'], [3, 'burning-hands', 'Burning Hands'], [3, 'fire-bolt', 'Fire Bolt'], [5, 'fireball', 'Fireball'], [7, 'blight', 'Blight'], [9, 'wall-of-stone', 'Wall of Stone']],
+  Polar: [[3, 'fog-cloud', 'Fog Cloud'], [3, 'hold-person', 'Hold Person'], [3, 'ray-of-frost', 'Ray of Frost'], [5, 'sleet-storm', 'Sleet Storm'], [7, 'ice-storm', 'Ice Storm'], [9, 'cone-of-cold', 'Cone of Cold']],
+  Temperate: [[3, 'misty-step', 'Misty Step'], [3, 'shocking-grasp', 'Shocking Grasp'], [3, 'sleep', 'Sleep'], [5, 'lightning-bolt', 'Lightning Bolt'], [7, 'freedom-of-movement', 'Freedom of Movement'], [9, 'tree-stride', 'Tree Stride']],
+  Tropical: [[3, 'acid-splash', 'Acid Splash'], [3, 'ray-of-sickness', 'Ray of Sickness'], [3, 'web', 'Web'], [5, 'stinking-cloud', 'Stinking Cloud'], [7, 'polymorph', 'Polymorph'], [9, 'insect-plague', 'Insect Plague']],
+};
+const SKILL_OPTS = ids => ids.map(id => { const s = SKILLS.find(k => k[0] === id); return { n: s ? s[1] : id, d: 'Proficiency in ' + (s ? s[1] : id) + '.' }; });
+/* class id or subclass id | feature name prefix -> what to add to the feature */
+const OPTS_24 = {
+  'cleric|Divine Order': { opts: [{ n: 'Protector', d: 'Proficiency with Martial weapons and training with Heavy armor.' }, { n: 'Thaumaturge', d: 'One extra Cleric cantrip, and add your Wisdom modifier (minimum +1) to Intelligence (Arcana or Religion) checks.' }] },
+  'druid|Primal Order': { opts: [{ n: 'Magician', d: 'One extra Druid cantrip, and add your Wisdom modifier (minimum +1) to Intelligence (Arcana or Nature) checks.' }, { n: 'Warden', d: 'Proficiency with Martial weapons and training with Medium armor.' }] },
+  'cleric|Blessed Strikes': { opts: [{ n: 'Divine Strike', d: 'Once on each of your turns when you hit with a weapon, deal an extra 1d8 Necrotic or Radiant damage (2d8 from Cleric level 14). Switch it on under Effects before the attack.' }, { n: 'Potent Spellcasting', d: 'Add your Wisdom modifier to the damage of your Cleric cantrips. The sheet adds it for you.' }] },
+  'druid|Elemental Fury': { opts: [{ n: 'Potent Spellcasting', d: 'Add your Wisdom modifier to the damage of your Druid cantrips. The sheet adds it for you.' }, { n: 'Primal Strike', d: 'Once on each of your turns when you hit with a weapon or a Wild Shape attack, deal an extra 1d8 Cold, Fire, Lightning or Thunder damage (2d8 from Druid level 15). Switch it on under Effects.' }] },
+  'warlock|Eldritch Invocations': { opts: INVOCATIONS_24, multi: 1 },
+  'sorcerer|Metamagic': { opts: METAMAGIC_24, multi: 1, chooseAt: { 2: 2, 10: 4, 17: 6 } },
+  'barbarian|Primal Knowledge': { opts: SKILL_OPTS(['animal-handling', 'athletics', 'intimidation', 'nature', 'perception', 'survival']), skillOpts: 1 },
+  'hunter|Hunter\'s Prey': { opts: [{ n: 'Colossus Slayer', d: 'Once per turn when you hit a creature that is missing any Hit Points, your weapon deals an extra 1d8 damage. Switch it on under Effects.' }, { n: 'Horde Breaker', d: 'Once on each of your turns when you attack with a weapon, you can attack a different creature within 5 feet of the first target with the same weapon.' }] },
+  'hunter|Defensive Tactics': { opts: [{ n: 'Escape the Horde', d: 'Opportunity Attacks against you have Disadvantage.' }, { n: 'Multiattack Defense', d: 'When a creature hits you with an attack roll, it has Disadvantage on its other attack rolls against you this turn.' }] },
+  'draconic-sorcery|Elemental Affinity': { opts: ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'].map(t => ({ n: t, d: `Resistance to ${t} damage, and add your Charisma modifier to one damage roll of your ${t} spells.` })) },
+  'college-of-lore|Bonus Proficiencies': { opts: SKILL_OPTS(SKILLS.map(s => s[0])), skillOpts: 1, multi: 1, choose: 3 },
+  'champion|Additional Fighting Style': { pick: 'fighting-style' },
+  'circle-of-the-land|Circle of the Land Spells': { opts: Object.keys(LAND_SPELLS).map(k => ({ n: k, d: 'Always prepared: ' + LAND_SPELLS[k].map(([l, , n]) => n + ' (Druid ' + l + ')').join(', ') + '. You can change the land after a Long Rest.' })), landOpts: 1, rename: 'Circle of the Land Spells' },
+};
+/* limited-use features the 2024 data leaves as text: [name, uses, reset] */
+const TRACK_24 = [
+  [/^divine intervention$/i, '1', 'long'], [/^magical cunning$/i, '1', 'long'], [/^innate sorcery$/i, '2', 'long'], [/^sorcerous restoration$/i, '1', 'long'],
+  [/^tireless$/i, 'wis1', 'long'], [/^nature's veil$/i, 'wis1', 'long'], [/^uncanny metabolism$/i, '1', 'long'], [/^wholeness of body$/i, 'wis1', 'long'],
+  [/^stroke of luck$/i, '1', 'short'], [/^dark one's own luck$/i, 'cha1', 'long'], [/^hurl through hell$/i, '1', 'long'], [/^holy nimbus$/i, '1', 'long'],
+  [/^dragon wings$/i, '1', 'long'], [/^intimidating presence$/i, '1', 'long'], [/^natural recovery$/i, '1', 'long'], [/^wild resurgence$/i, '1', 'long'],
+  [/^persistent rage$/i, '1', 'long'], [/^signature spells$/i, '2', 'short'], [/^contact patron$/i, '1', 'long'], [/^faithful steed$/i, '1', 'long'], [/^overchannel$/i, '1', 'long'], [/^favored enemy$/i, 'table:favored_enemies', 'long', "Hunter's Mark, free casts"],
+];
+const TRACK_SP_24 = [[/^giant ancestry/i, 'pb', 'long', 'Giant Ancestry'], [/^large form$/i, '1', 'long', 'Large Form'], [/^stonecunning$/i, 'pb', 'long', 'Stonecunning'], [/^draconic flight$/i, '1', 'long', 'Draconic Flight']];
+const MASTERY_RULES = {
+  Cleave: 'If you hit a creature with a melee attack roll, you can make a melee attack roll against a second creature within 5 feet of the first and within your reach. On a hit it takes the weapon\'s damage without your ability modifier (unless the modifier is negative). Once per turn.',
+  Graze: 'If your attack roll misses a creature, you can deal damage to it equal to the ability modifier you used for the roll, of the same type as the weapon. The modifier must be positive.',
+  Nick: 'When you make the extra attack of the Light property, you can make it as part of the Attack action instead of as a Bonus Action. Once per turn.',
+  Push: 'If you hit a Large or smaller creature, you can push it up to 10 feet straight away from you.',
+  Sap: 'If you hit a creature, it has Disadvantage on its next attack roll before the start of your next turn.',
+  Slow: 'If you hit and deal damage to a creature, you can reduce its Speed by 10 feet until the start of your next turn. Stacking several Slow hits still only reduces it by 10 feet.',
+  Topple: 'If you hit a creature, you can force it to make a Constitution saving throw (DC 8 + the ability modifier you used for the attack + your Proficiency Bonus). On a failure it has the Prone condition.',
+  Vex: 'If you hit a creature and deal damage to it, you have Advantage on your next attack roll against that creature before the end of your next turn.',
+};
+const WM_DEFAULT = { paladin: 2, ranger: 2, rogue: 2, barbarian: 2, fighter: 3 };
+
+function opts24(owner, f, is24) {
+  if (!is24 || !f || f.opts || f.pick) return f;
+  const n = String(f.n || '').toLowerCase();
+  for (const [k, v] of Object.entries(OPTS_24)) { const [o, pre] = k.split('|'); if (o === owner && n.startsWith(pre.toLowerCase())) return Object.assign({}, f, v, v.rename ? { n: v.rename } : {}); }
+  return f;
+}
+function trackMax(spec, D, row) {
+  const s = String(spec);
+  if (s === 'pb') return D.pb;
+  if (/^(wis|cha|int)1$/.test(s)) return Math.max(1, D.m[s.slice(0, 3)]);
+  if (/^table:/.test(s)) return +(row || {})[s.slice(6)] || 0;
+  return +s || 0;
+}
+/* spells a 2024 class feature choice brings: invocations, Mystic Arcanum, Magical Discoveries */
+function classGrants(ch, D, features) {
+  const out = [];
+  const wl = D.cls.find(x => x.def.id === 'warlock');
+  const inv = features.filter(z => z.cls === 'warlock' && /^eldritch invocations$/i.test(z.n)).flatMap(z => [].concat(ch.choices[z.key] || []));
+  if (inv.length) {
+    const all = [];
+    const put = (id, via, atwill) => { const s = look(ch, 'spells', id); if (s && !all.some(x => x.id === s.id)) all.push({ id: s.id, name: s.name, lvl: s.lvl, l: 1, free: atwill ? 0 : 1, at: s.lvl, ok: true, atwill: !!atwill, via }); };
+    for (const n of inv) {
+      if (INV_SPELLS[n]) put(INV_SPELLS[n], n, true);
+      if (n === 'Gift of the Depths') put('water-breathing', n, false);
+      if (n === 'Pact of the Chain') put('find-familiar', n, true);
+    }
+    if (all.length) out.push({ key: 'inv', name: 'Eldritch Invocations', ab: 'cha', classGrant: 1, all, spells: all });
+  }
+  if (wl && wl.c.lvl >= 11 && features.some(z => z.cls === 'warlock' && /^mystic arcanum/i.test(z.n))) {
+    const pick = ch.choices.arcanum || {};
+    const levels = [[6, 11], [7, 13], [8, 15], [9, 17]].filter(([, l]) => wl.c.lvl >= l).map(([s]) => s);
+    const all = levels.map(sl => { const s = pick[sl] ? look(ch, 'spells', pick[sl]) : null; return { id: s ? s.id : '', name: s ? s.name : 'Level ' + sl + ' spell', lvl: sl, l: 11, free: s ? 1 : 0, at: sl, ok: !!s }; });
+    out.push({ key: 'arcanum', name: 'Mystic Arcanum', ab: 'cha', classGrant: 1, arcanum: levels, all, spells: all.filter(x => x.ok) });
+  }
+  const lore = features.find(z => z.isSub && /^magical discoveries$/i.test(z.n));
+  if (lore) {
+    const bard = D.casters.find(c => c.id === 'bard');
+    const all = [].concat(ch.choices.discoveries || []).filter(Boolean).slice(0, 2).map(id => look(ch, 'spells', id)).filter(Boolean).map(s => ({ id: s.id, name: s.name, lvl: s.lvl, l: 6, free: 0, at: s.lvl, ok: true }));
+    out.push({ key: 'disc', name: 'Magical Discoveries', ab: (bard && bard.ab) || 'cha', classGrant: 1, disc: 1, maxLvl: bard ? bard.maxLvl : 0, all, spells: all });
+  }
+  for (const g of out) { g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
+}
+function classGrantPanel(ch, D, ro, R, g) {
+  const head = t => `<div class="ph">${t}<span class="spacer"></span><span class="pill acc">Save DC ${g.dc}</span><span class="pill acc">Attack ${sgn(g.atk)}</span></div>`;
+  if (g.key === 'inv') return `<div class="panel stack">${head('Spells from Eldritch Invocations')}<ul class="rt" style="margin:0;padding-left:1.2em">${g.all.map(x => `<li><b>${esc(x.name)}</b> <span class="small muted">${esc(x.via)} · ${x.atwill ? 'at will, no spell slot' : 'one free cast per Long Rest'}</span></li>`).join('')}</ul><p class="small muted">Change invocations under Features.</p></div>`;
+  if (g.key === 'arcanum') {
+    const pool = R.spellsByClass.get('warlock') || [], cur = ch.choices.arcanum || {};
+    return `<div class="panel stack">${head('Mystic Arcanum')}<p class="small muted">One Warlock spell for each level below. You cast each once without a spell slot, and again after a Long Rest.</p>
+      <div class="row">${g.arcanum.map(l => `<label class="field" style="width:230px"><span class="lbl">Level ${l} spell</span><select data-act="arcpick" data-l="${l}"${dis(ro)}>${opt('', 'Choose…', !cur[l])}${pool.filter(s => s.lvl === l).map(s => opt(s.id, s.name, cur[l] === s.id)).join('')}</select></label>`).join('')}</div></div>`;
+  }
+  if (g.key === 'disc') {
+    const seen = new Set(), pool = [];
+    for (const l of ['cleric', 'druid', 'wizard']) for (const s of R.spellsByClass.get(l) || []) if (!seen.has(s.id) && s.lvl <= g.maxLvl) { seen.add(s.id); pool.push(s); }
+    pool.sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+    const raw = [].concat(ch.choices.discoveries || []), cur = [raw[0] || '', raw[1] || ''];
+    return `<div class="panel stack">${head('Magical Discoveries')}<p class="small muted">Two spells from the Cleric, Druid or Wizard lists: cantrips, or levels you have Bard spell slots for. They are always prepared and don't count against your Bard spells.</p>
+      <div class="row">${[0, 1].map(i => `<label class="field" style="width:250px"><span class="lbl">Spell ${i + 1}</span><select data-act="discpick" data-i="${i}"${dis(ro)}>${opt('', 'Choose…', !cur[i])}${pool.filter(s => s.id === cur[i] || !cur.includes(s.id)).map(s => opt(s.id, (s.lvl ? 'Level ' + s.lvl : 'Cantrip') + ': ' + s.name, cur[i] === s.id)).join('')}</select></label>`).join('')}</div></div>`;
+  }
+  return '';
+}
+/* damage the sheet adds to a spell: Agonizing Blast, Potent Spellcasting, Elemental Affinity */
+function spellDmgBonus(ch, D, s, c, m) {
+  if (!m.dmg || !c) return 0;
+  const pick = (cid, re) => (D.features || []).filter(x => x.cls === cid && re.test(x.n)).flatMap(x => [].concat(ch.choices[x.key] || []));
+  let b = 0;
+  if (s.lvl === 0 && c.id === 'warlock' && s.id === 'eldritch-blast' && pick('warlock', /^eldritch invocations$/i).includes('Agonizing Blast')) { const k = D.level >= 17 ? 4 : D.level >= 11 ? 3 : D.level >= 5 ? 2 : 1; b += k * Math.max(0, D.m.cha); }
+  if (s.lvl === 0 && c.id === 'cleric' && (pick('cleric', /^blessed strikes$/i).includes('Potent Spellcasting') || (D.features || []).some(x => x.cls === 'cleric' && /^potent spellcasting$/i.test(x.n)))) b += D.m.wis;
+  if (s.lvl === 0 && c.id === 'druid' && pick('druid', /^elemental fury$/i).includes('Potent Spellcasting')) b += D.m.wis;
+  if (D.affinity && c.id === 'sorcerer' && String(m.dt || '').toLowerCase() === D.affinity.toLowerCase()) b += D.m.cha;
+  return b;
+}
+function spellMathFor(ch, D, s, slot, c) {
+  const m = spellMath(s, slot, D.level, D.m[c.ab]);
+  const b = spellDmgBonus(ch, D, s, c, m);
+  if (b) m.dmg = m.dmg + (b > 0 ? '+' : '-') + Math.abs(b);
+  return m;
+}
+/* what a weapon's mastery does once the DM's screen knows the attack hit */
+function masteryOnHit(ms, t, m, r) {
+  const n = ms.n, nm = t.name, who = m.who || 'The attacker';
+  if (n === 'Cleave') return `Cleave: ${who} can attack a second creature within 5 feet of ${nm}.`;
+  if (r.down) return '';
+  if (n === 'Topple') {
+    let bonus = 0;
+    if (t.kind === 'mon') { const def = t.def; bonus = def ? (def.saves && def.saves.con != null ? +def.saves.con : mod((def.ab || {}).con || 10)) : (+t.c.sv || 0); }
+    else bonus = derive(t.x.ch).save.con;
+    const sv = rollExpr('1d20' + (bonus ? (bonus > 0 ? '+' : '-') + Math.abs(bonus) : ''));
+    if (sv.total >= +ms.dc) return `Topple: ${nm} makes the DC ${ms.dc} Constitution save (${sv.total}).`;
+    if (t.kind === 'mon') { const c = t.c; c.cond = Array.from(new Set([...(c.cond || []), 'Prone'])); saveCombat(cbt()); }
+    else { const ch = t.x.ch; savePlay(ch, { cond: Array.from(new Set([...(ch.play.cond || []), 'Prone'])) }); }
+    return `Topple: ${nm} fails the DC ${ms.dc} Constitution save (${sv.total}) and falls Prone.`;
+  }
+  if (n === 'Vex') return r.dealt > 0 ? `Vex: ${who} has advantage on the next attack against ${nm}.` : '';
+  if (n === 'Sap') return `Sap: ${nm} has disadvantage on its next attack roll before ${who}'s next turn.`;
+  if (n === 'Slow') return r.dealt > 0 ? `Slow: ${nm}'s speed drops by 10 feet until ${who}'s next turn.` : '';
+  if (n === 'Push') return `Push: ${who} can push ${nm} up to 10 feet straight away.`;
+  return '';
+}
+/* the DM can type over any number the builder works out */
+const DS_KEYS = [['sc.str', 'Strength'], ['sc.dex', 'Dexterity'], ['sc.con', 'Constitution'], ['sc.int', 'Intelligence'], ['sc.wis', 'Wisdom'], ['sc.cha', 'Charisma'],
+  ['ac', 'Armor Class'], ['hp', 'Max HP'], ['speed', 'Speed (ft.)'], ['init', 'Initiative'], ['pb', 'Proficiency Bonus'], ['dv', 'Darkvision (ft.)'], ['passive.per', 'Passive Perception'], ['spell.dc', 'Spell save DC'], ['spell.atk', 'Spell attack bonus'],
+  ...ABIL.map(a => ['save.' + a, ABN[a] + ' save']), ...SKILLS.map(([id, n]) => ['skill.' + id, n])];
+const dsLabel = k => (DS_KEYS.find(x => x[0] === k) || [k, k])[1];
+const dsSet = ch => Object.keys(ch.dmSet || {}).filter(k => ch.dmSet[k] !== '' && ch.dmSet[k] != null && !isNaN(+ch.dmSet[k]));
+function dmStatsPanel(ch, D, ro) {
+  const set = dsSet(ch);
+  if (!isDMish()) return set.length ? `<div class="panel stack"><h3>Set by the DM</h3><p class="small muted">The DM changed these numbers for this character: ${esc(set.map(k => dsLabel(k) + ' ' + ch.dmSet[k]).join(', '))}.</p></div>` : '';
+  const DS = ch.dmSet || {};
+  const field = ([k, l]) => { const v = DS[k], c = D.calc ? D.calc[k] : null, on = set.includes(k); return `<label class="field"><span class="lbl">${esc(l)}${on ? ' <span class="pill brass">DM</span>' : ''}</span><input type="number" id="f-ds-${esc(k.replace(/\./g, '-'))}" data-act="dmset" data-k="${esc(k)}" value="${on ? esc(v) : ''}" placeholder="${c == null ? '' : esc(c)}"${dis(ro)}></label>`; };
+  const grp = (t, ks) => `<div class="stack"><span class="lbl">${t}</span><div class="grid3">${ks.map(field).join('')}</div></div>`;
+  const deep = set.some(k => /^(save|skill)\./.test(k));
+  return `<div class="panel stack"><div class="ph">DM: change any number<span class="spacer"></span>${set.length ? `<button class="btn ghost sm" data-act="dmclear"${dis(ro)}>Clear all ${set.length}</button>` : ''}</div>
+    <p class="small muted">Type a number to replace what the builder works out. Empty boxes keep the calculated value, shown in grey. Effects such as the Shield spell still add on top of the Armor Class you set. The player sees which numbers you set.</p>
+    ${grp('Ability scores', DS_KEYS.slice(0, 6))}${grp('Combat and spells', DS_KEYS.slice(6, 15))}
+    <details data-k="dmsaves"${deep ? ' open' : ''}><summary class="small" style="cursor:pointer">Saving throws and skills</summary><div class="stack" style="margin-top:8px">${grp('Saving throws', DS_KEYS.slice(15, 21))}${grp('Skills', DS_KEYS.slice(21))}</div></details></div>`;
+}
+
 function normClass(c) {
   const out = Object.assign({ saves: [], armor: [], weapons: [], tools: [], toolChoices: [], skills: { n: 0, from: [] }, features: [], resources: [], mc: { req: [] }, equip: [], equipFixed: [], subLevel: 3, subLabel: 'Subclass' }, c);
   out.hd = +String(out.hd || 8).replace(/^d/i, '') || 8;
@@ -652,6 +857,13 @@ function normClass(c) {
     out.table = t;
   }
   out.features = (out.features || []).map((f, i) => Object.assign({ id: f.id || (out.id + '-f' + i + '-' + slug(f.n)) }, f, { l: +f.l || 1 })).sort((a, b) => a.l - b.l);
+  for (const f of out.features.slice()) {
+    if (!f.asi || f.boon || /boon/i.test(f.n || '')) continue;
+    const m = /gain this feature again at [^.]*?levels? ([\d,\s and]+)/i.exec(String(f.d || ''));
+    if (!m) continue;
+    for (const l of (m[1].match(/\d+/g) || []).map(Number)) if (l > f.l && l <= 20 && !out.features.some(g => g.asi && g.l === l)) out.features.push(Object.assign({}, f, { id: f.id + '-l' + l, l }));
+    out.features.sort((a, b) => a.l - b.l);
+  }
   if (!out.features.some(f => f.asi) && Array.isArray(out.asiLevels)) {
     for (const l of out.asiLevels) out.features.push({ id: out.id + '-asi-' + l, l: +l, n: 'Ability Score Improvement', d: 'Increase one ability score by 2, or two ability scores by 1, or take a feat.', asi: 1 });
     out.features.sort((a, b) => a.l - b.l);
@@ -754,7 +966,9 @@ function fixChar(ch) {
   ch.skills = Object.assign(d.skills, ch.skills || {});
   ch.abil = Object.assign(d.abil, ch.abil || {});
   ch.money = Object.assign(d.money, ch.money || {});
-  if (!hadAssign && (ch.abil.method === 'standard' || ch.abil.method === 'roll')) {
+  const all8 = ABIL.every(a => +(ch.abil.base || {})[a] === 8);
+  if (hadAssign && all8 && ch.abil.method === 'standard') { const as = ch.abil.assign, ks = Object.keys(as); if (ks.length === 1 && as[ks[0]] === STANDARD.indexOf(8)) ch.abil.assign = {}; }
+  if (!hadAssign && !all8 && (ch.abil.method === 'standard' || ch.abil.method === 'roll')) {
     // older characters: work out which value went where from the scores themselves
     const pool = ch.abil.method === 'standard' ? STANDARD : (ch.abil.rolled || []);
     const used = new Set(); const as = {};
@@ -873,6 +1087,8 @@ function derive(ch) {
   D.cls = cls;
   D.level = clamp(sum(cls.map(x => x.c.lvl)), 0, 20) || 0;
   D.pb = Math.ceil(Math.max(D.level, 1) / 4) + 1;
+  const DS = ch.dmSet || {}; const dsv = k => (DS[k] === '' || DS[k] == null || isNaN(+DS[k])) ? null : +DS[k];
+  D.calc = { pb: D.pb }; if (dsv('pb') != null) D.pb = Math.round(dsv('pb'));
 
   /* feats in play (with their ability picks) */
   const feats = [];
@@ -885,8 +1101,9 @@ function derive(ch) {
   const features = [];
   const asiSlots = [];
   for (const x of cls) {
-    for (const f of x.def.features || []) {
-      if (f.l > x.c.lvl) continue;
+    for (const f0 of x.def.features || []) {
+      if (f0.l > x.c.lvl) continue;
+      const f = opts24(x.def.id, f0, is24);
       const key = x.def.id + ':' + f.id;
       features.push({ key, l: f.l, n: f.n, d: f.d, from: x.def.name, f, cls: x.def.id });
       if (f.asi) {
@@ -897,10 +1114,12 @@ function derive(ch) {
       if (f.pick === 'fighting-style') { const pid = ch.choices[key]; if (pid) addFeat(pid, {}, 'Fighting Style'); }
     }
     if (x.sub) {
-      for (const f of x.sub.features || []) {
-        if (f.l > x.c.lvl) continue;
-        const key = x.sub.id + ':' + (f.id || slug(f.n));
+      for (const f0 of x.sub.features || []) {
+        if (f0.l > x.c.lvl) continue;
+        const f = opts24(x.sub.id, f0, is24);
+        const key = x.sub.id + ':' + (f0.id || slug(f0.n));
         features.push({ key, l: f.l, n: f.n, d: f.d, from: x.sub.name, f, cls: x.def.id, isSub: 1 });
+        if (f.pick === 'fighting-style') { const pid = ch.choices[key]; if (pid) addFeat(pid, {}, 'Fighting Style'); }
       }
     }
   }
@@ -931,6 +1150,7 @@ function derive(ch) {
   for (const a of ABIL) { const cap = ch.free ? 30 : (capMap[a] || 20); if (sc[a] > cap) sc[a] = cap; }
   addAb('Other', ch.abil.misc);
   for (const a of ABIL) sc[a] = clamp(sc[a], 1, 30);
+  for (const a of ABIL) { D.calc['sc.' + a] = sc[a]; const v = dsv('sc.' + a); if (v != null) { sc[a] = clamp(Math.round(v), 1, 30); parts[a] = [['Set by the DM', sc[a]]]; } }
   D.sc = sc; D.parts = parts;
   D.m = Object.fromEntries(ABIL.map(a => [a, mod(sc[a])]));
 
@@ -945,6 +1165,11 @@ function derive(ch) {
   if (bg) (bg.tools || []).forEach(v => tools.add(v));
   csv(ch.tools).forEach(v => tools.add(v));
   csv(ch.profExtra).forEach(v => weapons.add(v));
+  if (is24) {
+    if (hasChoice(/^protector$/i)) { armor.add('Heavy Armor'); weapons.add('Martial Weapons'); }
+    if (hasChoice(/^warden$/i)) { armor.add('Medium Armor'); weapons.add('Martial Weapons'); }
+    D.pactBlade = hasChoice(/^pact of the blade$/i);
+  }
   D.armorProf = armor; D.weaponProf = weapons; D.toolProf = tools;
 
   const skillSet = new Set();
@@ -955,6 +1180,7 @@ function derive(ch) {
   (bg && bg.skills || []).forEach(s => skillSet.add(s));
   (ch.skills.bg || []).forEach(s => skillSet.add(s));
   (ch.skills.extra || []).forEach(s => skillSet.add(s));
+  for (const x of features) if (x.f && x.f.skillOpts) for (const nm of [].concat(ch.choices[x.key] || [])) { const s = SKILLS.find(k => k[1] === nm); if (s) skillSet.add(s[0]); }
   D.skillProf = skillSet;
   D.expertise = new Set((ch.expertise || []).filter(s => skillSet.has(s)));
   const joat = hasFeature(/^jack of all trades/i);
@@ -973,6 +1199,11 @@ function derive(ch) {
   D.expCount = expCount;
   D.save = {};
   for (const a of ABIL) D.save[a] = D.m[a] + (D.saveProf.has(a) ? D.pb : 0) + (+ch.bonus.save || 0) + itemBonus(ch, 'save');
+  if (is24) {
+    const wb = Math.max(1, D.m.wis);
+    if (hasChoice(/^thaumaturge$/i)) { D.skill.arcana += wb; D.skill.religion += wb; }
+    if (hasChoice(/^magician$/i)) { D.skill.arcana += wb; D.skill.nature += wb; }
+  }
   D.passive = { per: 10 + D.skill.perception, ins: 10 + D.skill.insight, inv: 10 + D.skill.investigation };
 
   /* hp */
@@ -1015,6 +1246,7 @@ function derive(ch) {
     if (a.cat && !profArmor(armor, a.cat)) D.warn.push(`You aren't proficient with ${a.cat} armor.`);
   } else {
     options.push([10 + dexM, 'Unarmored']);
+    if (is24 && hasChoice(/^armor of shadows$/i)) options.push([13 + dexM, 'Mage Armor (Armor of Shadows)']);
     for (const x of cls) {
       const un = x.def.unarmored || (hasFeatureIn(x, /^unarmored defense/i) ? (x.def.id === 'barbarian' ? { add: ['con'], shield: true } : x.def.id === 'monk' ? { add: ['wis'], shield: false } : null) : null);
       if (un && (un.shield || !shieldIt)) options.push([10 + dexM + sum((un.add || []).map(a => D.m[a])), x.def.name + ' Unarmored Defense']);
@@ -1062,6 +1294,8 @@ function derive(ch) {
     if (slots) slots.forEach((n, i) => { if (n) maxLvl = i + 1; });
     const abm = D.m[sc_.ab];
     let limit = null, cantrips = row.c || 0;
+    if (is24 && x.def.id === 'cleric' && hasChoice(/^thaumaturge$/i)) cantrips += 1;
+    if (is24 && x.def.id === 'druid' && hasChoice(/^magician$/i)) cantrips += 1;
     if (sc_ === (x.sub && x.sub.spell) && x.sub.spell.cantrips) cantrips = +x.sub.spell.cantrips[lvl - 1] || 0;
     if (sc_.prep === 'level') limit = Math.max(1, abm + lvl);
     else if (sc_.prep === 'half') limit = Math.max(1, abm + Math.floor(lvl / 2));
@@ -1070,6 +1304,8 @@ function derive(ch) {
     const ent = { id: x.def.id, name: x.sub && sc_ === x.sub.spell ? x.sub.name : x.def.name, ab: sc_.ab, dc: 8 + D.pb + abm, atk: D.pb + abm, cantrips, limit, maxLvl, book: !!sc_.book, prepMode: sc_.prep || 'known', list, prog: sc_.prog, lvl, ritual: !!sc_.ritual };
     ent.cantripLimit = cantrips > 0 ? cantrips : (/^SRD/.test(x.def.src || '') && sc_ === x.def.spell ? 0 : null);
     ent.always = [];
+    if (is24) { const lf = features.find(z => z.f && z.f.landOpts && z.cls === x.def.id); const land = lf && [].concat(ch.choices[lf.key] || [])[0]; if (land && LAND_SPELLS[land]) for (const [l, s] of LAND_SPELLS[land]) if (l <= lvl) ent.always.push(s); }
+    if (is24 && x.def.id === 'bard' && lvl >= 10) ent.secrets = ['cleric', 'druid', 'wizard'];
     if (x.sub && x.sub.spells) for (const [l, s] of x.sub.spells) if (l <= lvl) ent.always.push(s);
     if (x.def.always) for (const [l, s] of x.def.always) if (l <= lvl && !ent.always.includes(s)) ent.always.push(s);
     { const R0 = registry(ch.ruleset); ent.always = ent.always.map(id => R0.spells.has(id) ? id : ((R0.spBySlug.get(id) || {}).id || id)); }
@@ -1096,13 +1332,21 @@ function derive(ch) {
   }
 
   D.grants = grantsOf(ch, D, feats, sp, sub, bg);
+  if (is24) classGrants(ch, D, features);
 
   /* attacks */
   D.attacks = [];
   const archery = hasChoice(/^archery$/i) || hasFeat('archery');
   const twf = hasChoice(/^two-weapon fighting$/i) || hasFeat('two-weapon-fighting');
   const monkRow = cls.find(x => x.def.id === 'monk');
-  const hasWM = !is24 || cls.some(x => hasFeatureIn(x, /^weapon mastery$/i)) || feats.some(x => /weapon master/i.test(x.f.name || ''));
+  const hasWM = is24 && (cls.some(x => hasFeatureIn(x, /^weapon mastery$/i)) || feats.some(x => /weapon master/i.test(x.f.name || '')));
+  D.wmMax = 0; D.wmAllow = [];
+  if (hasWM) {
+    for (const x of cls) if (hasFeatureIn(x, /^weapon mastery$/i)) { const r0 = (x.def.table[x.c.lvl - 1] || {}).x || {}; D.wmMax = Math.max(D.wmMax, +r0.weapon_mastery || WM_DEFAULT[x.def.id] || 2); D.wmAllow.push(x.def.id); }
+    D.wmMax += feats.filter(x => /weapon master/i.test(x.f.name || '')).length;
+  }
+  D.wm = [].concat(ch.choices.wm || []);
+  const wmHas = d => D.wm.includes(d.id) || D.wm.includes(slug(d.name || ''));
   const maDie = monkRow ? ((monkRow.def.table[monkRow.c.lvl - 1] || {}).x || {}) : {};
   const martialDie = maDie.martial_arts || (maDie.martial_arts_die ? '1d' + maDie.martial_arts_die : null);
   for (const it of (ch.inv || []).filter(i => i.eq)) {
@@ -1114,13 +1358,14 @@ function derive(ch) {
     const isMonkW = monkRow && (props.includes('monk') || (is24 ? (w.rng === 'melee' && (w.cat === 'simple' || props.includes('light'))) : (w.cat === 'simple' && w.rng === 'melee' && !props.includes('two-handed') && !props.includes('heavy')) || /shortsword/i.test(d.name)));
     let ab = ranged ? 'dex' : 'str';
     if (finesse || isMonkW) ab = D.m.dex > D.m.str ? 'dex' : 'str';
-    const prof = profWeapon(weapons, d, w);
+    if (D.pactBlade && !ranged && D.m.cha > D.m[ab]) ab = 'cha';
+    const prof = profWeapon(weapons, d, w) || !!(D.pactBlade && !ranged);
     const bonusAtk = +(it.atk || 0), bonusDmg = +(it.dmg || 0);
     const atk = D.m[ab] + (prof ? D.pb : 0) + bonusAtk + (archery && ranged ? 2 : 0);
     let dice = w.dmg || '1';
     if (isMonkW && martialDie && diceAvg(martialDie) > diceAvg(dice)) dice = martialDie;
     const dm = D.m[ab] + bonusDmg;
-    D.attacks.push({ name: it.name || d.name, atk, dmg: dice + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : ''), two: w.two ? w.two + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : '') : null, dt: w.dt || '', props: (w.props || []).join(', '), range: w.range || '', prof, mastery: hasWM ? (w.mastery || '') : '', ab, melee: !ranged, weapon: true, light: props.includes('light'), ammo: props.includes('ammunition'), off: !ranged && props.includes('light') ? dice + ((twf ? dm : Math.min(0, dm)) ? ((twf ? dm : Math.min(0, dm)) > 0 ? '+' : '-') + Math.abs(twf ? dm : Math.min(0, dm)) : '') : null });
+    D.attacks.push({ name: it.name || d.name, atk, dmg: dice + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : ''), two: w.two ? w.two + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : '') : null, dt: w.dt || '', props: (w.props || []).join(', '), range: w.range || '', prof, mastery: hasWM && wmHas(d) ? (w.mastery || '') : '', mAvail: hasWM ? (w.mastery || '') : '', ab, melee: !ranged, weapon: true, light: props.includes('light'), ammo: props.includes('ammunition'), off: !ranged && props.includes('light') ? dice + ((twf ? dm : Math.min(0, dm)) ? ((twf ? dm : Math.min(0, dm)) > 0 ? '+' : '-') + Math.abs(twf ? dm : Math.min(0, dm)) : '') : null });
   }
   {
     const ab = monkRow && D.m.dex > D.m.str ? 'dex' : 'str';
@@ -1155,6 +1400,20 @@ function derive(ch) {
       if (f.f.uses) { addRes('u:' + f.key, f.n, Math.max(1, evalMax(f.f.uses.max, x.c.lvl, D)), f.f.uses.reset === 'short' ? 'short' : 'long'); continue; }
       const m = String(f.f.usage).match(/^\s*([^/]+)\/\s*(short|long)/i);
       if (m) addRes('u:' + f.key, f.n, evalMax(m[1], x.c.lvl, D), m[2].toLowerCase().startsWith('s') ? 'short' : 'long');
+    }
+  }
+  if (is24) {
+    const hasRes = n => D.res.some(r => r.n.toLowerCase() === String(n).toLowerCase());
+    for (const z of features) {
+      if (z.f && (z.f.usage || z.f.uses)) continue;
+      const t = TRACK_24.find(([re]) => re.test(z.n)); if (!t || hasRes(t[3] || z.n)) continue;
+      const x = cls.find(c => c.def.id === z.cls), r0 = x ? ((x.def.table[x.c.lvl - 1] || {}).x || {}) : {};
+      addRes('t:' + z.key, t[3] || z.n, trackMax(t[1], D, r0), t[2]);
+    }
+    for (const tr of D.traits) {
+      const t = TRACK_SP_24.find(([re]) => re.test(tr.n || '')); if (!t || hasRes(t[3])) continue;
+      const lv = +((/character level (\d+)/i.exec(String(tr.d || '')) || [])[1]) || +tr.l || 1;
+      if (D.level >= lv) addRes('t:sp:' + slug(t[3]), t[3], trackMax(t[1], D, {}), t[2]);
     }
   }
   const trait = re => [...(sp ? sp.traits || [] : []), ...(sub ? sub.traits || [] : [])].some(t => re.test(t.n));
@@ -1194,6 +1453,36 @@ function derive(ch) {
       if (!ok) D.mc.push(`Multiclassing into ${x.def.name} needs ${req.map(([a, n]) => ABN[a] + ' ' + n).join(x.def.mc.any ? ' or ' : ' and ')}.`);
     });
   }
+  {
+    const resist = new Set(), DT = /\b(acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\b/ig;
+    for (const t of D.traits.filter(t => !t.l || t.l <= D.level)) {
+      const nm = /^damage resistance:\s*(\w+)/i.exec(t.n || ''); if (nm) resist.add(cap(nm[1].toLowerCase()));
+      if (/\btable\b/i.test(String(t.d || ''))) continue;
+      for (const sent of String(t.d || '').replace(/<[^>]+>/g, ' ').split(/[.!?](?:\s+|$)/)) if (/\b(have|gain) resistance\b|\bresistant to\b/i.test(sent)) for (const w of sent.match(DT) || []) resist.add(cap(w.toLowerCase()));
+    }
+    const affF = features.find(z => /^elemental affinity$/i.test(z.n) && z.f && z.f.opts);
+    D.affinity = affF ? ([].concat(ch.choices[affF.key] || [])[0] || '') : '';
+    if (D.affinity) resist.add(D.affinity);
+    D.resist = Array.from(resist).sort();
+  }
+  {
+    const ovr = [];
+    const setv = (k, get, put) => { D.calc[k] = get(); const v = dsv(k); if (v != null) { put(Math.round(v)); ovr.push(k); } };
+    setv('ac', () => D.ac, v => { const fa = (typeof fxMods === 'function' ? fxMods(ch, D).ac : 0) || 0; D.ac = v + fa; D.acNote = 'Set by the DM' + (fa ? ' + effects' : ''); });
+    setv('hp', () => D.maxHp, v => { D.maxHp = Math.max(1, v); });
+    setv('speed', () => D.speed, v => { D.speed = Math.max(0, v); });
+    setv('init', () => D.init, v => { D.init = v; });
+    setv('dv', () => D.dv, v => { D.dv = Math.max(0, v); });
+    for (const a of ABIL) setv('save.' + a, () => D.save[a], v => { D.save[a] = v; });
+    for (const [id] of SKILLS) setv('skill.' + id, () => D.skill[id], v => { D.skill[id] = v; });
+    if (ovr.some(k => /^skill\.(perception|insight|investigation)$/.test(k))) D.passive = { per: 10 + D.skill.perception, ins: 10 + D.skill.insight, inv: 10 + D.skill.investigation };
+    setv('passive.per', () => D.passive.per, v => { D.passive.per = v; });
+    setv('spell.dc', () => (D.casters[0] || {}).dc, v => { for (const c of D.casters) c.dc = v; for (const g of D.grants || []) g.dc = v; });
+    setv('spell.atk', () => (D.casters[0] || {}).atk, v => { for (const c of D.casters) c.atk = v; for (const g of D.grants || []) g.atk = v; });
+    if (dsv('pb') != null) ovr.push('pb');
+    for (const a of ABIL) if (dsv('sc.' + a) != null) ovr.push('sc.' + a);
+    D.dmSet = ovr;
+  }
   D.issues = audit(ch, D);
   D.flags = flagsOf(ch);
   return D;
@@ -1205,6 +1494,7 @@ function choiceLimit(D, x) {
   const c = D.cls.find(c => c.def.id === x.cls);
   const row = c ? ((c.def.table[c.c.lvl - 1] || {}).x || {}) : {};
   let n = f.choose ? +f.choose : (f.multi ? 0 : 1);
+  if (f.chooseAt && c) for (const [l, k] of Object.entries(f.chooseAt)) if (c.c.lvl >= +l) n = +k;
   if (/invocation/i.test(f.n || '')) n = +row.invocations_known || +row.eldritch_invocations || n;
   return { multi: !!f.multi || n > 1, n };
 }
@@ -1254,6 +1544,7 @@ function audit(ch, D) {
   for (const x of D.features) {
     if (!x.f || !(x.f.opts || x.f.pick)) continue;
     const lim = choiceLimit(D, x); const v = ch.choices[x.key];
+    if (lim.multi && Array.isArray(x.f.opts)) { const on = [].concat(v || []), xc = D.cls.find(c => c.def.id === x.cls), cl = xc ? xc.c.lvl : 0; for (const o of x.f.opts) { if (!on.includes(o.n)) continue; if (o.req && !on.includes(o.req)) add('features', `${o.n} needs ${o.req}.`, !ch.free); if (o.lvl && cl < o.lvl) add('features', `${o.n} needs ${xc ? xc.def.name : 'class'} level ${o.lvl}.`, !ch.free); } }
     if (lim.multi) { const n = [].concat(v || []).length; if (lim.n && n < lim.n) add('features', `Choose ${pl(lim.n - n, 'option')} for ${x.n}.`); if (lim.n && n > lim.n) add('features', `${x.n} has ${n - lim.n} too many options chosen.`, !ch.free); }
     else if (!v || (Array.isArray(v) && !v.length)) add('features', `Make your ${x.n} choice (${x.from}).`);
   }
@@ -1282,6 +1573,15 @@ function audit(ch, D) {
       }
     }
   }
+  for (const g of D.grants || []) {
+    if (g.arcanum) for (const x of g.all) if (!x.ok) add('spells', `Choose your level ${x.lvl} Mystic Arcanum spell.`);
+    if (g.disc && g.all.length < 2) add('spells', `Magical Discoveries: choose ${pl(2 - g.all.length, 'spell')}.`);
+  }
+  if (D.wmMax) {
+    const n = D.wm.length, k = D.wmMax - n;
+    if (k > 0) add('features', `Choose ${k} more weapon ${k === 1 ? 'mastery' : 'masteries'}.`);
+    if (k < 0) add('features', `${-k} weapon ${k === -1 ? 'mastery is' : 'masteries are'} over your limit of ${D.wmMax}.`, !ch.free);
+  }
   if (D.cls.length && !ch.startApplied && !(ch.inv || []).length) add('equipment', 'Add your starting equipment.');
   const att = (ch.inv || []).filter(i => i.att).length;
   if (att > 3) add('equipment', `${att} items are attuned. The limit is three.`, !ch.free);
@@ -1300,6 +1600,7 @@ function flagsOf(ch) {
   const n = (ch.feats || []).length; if (n) F.push(n + ' bonus feat' + (n === 1 ? '' : 's'));
   const x = (ch.extraSpells || []).length; if (x) F.push(x + ' extra spell' + (x === 1 ? '' : 's'));
   if (+ch.expertiseBonus) F.push('+' + ch.expertiseBonus + ' Expertise picks');
+  const ds = dsSet(ch); if (ds.length) F.push('Set by the DM: ' + ds.map(k => dsLabel(k) + ' ' + ch.dmSet[k]).join(', '));
   const ib = (ch.inv || []).filter(i => +i.ac || +i.atk || +i.dmg).length; if (ib) F.push(ib + ' item' + (ib === 1 ? '' : 's') + ' with typed-in bonuses');
   return F;
 }
@@ -1415,6 +1716,10 @@ const FX_LIB = [
   { id: 'sof', n: 'Shield of Faith', ac: 2 },
   { id: 'haste', n: 'Haste', ac: 2, note: 'Advantage on Dexterity saves, doubled speed, one extra limited action.' },
   { id: 'cover', n: 'Half cover', ac: 2 },
+  { id: 'dstrike', n: 'Divine Strike', need: /^divine strike$/i, dmgFn: 'lvl', lvlCls: 'cleric', lvlAt: 14, die: '1d8', weaponOnly: 1, once: 1, note: 'Once on each of your turns: extra Necrotic or Radiant damage. Switches itself off after it lands.' },
+  { id: 'pstrike', n: 'Primal Strike', need: /^primal strike$/i, dmgFn: 'lvl', lvlCls: 'druid', lvlAt: 15, die: '1d8', weaponOnly: 1, once: 1, note: 'Once on each of your turns: extra Cold, Fire, Lightning or Thunder damage. Switches itself off after it lands.' },
+  { id: 'colossus', n: 'Colossus Slayer', need: /^colossus slayer$/i, dmg: '1d8', weaponOnly: 1, once: 1, note: 'Once per turn, against a creature that is missing any Hit Points.' },
+  { id: 'lifedrinker', n: 'Lifedrinker', need: /^lifedrinker$/i, dmg: '1d6', weaponOnly: 1, once: 1, note: 'Once per turn with your pact weapon: Necrotic, Psychic or Radiant. You can also spend a Hit Point Die to heal.' },
 ];
 const COND_FX = { Poisoned: { disAtk: 1, disCheck: 1 }, Blinded: { disAtk: 1 }, Frightened: { disAtk: 1, disCheck: 1 }, Prone: { disAtk: 1 }, Restrained: { disAtk: 1, disDex: 1 }, Invisible: { advAtk: 1 },
   Paralyzed: { failSD: 1 }, Petrified: { failSD: 1 }, Stunned: { failSD: 1 }, Unconscious: { failSD: 1 } };
@@ -1442,7 +1747,7 @@ function exhRule(n, rs) {
   return `Exhaustion ${n}: ` + L.slice(1, n + 1).join('; ') + '. A long rest removes one level.';
 }
 function fxAvailable(ch, D) {
-  const names = (D.features || []).map(x => x.n);
+  const names = (D.features || []).map(x => x.n).concat((D.features || []).flatMap(x => [].concat((ch.choices || {})[x.key] || [])).filter(v => typeof v === 'string'));
   const lib = FX_LIB.filter(f => !f.need || names.some(n => f.need.test(n)));
   return lib.concat((ch.customFx || []).map(f => Object.assign({ custom: 1 }, f)));
 }
@@ -1464,6 +1769,7 @@ function fxDamage(M, a, D) {
   for (const f of M.defs) {
     if (!fxApplies(f, a)) continue;
     if (f.dmgFn === 'rage') { const v = +infoVal(D, 'Rage damage') || 2; out.push('+' + v); }
+    else if (f.dmgFn === 'lvl') { const x = (D.cls || []).find(c => c.def.id === f.lvlCls); out.push(x && x.c.lvl >= f.lvlAt ? '2' + f.die.slice(1) : f.die); }
     else if (f.dmgFn === 'sneak') { const v = infoVal(D, 'Sneak Attack'); if (v) out.push(/d/.test(String(v)) ? String(v) : v + 'd6'); }
     else if (f.dmg) out.push(String(f.dmg));
   }
@@ -1487,6 +1793,7 @@ function d20Roll(o) {
   const M = o.M, t = o.type;
   const dice = M ? M.defs.filter(f => f[t] && (t !== 'atk' || fxApplies(f, o.a) || !f.strMelee)).map(f => f[t]) : [];
   const um = o.type === 'death' ? 'normal' : takeAdv(); let adv = um === 'adv', dis = um === 'dis';
+  if (t === 'atk' && o.vex) adv = true;
   if (M) {
     if (t === 'atk') { if (M.advAtk || M.defs.some(f => f.advAtk && fxApplies(f, o.a))) adv = true; if (M.disAtk) dis = true; }
     if (t === 'check' && M.disCheck) dis = true;
@@ -2154,7 +2461,8 @@ function buildView(ch, D, ro) {
   return `<div class="build">${steps}<div class="stack" style="min-width:0">${todo}${fn(ch, D, ro)}${nav}</div></div>`;
 }
 
-function stepBasics(ch, D, ro) {
+function stepBasics(ch, D, ro) { return stepBasics0(ch, D, ro) + dmStatsPanel(ch, D, ro); }
+function stepBasics0(ch, D, ro) {
   const packs = PACKS.filter(p => p.ruleset === 'any' || p.ruleset === ch.ruleset);
   const bend = canBendRules();
   return `<div class="panel stack"><h3>Basics</h3>
@@ -2340,7 +2648,7 @@ function stepFeatures(ch, D, ro) {
       if (p.type === 'feat') {
         const f = look(ch, 'feats', p.id);
         const pool = featList.filter(x => featOK(x, p.id));
-        inner = `<div class="row">${fselect({ items: pool, cur: p.id, act: 'asifeat', attrs: `data-key="${esc(s.key)}"`, ro, key: 'asi:' + s.key, placeholder: 'Choose a feat…', label: featLabel })}</div>${f && (f.asi || f.asiFeat) ? (f.asiFeat ? asiPair(s.key, p, ro, 'asifp') : asiPickFor('asifa', f, p.a, ro, s.key)) : ''}${f ? `<details class="feat"><summary><b>${esc(f.name)}</b><span class="small muted">${esc(f.src || '')}</span></summary><div class="body rt">${md(f.d)}</div></details>` : ''}`;
+        inner = `<div class="row">${fselect({ items: pool, cur: p.id, act: 'asifeat', attrs: `data-key="${esc(s.key)}" aria-label="Feat for ${esc(s.cls)} ${s.l}"`, ro, key: 'asi:' + s.key, placeholder: 'Choose a feat…', label: featLabel })}</div>${f && (f.asi || f.asiFeat) ? (f.asiFeat ? asiPair(s.key, p, ro, 'asifp') : asiPickFor('asifa', f, p.a, ro, s.key)) : ''}${f ? `<details class="feat"><summary><b>${esc(f.name)}</b><span class="small muted">${esc(f.src || '')}</span></summary><div class="body rt">${md(f.d)}</div></details>` : ''}`;
       } else inner = asiPair(s.key, p, ro, 'asip');
       return `<div class="stack" style="border-top:1px solid var(--line);padding-top:10px"><div class="row"><b>${esc(s.cls)} ${s.l}</b><span class="small muted">${s.boon ? 'Epic Boon' : 'Ability Score Improvement'}</span><span class="spacer"></span><div class="seg">${[['asi', 'Raise scores'], ['feat', 'Take a feat']].map(([k, l]) => `<button data-act="asitype" data-key="${esc(s.key)}" data-v="${k}"${pressed(p.type === k)}${dis(ro)}>${l}</button>`).join('')}</div></div>${inner}</div>`;
     }).join('')}</div>`;
@@ -2351,21 +2659,33 @@ function stepFeatures(ch, D, ro) {
       const lim = choiceLimit(D, x);
       let ctl, shown = [];
       if (x.f.pick === 'fighting-style') {
-        const fs = featList.filter(f => f.type === 'fighting-style');
-        ctl = `<div class="row">${fselect({ items: fs, cur: ch.choices[x.key], act: 'fchoice', attrs: `data-key="${esc(x.key)}"`, ro, key: 'fc:' + x.key })}</div>`;
+        const fs = featList.filter(f => f.type === 'fighting-style' && (f.id === ch.choices[x.key] || !taken.has(f.id)));
+        ctl = `<div class="row">${fselect({ items: fs, cur: ch.choices[x.key], act: 'fchoice', attrs: `data-key="${esc(x.key)}" aria-label="${esc(x.n)}"`, ro, key: 'fc:' + x.key })}</div>`;
         const f = look(ch, 'feats', ch.choices[x.key]); if (f) shown = [{ n: f.name, d: f.d }];
       } else if (lim.multi) {
         const cur = [].concat(ch.choices[x.key] || []);
         const full = !ch.free && lim.n && cur.length >= lim.n;
-        ctl = `<div class="row">${x.f.opts.map(o => `<label class="chk small"><input type="checkbox" data-act="fmulti" data-key="${esc(x.key)}" data-v="${esc(o.n)}"${cur.includes(o.n) ? ' checked' : ''}${dis(ro || (full && !cur.includes(o.n)))}> ${esc(o.n)}</label>`).join('')}</div><div class="small ${lim.n && cur.length > lim.n ? 'errline' : 'muted'}">${cur.length}${lim.n ? ' of ' + lim.n : ''} chosen</div>`;
+        const xc = D.cls.find(c => c.def.id === x.cls), cl = xc ? xc.c.lvl : 0;
+        const why = o => ch.free ? '' : (o.lvl && cl < o.lvl ? (xc ? xc.def.name : 'Level') + ' ' + o.lvl : '') || (o.req && !cur.includes(o.req) ? 'needs ' + o.req : '');
+        ctl = `<div class="row">${x.f.opts.map(o => { const on = cur.includes(o.n), w = why(o); return `<label class="chk small"${o.d ? ` title="${esc(o.d)}"` : ''}><input type="checkbox" data-act="fmulti" data-key="${esc(x.key)}" data-v="${esc(o.n)}"${on ? ' checked' : ''}${dis(ro || (full && !on) || (!!w && !on))}> ${esc(o.n)}${w ? ` <span class="muted">(${esc(w)})</span>` : ''}</label>`; }).join('')}</div><div class="small ${lim.n && cur.length > lim.n ? 'errline' : 'muted'}">${cur.length}${lim.n ? ' of ' + lim.n : ''} chosen</div>`;
         shown = x.f.opts.filter(o => cur.includes(o.n));
       } else {
         const cur = [].concat(ch.choices[x.key] || [])[0] || '';
-        ctl = `<div class="row">${fselect({ items: x.f.opts.map(o => ({ id: o.n, name: o.n })), cur, act: 'fchoice', attrs: `data-key="${esc(x.key)}"`, ro, key: 'fc:' + x.key })}</div>`;
+        ctl = `<div class="row">${fselect({ items: x.f.opts.map(o => ({ id: o.n, name: o.n })), cur, act: 'fchoice', attrs: `data-key="${esc(x.key)}" aria-label="${esc(x.n)}"`, ro, key: 'fc:' + x.key })}</div>`;
+        if (!cur && !ro && x.f.opts.length <= 6 && x.f.opts.every(o => o.d)) ctl += `<div>${featureList(x.f.opts.map(o => ({ n: o.n, d: o.d })))}</div>`;
         shown = x.f.opts.filter(o => o.n === cur);
       }
       return `<div class="stack" style="border-top:1px solid var(--line);padding-top:10px"><div class="row"><b>${esc(x.n)}</b><span class="small muted">${esc(x.from)} ${x.l}</span></div>${ctl}${shown.length ? `<div>${featureList(shown)}</div>` : ''}</div>`;
     }).join('')}</div>`;
+  }
+  if (D.wmMax || D.wm.length) {
+    const cur = D.wm, lim = D.wmMax, anyFeat = D.feats.some(x => /weapon master/i.test(x.f.name || ''));
+    const ok = w => anyFeat || D.wmAllow.some(c => c === 'barbarian' ? w.rng === 'melee' : c === 'rogue' ? (w.props || []).some(p => /finesse|light/i.test(p)) : true);
+    const list = R.list('items').filter(d => d.cat === 'weapon' && d.w && d.w.mastery && (d.w.cat === 'simple' || d.w.cat === 'martial') && (ok(d.w) || cur.includes(d.id)));
+    const full = !ch.free && cur.length >= lim;
+    out += `<div class="panel stack"><h3>Weapon Mastery</h3><p class="small muted">Choose ${lim} kind${lim === 1 ? '' : 's'} of weapon${D.wmAllow.includes('barbarian') && D.wmAllow.length === 1 ? ' (melee only)' : D.wmAllow.includes('rogue') && D.wmAllow.length === 1 ? ' (Finesse or Light only)' : ''}. When you attack with one, its mastery property applies, and the DM's screen settles Graze, Topple and Vex for you. You can swap one choice after each Long Rest.</p>
+      <div class="row">${list.map(d => { const on = cur.includes(d.id); return `<label class="chk small" title="${esc(d.w.mastery + ': ' + (MASTERY_RULES[d.w.mastery] || ''))}"><input type="checkbox" data-act="wmpick" data-v="${esc(d.id)}"${on ? ' checked' : ''}${dis(ro || (full && !on))}> ${esc(d.name)} <span class="muted">${esc(d.w.mastery)}</span></label>`; }).join('')}</div>
+      <div class="small ${cur.length > lim ? 'errline' : 'muted'}">${cur.length} of ${lim} chosen</div></div>`;
   }
   const expCount = D.expCount;
   if (expCount || (ch.expertise || []).length) {
@@ -2375,7 +2695,7 @@ function stepFeatures(ch, D, ro) {
   }
   out += `<div class="panel stack"><h3>Bonus feats</h3><p class="small muted">Feats your DM grants outside of level-ups. The DM sees these listed as house-rule items.</p>
     ${(ch.feats || []).map((f, i) => { const d = look(ch, 'feats', f.id); return `<div class="row"><b>${esc(d ? d.name : f.id)}</b>${d && d.asi ? asiPickFor('bonusfa', d, f.a, ro, String(i)) : ''}<span class="spacer"></span><button class="btn ghost sm danger" data-act="rmfeat" data-i="${i}"${dis(ro)}>Remove</button></div>`; }).join('')}
-    <div class="row">${fselect({ id: 'f-addfeat', items: featList.filter(f => !f.asiFeat && (f.rep || !taken.has(f.id))), none: false, ro, key: 'bonusfeat', label: f => f.name + (f.type && f.type !== 'general' ? ' · ' + f.type : '') })}<button class="btn" data-act="addfeat"${dis(ro)}>Add feat</button></div></div>`;
+    <div class="row">${fselect({ id: 'f-addfeat', attrs: 'aria-label="Feat to add"', items: featList.filter(f => !f.asiFeat && (f.rep || !taken.has(f.id))), none: false, ro, key: 'bonusfeat', label: f => f.name + (f.type && f.type !== 'general' ? ' · ' + f.type : '') })}<button class="btn" data-act="addfeat"${dis(ro)}>Add feat</button></div></div>`;
   const items = D.features.map(x => ({ l: x.l, n: x.n + (ch.choices[x.key] && x.f.opts ? ': ' + [].concat(ch.choices[x.key]).join(', ') : ''), d: x.d, from: x.from }));
   out += `<div class="panel"><h3>Class features</h3>${items.length ? featureList(items) : '<p class="muted">Pick a class first.</p>'}</div>`;
   const tr = D.traits.filter(t => !t.l || t.l <= D.level);
@@ -2387,6 +2707,13 @@ function asiPair(key, p, ro, act) {
   return `<div class="row">${[0, 1].map(i => `<label class="field" style="width:170px"><span class="small muted">${i ? 'Second +1' : 'First +1'}</span><select data-act="${act}" data-key="${esc(key)}" data-i="${i}"${dis(ro)}>${opt('', '—')}${ABIL.map(a => opt(a, ABN[a], picks[i] === a)).join('')}</select></label>`).join('')}<span class="small muted">Pick the same ability twice for +2.</span></div>`;
 }
 
+function spellPool(R, c) {
+  const base = R.spellsByClass.get(c.list) || [];
+  if (!c.secrets) return base;
+  const seen = new Set(base.map(s => s.id)), out = base.slice();
+  for (const l of c.secrets) for (const s of R.spellsByClass.get(l) || []) if (!seen.has(s.id)) { seen.add(s.id); out.push(s); }
+  return out.sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+}
 function stepSpells(ch, D, ro) {
   const R = registry(ch.ruleset);
   if (!D.casters.length && !(ch.extraSpells || []).length && !(D.grants || []).length) return `<div class="panel"><h3>Spells</h3><p class="muted">None of this character's classes cast spells yet. You can still add spells from feats or species below.</p></div>` + extraSpellsPanel(ch, D, ro, R);
@@ -2395,7 +2722,7 @@ function stepSpells(ch, D, ro) {
   for (const c of D.casters) {
     const st = ch.spells[c.id] || { c: [], s: [], p: [] };
     const mine = new Set([...(st.c || []), ...(st.s || []), ...(st.p || [])]);
-    const pool = (R.spellsByClass.get(c.list) || []).filter(s => (s.lvl === 0 ? c.cantripLimit !== 0 : s.lvl <= c.maxLvl) && !c.always.includes(s.id));
+    const pool = spellPool(R, c).filter(s => (s.lvl === 0 ? c.cantripLimit !== 0 : s.lvl <= c.maxLvl) && !c.always.includes(s.id));
     const inPool = new Set(pool.map(s => s.id));
     for (const id of mine) if (!inPool.has(id)) { const s = look(ch, 'spells', id); if (s) pool.push(s); }
     pool.sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
@@ -2431,7 +2758,7 @@ function stepSpells(ch, D, ro) {
       <div class="scroll-x" style="max-height:460px;overflow-y:auto"><table class="tbl"><tbody>${rows || '<tr><td class="muted">No spells match.</td></tr>'}</tbody></table></div>
       ${shown.length > cap ? `<div class="row"><button class="btn sm" data-act="spellall">Show all ${shown.length}</button><span class="small muted">Showing the first ${cap}.</span></div>` : ''}</div>`;
   }
-  return out + (D.grants || []).map(g => g.mi ? miPanel(ch, D, ro, R, g) : lineageSpellPanel(ch, D, ro)).join('') + extraSpellsPanel(ch, D, ro, R);
+  return out + (D.grants || []).map(g => g.mi ? miPanel(ch, D, ro, R, g) : g.classGrant ? classGrantPanel(ch, D, ro, R, g) : g.key === 'lineage' ? lineageSpellPanel(ch, D, ro) : '').join('') + extraSpellsPanel(ch, D, ro, R);
 }
 const ABSEL = (act, k, w, g, ro) => `<label class="field" style="width:190px"><span class="lbl">Spellcasting ability</span><select data-act="${act}" data-k="${esc(k)}"${w ? ` data-w="${w}"` : ''}${dis(ro)}>${opt('', 'Choose…', !g.abChosen)}${['int', 'wis', 'cha'].map(a => opt(a, ABN[a], g.abChosen && g.ab === a)).join('')}</select></label>`;
 function lineageSpellPanel(ch, D, ro) {
@@ -2594,14 +2921,14 @@ function sheetView(ch, D, ro, e) {
     <button class="vital" data-act="insp"${dis(ro)} aria-pressed="${!!p.insp}" style="${p.insp ? 'border-color:var(--brass);color:var(--brass)' : ''}"><div class="lbl">Inspiration</div><div class="v">${p.insp ? '★' : '☆'}</div></button>
     <div class="vital"><div class="lbl">Hit dice</div><div class="v" style="font-size:18px;padding-top:4px">${Object.entries(D.hdPool).map(([d, n]) => `${n - (+(p.hd || {})[d] || 0)}d${d}`).join(' ') || '—'}</div></div>
   </div>`;
-  const hpBox = `<div class="hp${hp <= 0 ? ' down' : ''}"><div class="row"><span class="lbl">Hit points</span>${hp <= 0 ? '<span class="pill bad">Down</span>' : ''}<span class="spacer"></span>${D.dv ? `<span class="pill">Darkvision ${D.dv} ft.</span>` : ''}</div>
+  const hpBox = `<div class="hp${hp <= 0 ? ' down' : ''}"><div class="row"><span class="lbl">Hit points</span>${hp <= 0 ? '<span class="pill bad">Down</span>' : ''}<span class="spacer"></span>${(D.resist || []).length ? `<span class="pill" title="Damage of these types is halved when the DM's screen applies it">Resists ${esc(D.resist.join(', '))}</span>` : ''}${D.dv ? `<span class="pill">Darkvision ${D.dv} ft.</span>` : ''}</div>
     <div class="row" style="align-items:flex-end"><span class="hpnum">${hp}</span><span class="muted num" style="font-size:20px">/ ${D.maxHp}</span>${p.temp ? `<span class="pill acc">+${p.temp} temp</span>` : ''}<span class="spacer"></span></div>
     ${hpBar(ch, D)}
     ${ro ? '' : `<div class="row"><input type="number" id="f-hpamt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="dmg">Damage</button><button class="btn sm" data-act="heal">Heal</button><button class="btn sm" data-act="temp">Set temp</button></div>`}
     ${hp <= 0 ? `<div class="row" style="margin-top:8px"><span class="lbl">Death saves</span>${[0, 1].map(k => `<span class="row" style="gap:2px"><span class="small">${k ? 'Failures' : 'Successes'}</span>${[1, 2, 3].map(n => `<button class="pip big circ${(p.ds || [0, 0])[k] >= n ? '' : ' used'}" style="${k ? '--pc:var(--danger);--pcu:var(--danger)' : ''}" data-act="ds" data-k="${k}" data-n="${n}" aria-label="Death save ${k ? 'failure' : 'success'} ${n}, ${(p.ds || [0, 0])[k] >= n ? 'marked' : 'not marked'}"${dis(ro)}></button>`).join('')}</span>`).join('')}<button class="roll" ${roll('Death save', 0, 'death')}>Roll</button></div>` : ''}
   </div>`;
   const cap = S.mode === 'live' && !S.me.isOwner ? (+(S.settings || {}).maxLevel || 20) : 20;
-  const rest = ro ? '' : `<div class="row"><button class="btn" data-act="shortrest">Short rest</button><button class="btn" data-act="longrest">Long rest</button>${Object.keys(D.hdPool).map(d => `<button class="btn sm" data-act="spendhd" data-d="${d}"${dis(((+(p.hd || {})[d]) || 0) >= D.hdPool[d])}>Spend d${d}</button>`).join('')}${last ? `<button class="btn sm" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 22))}</button>` : ''}<span class="spacer"></span><button class="btn sm" data-act="levelup"${dis(D.level >= cap)} title="${D.level >= cap ? 'At the level cap' : 'Gain a level'}">Level up</button></div>`;
+  const rest = ro ? '' : `<div class="row"><button class="btn" data-act="shortrest">Short rest</button><button class="btn" data-act="longrest">Long rest</button>${Object.keys(D.hdPool).map(d => `<button class="btn sm" data-act="spendhd" data-d="${d}"${dis(((+(p.hd || {})[d]) || 0) >= D.hdPool[d])}>Spend d${d}</button>`).join('')}${last ? `<button class="btn sm" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 22))}</button>` : ''}${S.mode === 'live' && S.me && S.me.isOwner && !ro ? `<button class="btn sm" data-act="gobuild" data-v="basics" title="Change any of this character's numbers">DM: change numbers</button>` : ''}<span class="spacer"></span><button class="btn sm" data-act="levelup"${dis(D.level >= cap)} title="${D.level >= cap ? 'At the level cap' : 'Gain a level'}">Level up</button></div>`;
   const nav = `<nav class="secnav" aria-label="Sheet sections">${SECS.map(([k, l]) => `<button data-act="sec" data-v="${k}"${pressed(sec === k)}>${l}</button>`).join('')}</nav>`;
   const top = `<div class="stack sec sec-top">${turn}${conc}${vit}${hpBox}${rest}${nav}</div>`;
 
@@ -2619,7 +2946,7 @@ function sheetView(ch, D, ro, e) {
     ${D.attacks.map((a, i) => { const am = ammoFor(ch, a); return `<tr><td><b>${esc(a.name)}</b>${a.prof ? '' : '<div class="small warnline">Not proficient</div>'}</td>
       <td><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="roll pri" data-act="attack" data-i="${i}">${sgn(a.atk)}</button>${a.two ? `<button class="roll" data-act="attack" data-i="${i}" data-g="two" title="Two-handed">2H</button>` : ''}${a.off ? `<button class="roll" data-act="attack" data-i="${i}" data-g="off" title="Off-hand attack (bonus action)">Off</button>` : ''}</span></td>
       <td>${a.flat ? `<span class="num">${esc(a.dmg)}</span>` : `<button class="roll" data-act="dmgroll" data-label="${esc(a.name)} damage" data-x="${esc(a.dmg)}" data-i="${i}">${esc(a.dmg)}</button>`} <span class="small muted">${esc(a.dt)}</span></td>
-      <td class="small muted">${esc([a.props, a.range ? a.range + ' ft.' : '', a.mastery ? 'Mastery: ' + a.mastery : ''].filter(Boolean).join(' · '))}${am ? `<div class="${am.none || !(+am.it.q) ? 'warnline' : ''}">${am.none ? 'No ammunition in your gear' : esc(am.d.name) + ': ' + (+am.it.q || 0)}</div>` : ''}</td></tr>`; }).join('')}
+      <td class="small muted">${esc([a.props, a.range ? a.range + ' ft.' : ''].filter(Boolean).join(' · '))}${a.mastery ? `<div><button class="btn ghost sm" style="padding:0 4px;min-height:0;font-size:inherit" data-act="mastinfo" data-v="${esc(a.mastery)}" title="${esc(MASTERY_RULES[a.mastery] || '')}">Mastery: ${esc(a.mastery)}</button></div>` : a.mAvail ? `<div>${esc(a.mAvail)} mastery not chosen</div>` : ''}${am ? `<div class="${am.none || !(+am.it.q) ? 'warnline' : ''}">${am.none ? 'No ammunition in your gear' : esc(am.d.name) + ': ' + (+am.it.q || 0)}</div>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div><p class="small muted" style="margin-top:6px">The big button rolls to hit and damage together, doubling the dice on a critical hit. Equip weapons under Gear.</p></div>`;
   const res = (D.res.length || D.info.length) ? `<div class="panel stack"><h3>Class resources</h3>
     ${D.info.length ? `<div class="row small">${D.info.map(([k, v]) => `<span class="pill">${esc(k)}: <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
@@ -2664,7 +2991,7 @@ function sheetView(ch, D, ro, e) {
         const n = l ? D.slots[l - 1] || 0 : 0, u = +(p.slots || {})[l] || 0;
         const list = known.filter(x => x.s.lvl === l).sort((a, b) => a.s.name.localeCompare(b.s.name));
         return `<div class="splv"><h4>${l ? ORD(l) + ' level' : 'Cantrips'}</h4>${n ? `<span class="pips">${Array.from({ length: n }, (_, i) => `<button class="pip${i < n - u ? '' : ' used'}" data-act="slot" data-l="${l}" data-n="${i < n - u ? u + 1 : u - 1}" aria-label="Level ${l} slot ${i + 1} of ${n}, ${i < n - u ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span><span class="small muted">${n - u} left</span>` : ''}</div>
-          ${list.map(({ s, c }) => { const m = spellMath(s, s.lvl, D.level, D.m[c.ab]); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name, c.freeTxt || ''].filter(Boolean).join(' · '))}</div></div>
+          ${list.map(({ s, c }) => { const m = spellMathFor(ch, D, s, s.lvl, c); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name, c.freeTxt || ''].filter(Boolean).join(' · '))}</div></div>
               <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(m.dmg)}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
       }).join('')}</div>`;
   }
@@ -3552,7 +3879,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 19</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 20</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4221,9 +4548,14 @@ function hurt(t, amount, dt) {
     saveCombat(cbt());
     return { dealt: amount, note, down: c.hp <= 0 };
   }
-  const ch = t.x.ch, before = hpOf(ch, derive(ch)) + (+ch.play.temp || 0);
+  const ch = t.x.ch, Dp = derive(ch), before = hpOf(ch, Dp) + (+ch.play.temp || 0);
+  let note = ''; const d = String(dt || '').toLowerCase();
+  if (d && amount) {
+    const raging = (ch.play.fx || []).includes('rage') && /^(bludgeoning|piercing|slashing)$/.test(d);
+    if (raging || (Dp.resist || []).some(r => r.toLowerCase() === d)) { amount = Math.floor(amount / 2); note = ' (resisted)'; }
+  }
   hpChange(ch, -amount);
-  return { dealt: amount, note: '', down: amount > 0 && before - amount <= 0 };
+  return { dealt: amount, note, down: amount > 0 && before - amount <= 0 };
 }
 function mend(t, amount) {
   amount = Math.max(0, Math.round(+amount || 0));
@@ -4256,7 +4588,7 @@ function handleMsg(m) {
   if (m.kind === 'ping') { if (!m.old) mapPing(m); return; }
   S.log.unshift(logLine(m)); S.log = S.log.slice(0, 150);
   if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note') showRoll(S.log[0]);
-  if (m.kind === 'res' && !m.old) { toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); } }
+  if (m.kind === 'res' && !m.old) { toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); if (pend.vex && m.hit && +m.dealt > 0) { const x = findChar(pend.cid, pend.owner); if (x) savePlay(x.ch, { vex: pend.vex }); } } }
   if (m.kind === 'req') { S.reqs[m.rid] = Object.assign({}, m, { answers: {} }); if (!m.old && !m.isMe && myRequests().some(r => r.q.rid === m.rid)) { toastMsg('The DM asks for ' + m.label + '. Roll from the bar at the top.'); try { navigator.vibrate && navigator.vibrate(40); } catch (e) { } } }
   const q = m.ref && S.reqs[m.ref];
   if (q && m.key && m.total != null) {
@@ -4265,7 +4597,7 @@ function handleMsg(m) {
     if (isResolver() && !m.old && q.dmg != null) {
       const t = findTarget('pc|' + m.key);
       const amt = pass ? (q.half ? Math.floor(q.dmg / 2) : 0) : q.dmg;
-      if (t) { if (amt) hurt(t, amt, q.dt); sendMsg({ kind: 'res', text: `${t.name} ${pass ? 'saves' : 'fails'}${amt ? ` and takes ${amt}${q.dt ? ' ' + String(q.dt).toLowerCase() : ''} damage` : ' and takes no damage'}.`, priv: q.priv }); }
+      if (t) { const hh = amt ? hurt(t, amt, q.dt) : null; sendMsg({ kind: 'res', text: `${t.name} ${pass ? 'saves' : 'fails'}${amt ? ` and takes ${hh ? hh.dealt : amt}${q.dt ? ' ' + String(q.dt).toLowerCase() : ''} damage${hh ? hh.note : ''}` : ' and takes no damage'}.`, priv: q.priv }); }
     }
   }
   /* private DM rolls never leave this window, so they are settled here whoever holds the job */
@@ -4293,12 +4625,16 @@ function resolveAtk(m) {
   settleAtk(m, t, m.crit || (!m.fail && m.total >= +ac));
 }
 function settleAtk(m, t, hit) {
-  let text;
+  let text, dealt = 0; const ms = m.ms && m.ms.n ? m.ms : null, extra = [];
   if (hit) {
-    const r = hurt(t, m.dmg, m.dt);
+    const r = hurt(t, m.dmg, m.dt); dealt = r.dealt;
     text = `${m.who} ${m.crit ? 'crits' : 'hits'} ${t.name} with ${m.label}: ${r.dealt}${m.dt ? ' ' + String(m.dt).toLowerCase() : ''} damage${r.note}${r.down ? '. ' + t.name + ' goes down' : ''}.`;
-  } else text = `${m.who} misses ${t.name} with ${m.label}${m.fail ? ' (natural 1)' : ''}.`;
-  sendMsg({ kind: 'res', ref: m.rid, text, hit, priv: m.priv });
+    if (ms) extra.push(masteryOnHit(ms, t, m, r));
+  } else {
+    text = `${m.who} misses ${t.name} with ${m.label}${m.fail ? ' (natural 1)' : ''}.`;
+    if (ms && ms.n === 'Graze' && +ms.mod > 0) { const r = hurt(t, +ms.mod, m.dt); extra.push(`Graze: ${r.dealt}${m.dt ? ' ' + String(m.dt).toLowerCase() : ''} damage anyway${r.note}${r.down ? ', and ' + t.name + ' goes down' : ''}.`); }
+  }
+  sendMsg({ kind: 'res', ref: m.rid, text: [text, ...extra.filter(Boolean)].join(' '), hit, dealt, priv: m.priv });
 }
 function resolveSave(m) {
   const parts = [], pcs = [];
@@ -4654,7 +4990,8 @@ function slotOptions(ch, D, s, cid) {
   for (let l = s.lvl; l <= 9; l++) { const left = (D.slots[l - 1] || 0) - (+(p.slots || {})[l] || 0); if (left > 0) out.push({ k: String(l), l, label: ORD(l) + ' level', left }); }
   if (D.pact && D.pact.lvl >= s.lvl && D.pact.n - (+p.pact || 0) > 0) out.push({ k: 'pact', l: D.pact.lvl, label: 'Pact slot (level ' + D.pact.lvl + ')', left: D.pact.n - (+p.pact || 0) });
   if (s.rit) out.push({ k: 'ritual', l: s.lvl, label: 'Ritual (no slot, 10 minutes longer)', left: null });
-  if (ch.free) out.push({ k: 'free', l: s.lvl, label: 'No slot (DM exception)', left: null });
+  if (cid && /^g:/.test(cid)) { const gx = (D.grants || []).find(g => g.id === cid), sx = gx && gx.spells.find(x => x.id === s.id); if (sx && sx.atwill) out.unshift({ k: 'free', l: s.lvl, label: 'At will (no slot)', left: null }); }
+  if (ch.free && !out.some(o => o.k === 'free')) out.push({ k: 'free', l: s.lvl, label: 'No slot (DM exception)', left: null });
   return out;
 }
 function casterFor(ch, D, cid) {
@@ -4672,7 +5009,7 @@ function castNow(e, s, c, key, tgts) {
   }
   if (s.conc) { patch.conc = s.name; patch.concDC = 0; }
   if (Object.keys(patch).length && canEditChar(e.owner)) play(ch, patch, 'casting ' + s.name);
-  const m = spellMath(s, slotLvl, D.level, D.m[c.ab]);
+  const m = spellMathFor(ch, D, s, slotLvl, c);
   const who = ch.name, label = s.name + (s.lvl && slotLvl > s.lvl ? ` (level ${slotLvl} slot)` : ''), priv = privOn();
   const all = targetsFor(ch);
   const names = ids => ids.map(id => id === 'self' ? ch.name : (all.find(t => t.id === id) || {}).name).filter(Boolean).join(', ');
@@ -4702,7 +5039,7 @@ MODALS.cast = () => {
   const ch = e.ch, D = getD(ch), s = look(ch, 'spells', m.sid); if (!s) return '';
   const c = casterFor(ch, D, m.cid), opts = slotOptions(ch, D, s, m.cid);
   if (!opts.some(o => o.k === m.slot)) m.slot = opts.length ? opts[0].k : '';
-  const cur = opts.find(o => o.k === m.slot), math = spellMath(s, cur ? cur.l : s.lvl, D.level, D.m[c.ab]);
+  const cur = opts.find(o => o.k === m.slot), math = spellMathFor(ch, D, s, cur ? cur.l : s.lvl, c);
   const all = targetsFor(ch), needs = s.atk || math.save || math.dmg || math.heal;
   const tg = m.tg || (m.tg = {});
   const pickers = !needs ? '' : s.atk
@@ -4753,12 +5090,14 @@ Object.assign(ACT, {
     const e = E(); if (!e) return; const ch = e.ch, D = getD(ch), M = fxMods(ch, D), a = D.attacks[+el.dataset.i]; if (!a) return;
     const g = el.dataset.g || '', am = ammoFor(ch, a);
     if (am && !am.none && !(+am.it.q) && !ch.free) { toastMsg(`Out of ${am.d.name.toLowerCase()}. Add more under Build → Equipment.`); return; }
-    const r = d20Roll({ M, a, bonus: a.atk, type: 'atk', critAt: critAt(D) });
+    const r = d20Roll({ M, a, bonus: a.atk, type: 'atk', critAt: critAt(D), vex: !!(ch.play.vex && UI.tgt && ch.play.vex === UI.tgt) });
     let expr = joinExpr(g === 'two' ? a.two : g === 'off' ? a.off : a.dmg, fxDamage(M, a, D)); if (r.crit) expr = critExpr(expr);
     const dr = rollExpr(expr), all = targetsFor(ch), t = all.find(x => x.id === UI.tgt), rid = uid('a');
     const once = M.defs.filter(f => f.once && fxApplies(f, a)).map(f => f.id);
     if (once.length && canEditChar(e.owner)) { if (t) PENDING[rid] = { cid: ch.id, owner: e.owner, once }; else savePlay(ch, { fx: (ch.play.fx || []).filter(id => !once.includes(id)) }); }
-    sendMsg({ kind: t ? 'atk' : 'roll', rid, who: ch.name, label: a.name + (g === 'two' ? ' (two-handed)' : g === 'off' ? ' (off-hand)' : '') + modeTag(r), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: Math.max(0, dr.total), dmgDetail: dr.detail, dt: a.dt, tgt: t ? t.id : '', tgtName: t ? t.name : '', cid: ch.id, owner: e.owner, priv: privOn() });
+    if (t && a.mastery === 'Vex' && canEditChar(e.owner)) PENDING[rid] = Object.assign(PENDING[rid] || { cid: ch.id, owner: e.owner, once: [] }, { vex: t.id });
+    if (ch.play.vex && canEditChar(e.owner)) savePlay(ch, { vex: '' });
+    sendMsg({ kind: t ? 'atk' : 'roll', rid, who: ch.name, label: a.name + (g === 'two' ? ' (two-handed)' : g === 'off' ? ' (off-hand)' : '') + modeTag(r), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: Math.max(0, dr.total), dmgDetail: dr.detail, dt: a.dt, tgt: t ? t.id : '', tgtName: t ? t.name : '', cid: ch.id, owner: e.owner, priv: privOn(), ms: a.mastery ? { n: a.mastery, mod: D.m[a.ab], dc: 8 + D.m[a.ab] + D.pb } : undefined });
     if (am && !am.none && canEditChar(e.owner)) { ch.inv[am.i].q = Math.max(0, (+ch.inv[am.i].q || 0) - 1); saveChar(ch); }
     queueRender();
   },
@@ -5906,6 +6245,25 @@ ACT.theme = function () {
   queueRender();
 };
 
+ACT.wmpick = function (el) {
+  const ch = C(); if (!ch) return; const D = getD(ch), v = el.dataset.v, cur = [].concat(ch.choices.wm || []), i = cur.indexOf(v);
+  if (i >= 0) cur.splice(i, 1); else { if (!ch.free && cur.length >= D.wmMax) { toastMsg(`You can master ${D.wmMax} kinds of weapons. Untick one first.`); queueRender(); return; } cur.push(v); }
+  ch.choices.wm = cur; commit(ch);
+};
+ACT.mastinfo = function (el) { const n = el.dataset.v; openModal({ kind: 'text', title: n + ' (weapon mastery)', html: `<p>${esc(MASTERY_RULES[n] || 'No rules text for this mastery.')}</p><p class="small muted">Attack a target from the sheet and the DM’s screen applies Graze, Topple and Vex for you. The others show in the result for the table to play out.</p>` }); };
+ACT.arcpick = function (el) { const ch = C(); if (!ch) return; const a = Object.assign({}, ch.choices.arcanum || {}); if (el.value) a[el.dataset.l] = el.value; else delete a[el.dataset.l]; ch.choices.arcanum = a; commit(ch); };
+ACT.discpick = function (el) { const ch = C(); if (!ch) return; const raw = [].concat(ch.choices.discoveries || []), cur = [raw[0] || '', raw[1] || '']; cur[+el.dataset.i] = el.value; ch.choices.discoveries = cur; commit(ch); };
+ACT.dmset = function (el) {
+  const ch = C(); if (!ch || !isDMish()) return; const k = el.dataset.k, v = String(el.value).trim();
+  const ds = Object.assign({}, ch.dmSet || {}); if (v === '' || isNaN(+v)) delete ds[k]; else ds[k] = +v;
+  ch.dmSet = ds; commit(ch);
+};
+ACT.dmclear = function () {
+  const ch = C(); if (!ch || !isDMish()) return; const prev = JSON.stringify(ch.dmSet || {}), id = ch.id;
+  ch.dmSet = {}; commit(ch);
+  pushUndo('Clear the DM numbers', () => { const c2 = C(); if (c2 && c2.id === id) { c2.dmSet = JSON.parse(prev); commit(c2); } });
+  toastMsg('Calculated values are back.');
+};
 ACT.gchoice = function (el) { const ch = C(); if (!ch) return; const k = el.dataset.k; if (el.value) ch.choices[k] = el.value; else delete ch.choices[k]; commit(ch); };
 ACT.michoice = function (el) {
   const ch = C(); if (!ch) return; const k = el.dataset.k, w = el.dataset.w;
