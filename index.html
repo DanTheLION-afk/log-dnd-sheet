@@ -779,7 +779,7 @@ const LINEAGE_SPELLS = {
     'gnomish-lineage-rock-gnome': { ab: 'choose', spells: [['mending', 1], ['prestidigitation', 1]] },
   },
   '2014': {
-    'tiefling': { ab: 'cha', spells: [['thaumaturgy', 1], ['hellish-rebuke', 3, { at: 2 }], ['darkness', 5]] },
+    'tiefling': { ab: 'cha', legacy: true, spells: [['thaumaturgy', 1], ['hellish-rebuke', 3, { at: 2 }], ['darkness', 5]] },
     'high-elf': { ab: 'int', spells: [['', 1, { pick: 'wizard' }]] },
   },
 };
@@ -787,21 +787,40 @@ const MI_LISTS = { '2024': ['cleric', 'druid', 'wizard'], '2014': ['bard', 'cler
 const MI_AB14 = { bard: 'cha', cleric: 'wis', druid: 'wis', sorcerer: 'cha', warlock: 'cha', wizard: 'int' };
 const MI_BG = { acolyte: 'cleric', sage: 'wizard', guide: 'druid' };
 const bestMental = D => ['int', 'wis', 'cha'].sort((a, b) => D.m[b] - D.m[a])[0];
-/* homebrew and imported species: a trait named after a spell that says you know or learn it */
+/* homebrew and imported species: spells named in a trait's title or written into its text */
+const LEGACY_TRAIT = /^(infernal legacy|fiendish legacy|elven lineage|gnomish lineage|drow magic)$/i;
 function guessGrants(e, R) {
   const spells = []; let ab = null;
+  const find = name => R.spBySlug ? R.spBySlug.get(slug(String(name).replace(/[*_]/g, '').trim())) || null : null;
+  const add = (s, l, o) => { if (s && !spells.some(x => x[0] === s.id)) spells.push([s.id, l, o]); };
   for (const t of e.traits || []) {
-    const d = String(t.d || '');
+    const d = String(t.d || '').replace(/<[^>]+>/g, ' ').replace(/[*_]/g, '');
     const m = /\b(Intelligence|Wisdom|Charisma) is your spellcasting ability/i.exec(d); if (m) ab = m[1].slice(0, 3).toLowerCase();
-    const s = R.spBySlug && R.spBySlug.get(slug(t.n));
-    if (s && /\b(know|learn|always have)\b/i.test(d)) spells.push([s.id, +t.l || 1]);
+    const named = find(t.n);
+    if (named && /\b(know|learn|always have)\b/i.test(d)) { add(named, +t.l || 1); continue; }
+    for (const sent of d.split(/[.!?](?:\s+|$)/)) {
+      const lv = +((/\breach(?:es)? (\d+)(?:st|nd|rd|th) level/i.exec(sent) || /\bat (\d+)(?:st|nd|rd|th) level/i.exec(sent) || [])[1]) || +t.l || 1;
+      const at = +((/\bas an? (\d)(?:st|nd|rd|th)[- ]level spell/i.exec(sent) || [])[1]) || 0;
+      const pb = /proficiency bonus/i.test(sent);
+      for (const re of [/\b(?:know|learn)s? the ([a-z][a-z' \/-]{1,40}?) cantrip/ig, /\bcast (?:the )?([a-z][a-z' \/-]{1,40}?) spell\b/ig, /\b(?:know|learn) the spell ([a-z][a-z' \/-]{1,40}?)\s*$/ig, /\balways have the ([a-z][a-z' \/-]{1,40}?) spell prepared/ig])
+        for (const mm of sent.matchAll(re)) { const s = find(mm[1]); if (!s) continue; const o = {}; if (at && s.lvl) o.at = at; if (pb && s.lvl) o.uses = 'pb'; add(s, lv, Object.keys(o).length ? o : undefined); }
+    }
   }
   return spells.length ? { ab: ab || 'choose', spells } : null;
+}
+/* species traits in play: an imported lineage that brings its own spells replaces the base legacy's text */
+function traitsInPlay(sp, sub, R) {
+  const gone = new Set();
+  for (const t of (sub && sub.traits) || []) { const m = /replaces? (?:the |your )?([A-Z][\w' -]+?) trait/i.exec(String(t.d || '')); if (m) gone.add(m[1].toLowerCase()); }
+  if (sub && sub.pack && sp && !sp.pack && guessGrants(sub, R)) for (const t of sp.traits || []) if (LEGACY_TRAIT.test(t.n)) gone.add(String(t.n).toLowerCase());
+  if (gone.has('infernal legacy')) gone.add('fiendish legacy');
+  return [...((sp && sp.traits) || []).filter(t => !gone.has(String(t.n).toLowerCase())).map(t => Object.assign({ from: sp.name }, t)), ...((sub && sub.traits) || []).map(t => Object.assign({ from: sub.name }, t))];
 }
 function grantsOf(ch, D, feats, sp, sub, bg) {
   const R = registry(ch.ruleset), is24 = ch.ruleset === '2024', T = LINEAGE_SPELLS[ch.ruleset] || {}, out = [];
   const lvl = Math.max(1, D.level);
-  const lg = [sp, sub].filter(Boolean).map(e => T[e.id] || (e.pack ? guessGrants(e, R) : null)).filter(Boolean);
+  const subOwn = sub && sub.pack ? guessGrants(sub, R) : null;
+  const lg = [sp, sub].filter(Boolean).map(e => e === sub && subOwn ? subOwn : (T[e.id] && !(subOwn && T[e.id].legacy) ? T[e.id] : (e.pack && e !== sub ? guessGrants(e, R) : null))).filter(Boolean);
   if (lg.length) {
     const fixed = lg.map(g => g.ab).find(a => a && a !== 'choose');
     const chosen = ch.choices['lineage-ab'];
@@ -811,6 +830,7 @@ function grantsOf(ch, D, feats, sp, sub, bg) {
       let sid = id;
       if (o && (o.pick || o.swap)) { pick = { list: o.pick || o.swap, def: id }; sid = ch.choices['lineage-cantrip'] || id; }
       const s = sid ? look(ch, 'spells', sid) : null;
+      if (s && all.some(z => z.id === s.id)) continue;
       all.push({ id: s ? s.id : '', name: s ? s.name : 'A ' + ((o && o.pick) || '') + ' cantrip of your choice', lvl: s ? s.lvl : 0, l, free: s && s.lvl > 0 ? (o && o.uses === 'pb' ? D.pb : 1) : 0, at: (o && o.at) || (s ? s.lvl : 0), ok: l <= lvl && !!s });
     }
     const label = sub ? (sub.name.toLowerCase().includes(sp.name.toLowerCase()) || /^drow$/i.test(sub.name) ? sub.name : sub.name + ' ' + sp.name) : sp.name;
@@ -848,6 +868,7 @@ function derive(ch) {
   const sub = subOf(ch, sp, ch.sub);
   const bg = look(ch, 'backgrounds', ch.bg);
   D.sp = sp; D.sub = sub; D.bg = bg;
+  D.traits = traitsInPlay(sp, sub, R);
   const cls = (ch.classes || []).map(c => ({ c, def: look(ch, 'classes', c.id), sub: look(ch, 'subclasses', c.sub) })).filter(x => x.def);
   D.cls = cls;
   D.level = clamp(sum(cls.map(x => x.c.lvl)), 0, 20) || 0;
@@ -2164,7 +2185,7 @@ function stepSpecies(ch, D, ro) {
     <div class="row small"><span class="pill">${esc(sp.size || 'Medium')}</span><span class="pill">Speed ${esc((sub && sub.speed) || sp.speed || 30)} ft.</span>${D.dv ? `<span class="pill">Darkvision ${D.dv} ft.</span>` : ''}${abTxt ? `<span class="pill acc">${esc(abTxt)}</span>` : ''}</div>
     ${picks}
     ${langPicker(ch, D, ro)}
-    <div>${featureList([...(sp.traits || []), ...((sub && sub.traits) || [])].map(t => ({ n: t.n, d: t.d, l: t.l })))}</div>
+    <div>${featureList(D.traits.map(t => ({ n: t.n, d: t.d, l: t.l })))}</div>
   </div>`;
   return out;
 }
@@ -2331,7 +2352,7 @@ function stepFeatures(ch, D, ro) {
     <div class="row">${fselect({ id: 'f-addfeat', items: featList.filter(f => !f.asiFeat && (f.rep || !taken.has(f.id))), none: false, ro, key: 'bonusfeat', label: f => f.name + (f.type && f.type !== 'general' ? ' · ' + f.type : '') })}<button class="btn" data-act="addfeat"${dis(ro)}>Add feat</button></div></div>`;
   const items = D.features.map(x => ({ l: x.l, n: x.n + (ch.choices[x.key] && x.f.opts ? ': ' + [].concat(ch.choices[x.key]).join(', ') : ''), d: x.d, from: x.from }));
   out += `<div class="panel"><h3>Class features</h3>${items.length ? featureList(items) : '<p class="muted">Pick a class first.</p>'}</div>`;
-  const tr = [...((D.sp && D.sp.traits) || []), ...((D.sub && D.sub.traits) || [])].filter(t => !t.l || t.l <= D.level);
+  const tr = D.traits.filter(t => !t.l || t.l <= D.level);
   if (tr.length || D.feats.length) out += `<div class="panel"><h3>Traits & feats</h3>${featureList([...tr.map(t => ({ n: t.n, d: t.d, from: D.sp.name })), ...D.feats.map(x => ({ n: x.f.name, d: x.f.d, from: x.from }))])}</div>`;
   return out;
 }
@@ -2601,7 +2622,7 @@ function sheetView(ch, D, ro, e) {
   /* --- features, gear, notes --- */
   const feats = `<div class="stack sec sec-features"><div class="panel"><h3>Features & traits</h3>${featureList([
     ...D.features.map(x => ({ l: x.l, n: x.n + (ch.choices[x.key] && x.f && x.f.opts ? ': ' + [].concat(ch.choices[x.key]).join(', ') : ''), d: x.d, from: x.from })),
-    ...((D.sp && D.sp.traits) || []).filter(t => !t.l || t.l <= D.level).map(t => ({ n: t.n, d: t.d, from: D.sp.name })), ...((D.sub && D.sub.traits) || []).filter(t => !t.l || t.l <= D.level).map(t => ({ n: t.n, d: t.d, from: D.sub.name })),
+    ...D.traits.filter(t => !t.l || t.l <= D.level).map(t => ({ n: t.n, d: t.d, from: t.from })),
     ...(D.bg && D.bg.feature ? [{ n: D.bg.feature.n, d: D.bg.feature.d, from: D.bg.name }] : []),
     ...D.feats.map(x => ({ n: x.f.name, d: x.f.d, from: 'Feat · ' + x.from })),
   ]) || '<p class="muted">Build the character to see features.</p>'}</div></div>`;
@@ -3480,7 +3501,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 17</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 18</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
