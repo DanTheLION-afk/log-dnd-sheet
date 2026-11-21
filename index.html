@@ -1338,6 +1338,32 @@ function calc(src) {
   const expr = () => { let v = term(); while (s[i] === '+' || s[i] === '-') { const o = s[i++]; const r = term(); v = o === '+' ? v + r : v - r; } return v; };
   const v = expr(); if (i !== s.length) throw new Error('bad'); return v;
 }
+/* ===== prices and coins: everything is counted in copper ===== */
+const COIN = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };
+/* guide prices by rarity from the 2024 Dungeon Master's Guide; the DM sets the real price */
+const RARITY_GP = { common: 100, uncommon: 400, rare: 4000, 'very rare': 40000, legendary: 200000 };
+function priceCp(d) {
+  if (!d || d.cost == null || d.cost === '') return null;
+  const m = /(\d[\d,]*(?:\.\d+)?)\s*(cp|sp|ep|gp|pp)?/i.exec(String(d.cost));
+  return m ? Math.round(parseFloat(m[1].replace(/,/g, '')) * COIN[(m[2] || 'gp').toLowerCase()]) : null;
+}
+function guideCp(d) { if (!d || d.cat !== 'magic') return null; const g = RARITY_GP[String(d.rar || '').toLowerCase().trim()]; return g ? g * 100 : null; }
+function fmtCp(cp) {
+  if (cp == null) return '';
+  if (cp >= 100) return (cp / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' gp';
+  return cp % 10 === 0 ? cp / 10 + ' sp' : cp + ' cp';
+}
+const walletCp = m => Object.keys(COIN).reduce((t, k) => t + (+(m || {})[k] || 0) * COIN[k], 0);
+function giveChange(out, cp) { for (const c of ['gp', 'sp', 'cp']) { const n = Math.floor(cp / COIN[c]); out[c] = (+out[c] || 0) + n; cp -= n * COIN[c]; } return out; }
+/* pay with the biggest coins that fit, then break one coin and take change in gp, sp and cp */
+function payCoins(m, cost) {
+  if (walletCp(m) < cost) return null;
+  const out = Object.assign({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, m); let need = cost;
+  for (const k of ['pp', 'gp', 'ep', 'sp', 'cp']) { const use = Math.min(+out[k] || 0, Math.floor(need / COIN[k])); out[k] -= use; need -= use * COIN[k]; }
+  if (need > 0) for (const k of ['cp', 'sp', 'ep', 'gp', 'pp']) if ((+out[k] || 0) > 0 && COIN[k] >= need) { out[k] -= 1; giveChange(out, COIN[k] - need); need = 0; break; }
+  if (need > 0) { const left = walletCp(m) - cost; for (const k of Object.keys(COIN)) out[k] = 0; giveChange(out, left); }
+  return out;
+}
 function itemDef(ch, it) {
   if (it.custom) return it.custom;
   return look(ch, 'items', it.id);
@@ -1986,7 +2012,7 @@ async function saveFile(name, text) {
 /* ===== UI state ===== */
 const UI = {
   view: LS.get('view', 'chars'), cur: LS.get('cur', null), tab: 'sheet', step: 'basics', adv: 'normal',
-  spellQ: '', spellLvl: 'all', spellSrc: '', spellMine: false, spellAll: false, itemQ: '', xspQ: '', newRs: LS.get('rs', '2024'),
+  spellQ: '', spellLvl: 'all', spellSrc: '', spellMine: false, spellAll: false, itemQ: '', itemCat: 'all', itemSort: 'name', itemAfford: false, itemAll: false, xspQ: '', newRs: LS.get('rs', '2024'),
   hb: { pack: null, type: 'spells', edit: null, q: '', srcQ: '' }, modal: null, startSel: {}, pk: {}, flt: {},
 };
 const STEPS = [['basics', 'Basics'], ['species', 'Species'], ['background', 'Background'], ['class', 'Class & levels'], ['abilities', 'Ability scores'], ['features', 'Features & feats'], ['spells', 'Spells'], ['equipment', 'Equipment'], ['story', 'Story']];
@@ -2477,25 +2503,50 @@ function stepEquipment(ch, D, ro) {
       }).join('')}
       <div class="row"><button class="btn ${ch.startApplied ? '' : 'pri'}" data-act="applystart"${dis(ro)}>${ch.startApplied ? 'Add starting equipment again' : 'Add starting equipment'}</button>${ch.startApplied ? '<span class="small muted">Already added once. Adding again doubles everything.</span>' : ''}</div></div>`;
   }
-  const q = UI.itemQ.toLowerCase();
-  const results = q.length >= 2 ? R.list('items').filter(i => i.name.toLowerCase().includes(q)).slice(0, 14) : [];
+  const q = UI.itemQ.toLowerCase().trim();
+  const purse = walletCp(ch.money);
+  const CATS = { all: null, weapon: ['weapon'], armor: ['armor', 'shield'], gear: ['gear'], magic: ['magic'] };
+  const want = CATS[UI.itemCat] || null;
+  let pool = R.list('items').filter(i => (!want || want.includes(i.cat)) && (!q || i.name.toLowerCase().includes(q)));
+  const pr = i => { const p = priceCp(i); return p != null ? p : guideCp(i); };
+  if (UI.itemAfford) pool = pool.filter(i => { const p = pr(i); return p != null && p <= purse; });
+  if (UI.itemSort !== 'name') pool.sort((a, b) => { const pa = pr(a), pb = pr(b); if (pa == null) return 1; if (pb == null) return -1; return UI.itemSort === 'cheap' ? pa - pb : pb - pa; });
+  const cap = UI.itemAll ? 5000 : 40;
+  const shopRows = pool.slice(0, cap).map(i => {
+    const p = priceCp(i), g = p == null ? guideCp(i) : null, cost = p != null ? p : g;
+    const det = [i.cat === 'magic' ? (i.rar || 'magic') : i.cat, i.w ? i.w.dmg + ' ' + (i.w.dt || '') : '', i.a && i.a.base ? 'AC ' + i.a.base : '', i.att ? 'attunement' : ''].filter(Boolean).join(' · ');
+    return `<tr><td><button class="btn ghost sm" style="padding:0;font-weight:600;text-align:left" data-act="shopinfo" data-v="${esc(i.id)}">${esc(i.name)}</button><div class="small muted">${esc(det)}</div></td>
+      <td class="num" style="white-space:nowrap">${p != null ? esc(fmtCp(p)) : g != null ? `<span class="muted" title="Guide price for this rarity. The DM sets the real price.">about ${esc(fmtCp(g))}</span>` : '<span class="muted small">no price</span>'}</td>
+      <td class="num small muted" style="white-space:nowrap">${i.wt ? esc(i.wt) + ' lb.' : ''}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm pri" data-act="invbuy" data-v="${esc(i.id)}"${dis(ro || cost == null || (p != null && p > purse))} title="${p != null && p > purse ? 'Not enough coins' : 'Pay from your coins'}">Buy</button> <button class="btn sm" data-act="invadd" data-v="${esc(i.id)}"${dis(ro)} title="Add without paying, for loot and gifts">Add</button></td></tr>`;
+  }).join('');
+  const last = UNDO[UNDO.length - 1];
+  const shop = `<div class="panel stack"><div class="ph">Find and buy items<span class="spacer"></span><span class="pill acc" title="All your coins, counted in gold">Purse ${esc(fmtCp(purse) || '0 gp')}</span></div>
+    <div class="row"><input type="search" id="f-itemq" data-act="itemq" placeholder="Search items" value="${esc(UI.itemQ)}" style="max-width:220px" aria-label="Search items"${dis(ro)}>
+      <select data-act="itemcat" aria-label="Kind of item">${[['all', 'All items'], ['weapon', 'Weapons'], ['armor', 'Armor and shields'], ['gear', 'Gear and tools'], ['magic', 'Magic items']].map(([k, l]) => opt(k, l, UI.itemCat === k)).join('')}</select>
+      <select data-act="itemsort" aria-label="Sort">${[['name', 'A to Z'], ['cheap', 'Cheapest first'], ['dear', 'Most expensive first']].map(([k, l]) => opt(k, l, UI.itemSort === k)).join('')}</select>
+      <button class="btn sm" data-act="itemafford"${pressed(UI.itemAfford)}>Only what I can afford</button>
+      <span class="small muted">${pool.length} item${pool.length === 1 ? '' : 's'}</span>${last && /^buy /.test(last.label) && !ro ? `<button class="btn ghost sm" data-act="undo">Undo: ${esc(last.label)}</button>` : ''}</div>
+    <div class="scroll-x" style="max-height:480px;overflow-y:auto"><table class="tbl"><thead><tr><th>Item</th><th>Price</th><th>Weight</th><th><span class="sr-only">Buy or add</span></th></tr></thead><tbody>${shopRows || '<tr><td colspan="4" class="muted">No items match.</td></tr>'}</tbody></table></div>
+    ${pool.length > cap ? `<div class="row"><button class="btn sm" data-act="itemall">Show all ${pool.length}</button><span class="small muted">Showing the first ${cap}.</span></div>` : ''}
+    <p class="small muted">Buy pays from your coins and gives change. Add puts an item in your pack for free. Magic items show a guide price for their rarity; the DM decides the real one.</p></div>`;
   const inv = `<div class="panel stack"><h3>Inventory</h3>
-    <div class="scroll-x"><table class="tbl"><thead><tr><th>Item</th><th>Qty</th><th>Equipped</th><th title="Bonus to AC / attack / damage">AC · Atk · Dmg</th><th></th></tr></thead><tbody>
+    <div class="scroll-x"><table class="tbl"><thead><tr><th>Item</th><th>Qty</th><th>Equipped</th><th title="Bonus to AC / attack / damage">AC · Atk · Dmg</th><th><span class="sr-only">Sell or remove</span></th></tr></thead><tbody>
     ${(ch.inv || []).map((it, i) => {
       const d = itemDef(ch, it);
       const eqable = d && ['weapon', 'armor', 'shield', 'magic'].includes(d.cat);
-      return `<tr><td><b>${esc(it.name || (d ? d.name : it.id))}</b><div class="small muted">${esc(d ? [d.cat, d.rar, d.w ? d.w.dmg + ' ' + (d.w.dt || '') : '', d.a && d.a.base ? 'AC ' + d.a.base : ''].filter(Boolean).join(' · ') : 'Missing from content')}</div></td>
+      const up = d ? priceCp(d) : null;
+      return `<tr><td><b>${esc(it.name || (d ? d.name : it.id))}</b><div class="small muted">${esc(d ? [d.cat, d.rar, d.w ? d.w.dmg + ' ' + (d.w.dt || '') : '', d.a && d.a.base ? 'AC ' + d.a.base : '', up != null ? fmtCp(up) + ' each' : '', d.wt ? d.wt + ' lb.' : ''].filter(Boolean).join(' · ') : 'Missing from content')}</div></td>
         <td><input type="number" id="f-q-${i}" min="0" data-act="invq" data-i="${i}" value="${esc(it.q || 1)}" style="width:62px"${dis(ro)}></td>
         <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Use</label>${d.att ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
         <td><span class="row" style="gap:3px;flex-wrap:nowrap">${['ac', 'atk', 'dmg'].map(k => `<input type="number" id="f-ib-${k}-${i}" data-act="invb" data-k="${k}" data-i="${i}" value="${esc(it[k] || 0)}" style="width:46px" aria-label="${k} bonus"${dis(ro)}>`).join('')}</span></td>
-        <td><button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></td></tr>`;
+        <td style="white-space:nowrap">${up != null && !it.custom ? `<button class="btn ghost sm" data-act="invsell" data-i="${i}" title="Sell one for half its price"${dis(ro)}>Sell</button>` : ''}<button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></td></tr>`;
     }).join('') || '<tr><td colspan="5" class="muted">Nothing carried yet.</td></tr>'}</tbody></table></div>
-    <div class="row"><input type="search" id="f-itemq" data-act="itemq" placeholder="Search items to add" value="${esc(UI.itemQ)}" style="max-width:260px"${dis(ro)}><span class="small muted">Weight ${Math.round(D.weight * 10) / 10} / ${D.capacity} lb.</span></div>
-    ${results.length ? `<div class="row">${results.map(i => `<button class="btn sm" data-act="invadd" data-v="${esc(i.id)}"${dis(ro)}>+ ${esc(i.name)}</button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No items match.</div>' : '')}
+    <div class="row"><span class="small muted">Weight ${Math.round(D.weight * 10) / 10} / ${D.capacity} lb.</span>${(() => { const v = sum((ch.inv || []).map(it => { const d = itemDef(ch, it); const p = d && !it.custom ? priceCp(d) : null; return p != null ? p * (+it.q || 1) : 0; })); return v ? `<span class="small muted">· Worth about ${esc(fmtCp(v))} at list price</span>` : ''; })()}</div>
     <details><summary class="small" style="cursor:pointer">Add a custom item</summary><div class="grid2" style="margin-top:8px"><input type="text" id="f-cname" placeholder="Name"${dis(ro)}><input type="text" id="f-cnote" placeholder="Notes"${dis(ro)}><button class="btn" data-act="invcustom"${dis(ro)}>Add custom item</button></div></details>
   </div>`;
-  const money = `<div class="panel"><h3>Coins</h3><div class="grid3">${['cp', 'sp', 'ep', 'gp', 'pp'].map(k => `<label class="field"><span class="lbl">${k}</span><input type="number" id="f-m-${k}" min="0" data-f="money.${k}" data-t="num" value="${esc(ch.money[k] || 0)}"${dis(ro)}></label>`).join('')}</div></div>`;
-  return start + inv + money;
+  const money = `<div class="panel"><h3>Coins <span class="small muted" style="font-family:var(--f-body);letter-spacing:0;font-weight:400">${esc(fmtCp(walletCp(ch.money)) || '0 gp')} in all</span></h3><div class="grid3">${['cp', 'sp', 'ep', 'gp', 'pp'].map(k => `<label class="field"><span class="lbl">${k}</span><input type="number" id="f-m-${k}" min="0" data-f="money.${k}" data-t="num" value="${esc(ch.money[k] || 0)}"${dis(ro)}></label>`).join('')}</div></div>`;
+  return start + money + inv + shop;
 }
 
 function stepStory(ch, D, ro) {
@@ -3501,7 +3552,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 18</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 19</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -5864,6 +5915,55 @@ ACT.michoice = function (el) {
   else if (w === 'c0' || w === 'c1') c.c[+w[1]] = el.value;
   else if (w === 's') c.s = el.value;
   ch.choices[k] = c; commit(ch);
+};
+
+ACT.itemcat = function (el) { UI.itemCat = el.value; UI.itemAll = false; queueRender(); };
+ACT.itemsort = function (el) { UI.itemSort = el.value; queueRender(); };
+ACT.itemafford = function () { UI.itemAfford = !UI.itemAfford; queueRender(); };
+ACT.itemall = function () { UI.itemAll = true; queueRender(); };
+ACT.shopinfo = function (el) {
+  const ch = C(); if (!ch) return; const d = registry(ch.ruleset).items.get(el.dataset.v); if (!d) return;
+  const p = priceCp(d), g = guideCp(d);
+  openModal({ kind: 'text', title: d.name, html: `<p class="small muted">${esc([d.cat, d.rar, d.att ? 'requires attunement' : '', p != null ? fmtCp(p) : g != null ? 'guide price about ' + fmtCp(g) : '', d.wt ? d.wt + ' lb.' : '', d.src || ''].filter(Boolean).join(' · '))}</p>${md(d.d || '')}` });
+};
+function buyItem(ch, id, cost) {
+  const d = registry(ch.ruleset).items.get(id); if (!d) return;
+  const paid = payCoins(ch.money, cost);
+  if (!paid) { toastMsg(`Not enough coins: ${d.name} costs ${fmtCp(cost)} and you have ${fmtCp(walletCp(ch.money)) || '0 gp'}.`); return; }
+  const snapM = JSON.stringify(ch.money), snapI = JSON.stringify(ch.inv), cid = ch.id;
+  ch.money = paid;
+  const ex = ch.inv.find(x => x.id === id && !x.custom);
+  if (ex) ex.q = (+ex.q || 1) + 1; else ch.inv.push({ id, q: 1, eq: false });
+  pushUndo('buy ' + d.name, () => { const x = chars().find(y => y.ch.id === cid && y.mine) || chars().find(y => y.ch.id === cid); if (!x) return; x.ch.money = JSON.parse(snapM); x.ch.inv = JSON.parse(snapI); saveChar(x.ch); });
+  commit(ch); toastMsg(`Bought ${d.name} for ${fmtCp(cost)}. ${fmtCp(walletCp(ch.money)) || '0 gp'} left.`);
+}
+ACT.invbuy = function (el) {
+  const ch = C(); if (!ch) return; const d = registry(ch.ruleset).items.get(el.dataset.v); if (!d) return;
+  const p = priceCp(d);
+  if (p != null) { buyItem(ch, d.id, p); return; }
+  openModal({ kind: 'buy', id: d.id });
+};
+MODALS.buy = () => {
+  const m = UI.modal, ch = C(); if (!ch) return ''; const d = registry(ch.ruleset).items.get(m.id); if (!d) return '';
+  const g = guideCp(d);
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Buy ${esc(d.name)}"><div class="row"><h2>Buy ${esc(d.name)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <p class="small">${esc(d.rar || 'Magic item')}${g != null ? `. The guide price for this rarity is ${esc(fmtCp(g))}; the DM sets the real price.` : '. It has no listed price; agree one with the DM.'}</p>
+    <label class="field" style="max-width:220px"><span class="lbl">Price in gold</span><input type="number" id="f-buyp" min="0" step="any" value="${g != null ? g / 100 : ''}"></label>
+    <p class="small muted">You have ${esc(fmtCp(walletCp(ch.money)) || '0 gp')}.</p>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="buygo">Buy</button></div></div>`;
+};
+ACT.buygo = function () {
+  const m = UI.modal, ch = C(); if (!ch || !m) return;
+  const gp = parseFloat(($('#f-buyp') || {}).value); if (!(gp >= 0)) { toastMsg('Type a price in gold first.'); return; }
+  closeModal(); buyItem(ch, m.id, Math.round(gp * 100));
+};
+ACT.invsell = function (el) {
+  const ch = C(); if (!ch) return; const i = +el.dataset.i, it = ch.inv[i]; if (!it) return;
+  const d = itemDef(ch, it), p = d ? priceCp(d) : null; if (p == null) return;
+  const back = Math.floor(p / 2);
+  ch.money = giveChange(Object.assign({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, ch.money), back);
+  if ((+it.q || 1) > 1) it.q = (+it.q || 1) - 1; else ch.inv.splice(i, 1);
+  commit(ch); toastMsg(`Sold ${d.name} for ${fmtCp(back) || '0 cp'} (half its price).`);
 };
 </script>
 </body>
