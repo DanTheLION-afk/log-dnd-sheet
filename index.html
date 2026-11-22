@@ -230,7 +230,7 @@ input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin:
 .rt ul { margin: 0 0 .55em; padding-left: 1.2em; }
 .feat { border-top: 1px solid var(--line); padding: 10px 0; }
 .feat:first-child { border-top: 0; padding-top: 0; }
-.feat summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; list-style: none; }
+.feat summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; list-style: none; }
 .feat summary::-webkit-details-marker { display: none; }
 .feat summary::before { content: "\25B8"; color: var(--ink-2); font-size: 12px; transition: transform .15s; }
 .feat[open] summary::before { transform: rotate(90deg); }
@@ -286,6 +286,9 @@ button.vital:hover { border-color: var(--accent); }
 .tbl td { padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .tbl tr:last-child td { border-bottom: 0; }
 .scroll-x { overflow-x: auto; }
+@media (max-width: 480px) { .prepseg { max-width: 100%; } .prepseg button { padding-inline: 5px; font-size: 14px; } }   /* five Prep sections fit a phone */
+@media (max-width: 480px) { .crow .pill { white-space: normal; } }   /* a long timed effect ("Frightened · 5 rounds · ends on WIS DC 13") wraps inside the row */
+@media (max-width: 480px) { .tbl.shop td.num { white-space: normal !important; } .tbl.shop th, .tbl.shop td { padding-inline: 4px; } }   /* phones: Buy and Add must not hide behind a sideways scroll */
 .roll { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 2px 8px; cursor: pointer; font-family: var(--f-label); font-weight: 700; white-space: nowrap; }
 .roll:hover { border-color: var(--accent); color: var(--accent); }
 .cond { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -350,6 +353,7 @@ button.vital:hover { border-color: var(--accent); }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .rowed { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; border: 1px solid var(--line); border-radius: var(--r); padding: 8px; background: var(--bg); }
 .rowed .wide { grid-column: 1 / -1; }
+@media (min-width: 700px) { .rowed > .field:first-child { grid-column: span 2; } }   /* the name field of a trait, action or legendary row gets room for a real name */
 .abgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 @media (max-width: 520px) { .abgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .abgrid input, .abgrid select { width: 100%; }
@@ -632,7 +636,7 @@ footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color:
 }
 @media (min-width: 701px) and (hover: hover) { .kbdhint { display: inline; } }
 @media (min-width: 1101px) {
-  .cbsheet .vitals { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .cbsheet .vitals { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
   .cbsheet .sec-top > .row:has(> [data-act="shortrest"]) { display: none; }
 }
 .bnav, .chmorewrap { display: none; }
@@ -3205,7 +3209,7 @@ function stepEquipment(ch, D, ro) {
       <select data-act="itemsort" aria-label="Sort">${[['name', 'A to Z'], ['cheap', 'Cheapest first'], ['dear', 'Most expensive first']].map(([k, l]) => opt(k, l, UI.itemSort === k)).join('')}</select>
       <button class="btn sm" data-act="itemafford"${pressed(UI.itemAfford)}>Only what I can afford</button>
       <span class="small muted">${pool.length} item${pool.length === 1 ? '' : 's'}</span>${last && /^buy /.test(last.label) && !ro ? `<button class="btn ghost sm" data-act="undo">Undo: ${esc(last.label)}</button>` : ''}</div>
-    <div class="scroll-x" style="max-height:480px;overflow-y:auto"><table class="tbl"><thead><tr><th>Item</th><th>Price</th><th>Weight</th><th><span class="sr-only">Buy or add</span></th></tr></thead><tbody>${shopRows || '<tr><td colspan="4" class="muted">No items match.</td></tr>'}</tbody></table></div>
+    <div class="scroll-x" style="max-height:480px;overflow-y:auto"><table class="tbl shop"><thead><tr><th>Item</th><th>Price</th><th>Weight</th><th><span class="sr-only">Buy or add</span></th></tr></thead><tbody>${shopRows || '<tr><td colspan="4" class="muted">No items match.</td></tr>'}</tbody></table></div>
     ${pool.length > cap ? `<div class="row"><button class="btn sm" data-act="itemall">Show all ${pool.length}</button><span class="small muted">Showing the first ${cap}.</span></div>` : ''}
     <p class="small muted">Buy pays from your coins and gives change. Add puts an item in your pack for free. Magic items show a guide price for their rarity; the DM decides the real one.</p></div>`;
   const inv = `<div class="panel stack"><h3>Inventory</h3>
@@ -3281,7 +3285,7 @@ function moveBtns(s, i, at, n, ro) {
   return ro ? '' : `<button class="btn ghost sm" data-act="cfmove" data-s="${s}" data-i="${i}" data-d="-1" aria-label="Move up"${dis(at === 0)}>↑</button><button class="btn ghost sm" data-act="cfmove" data-s="${s}" data-i="${i}" data-d="1" aria-label="Move down"${dis(at === n - 1)}>↓</button><button class="btn ghost sm danger" data-act="cfrm" data-s="${s}" data-i="${i}" aria-label="Delete">${svgIcon('x', 16)}</button>`;
 }
 function fieldRow(ch, D, si, fi, f, n, ro) {
-  const path = `fields.${si}.items.${fi}`, nm = `<input type="text" class="grow" data-in="${path}.n" value="${esc(f.n || '')}" placeholder="Name" aria-label="Field name"${dis(ro)}>`;
+  const path = `fields.${si}.items.${fi}`, nm = `<input type="text" class="grow" style="min-width:min(100%,190px)" data-in="${path}.n" value="${esc(f.n || '')}" placeholder="Name" aria-label="Field name"${dis(ro)}>`;
   let inline = '', below = '';
   if (f.t === 'text') below = `<textarea data-in="${path}.v" aria-label="${esc(f.n || 'Notes')}"${dis(ro)}>${esc(f.v || '')}</textarea>`;
   else if (f.t === 'num') inline = `<input type="number" data-f="${path}.v" data-t="num" value="${esc(f.v == null ? 0 : f.v)}" style="width:90px" aria-label="${esc(f.n || 'Number')}"${dis(ro)}>`;
@@ -5592,7 +5596,7 @@ const RUN = { sel: null, picks: {}, q: '', rs: LS.get('rs', '2024'), tgt: '', hp
 /* clickable pips: a filled pip is still available, a hollow one is spent; tapping one spends or restores up to it */
 const combatPips = (c, k, max, label) => `<span class="pips" role="group" aria-label="${label}">${Array.from({ length: max }, (_, i) => { const spent = i < (+c[k] || 0); return `<button class="pip${spent ? ' used' : ''}" data-act="cpip" data-v="${esc(c.id)}" data-k="${k}" data-n="${spent ? i : i + 1}" aria-label="${label} ${i + 1} of ${max}, ${spent ? 'spent' : 'available'}"></button>`; }).join('')}</span>`;
 /* add an effect: name (a condition name also applies that condition), rounds, and an optional save that ends it */
-const fxForm = (btn, id) => `<div class="row" data-fxf="${esc(id)}"><input type="text" list="fxnames" data-k="n" placeholder="Effect or condition" aria-label="Effect" style="width:150px"><input type="number" min="1" data-k="r" placeholder="Rounds" aria-label="Rounds" style="width:76px"><select data-k="ab" aria-label="Save that ends it"><option value="">No save</option>${ABIL.map(a => opt(a, a.toUpperCase() + ' save')).join('')}</select><input type="number" min="1" data-k="dc" placeholder="DC" aria-label="Save DC" style="width:62px">${btn}</div><datalist id="fxnames">${CONDITIONS.map(k => `<option value="${k}">`).join('')}</datalist>`;
+const fxForm = (btn, id) => `<div class="row" data-fxf="${esc(id)}"><input type="text" list="fxnames" data-k="n" placeholder="Effect or condition" aria-label="Effect" style="width:190px"><input type="number" min="1" data-k="r" placeholder="Rounds" aria-label="Rounds" style="width:92px"><select data-k="ab" aria-label="Save that ends it"><option value="">No save</option>${ABIL.map(a => opt(a, a.toUpperCase() + ' save')).join('')}</select><input type="number" min="1" data-k="dc" placeholder="DC" aria-label="Save DC" style="width:62px">${btn}</div><datalist id="fxnames">${CONDITIONS.map(k => `<option value="${k}">`).join('')}</datalist>`;
 function fxRead(el) {
   const b = el.closest('[data-fxf]'), g = k => b.querySelector(`[data-k="${k}"]`).value, n = g('n').trim(), ab = g('ab'), dc = +g('dc');
   if (!n) { toastMsg('Name the effect first.'); return null; }
@@ -5715,7 +5719,7 @@ function combatDetail(c, cb) {
     ${[['actions', 'Actions'], ['bonus', 'Bonus actions'], ['reactions', 'Reactions'], ['legendary', 'Legendary actions']].filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}`
     : `<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>`;
   return `<div class="panel stack"><div class="ph">${esc(c.name)}<span class="spacer"></span>${c.hidden ? '<span class="pill">hidden</span>' : ''}</div>
-    <div class="row"><label class="field" style="width:150px"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>
+    <div class="row"><label class="field" style="width:210px;max-width:100%"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>
     ${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}
     ${ex.la || ex.lr ? `<div class="row small">${ex.la ? `<span class="lbl">Legendary actions</span>${combatPips(c, 'lau', ex.la, 'Legendary action')}` : ''}${ex.lr ? `<span class="lbl">Legendary resistance</span>${combatPips(c, 'lru', ex.lr, 'Legendary resistance')}` : ''}</div>` : ''}
     ${c.conc ? `<div class="row small"><span class="pill brass">Concentrating: ${esc(c.conc)}</span><button class="btn ghost sm" data-act="mbreak" data-v="${esc(c.id)}">Break</button><span class="muted">Damage asks for a Con save</span></div>` : ''}
@@ -6330,11 +6334,11 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 function viewPrep() {
   if (!isDMish()) return `<div class="empty">Only the DM sees Prep.</div>`;
   const P = pp(), tabs = [['enc', 'Encounters'], ['npc', 'NPCs'], ['quest', 'Quests'], ['sess', 'Sessions'], ['loot', 'Loot']];
-  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Prep</h2><div class="seg" role="group" aria-label="Prep sections">${tabs.map(([k, l]) => `<button data-act="pptab" data-v="${k}"${pressed(P.t === k)}>${l}</button>`).join('')}</div></div>`
+  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Prep</h2><div class="seg prepseg" role="group" aria-label="Prep sections">${tabs.map(([k, l]) => `<button data-act="pptab" data-v="${k}"${pressed(P.t === k)}>${l}</button>`).join('')}</div></div>`
     + { enc: prepEnc, npc: prepNpc, quest: prepQuest, sess: prepSess, loot: prepLoot }[P.t]();
 }
 const twoCol = (a, b) => `<div class="grid2 loglay" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:start">${a}${b}</div>`;
-const listBtn = (k, id, main, sub, pill) => `<button class="btn" style="justify-content:flex-start;text-align:left" data-act="ppsel" data-k="${k}" data-v="${esc(id)}"${pressed(id === pp()[k])}><b>${esc(main)}</b> <span class="small">${esc(sub)}</span>${pill || ''}</button>`;
+const listBtn = (k, id, main, sub, pill) => `<button class="btn" style="justify-content:flex-start;text-align:left" data-act="ppsel" data-k="${k}" data-v="${esc(id)}"${pressed(id === pp()[k])}><span class="grow" style="min-width:0"><b>${esc(main)}</b> <span class="small">${esc(sub)}</span></span>${pill || ''}</button>`;
 
 function prepEnc() {
   const P = pp(), R = registry(P.rs), q = P.q.trim().toLowerCase(), enc = S.dm.enc || [];
@@ -8361,7 +8365,7 @@ function b31After() {
 /* ----- absent players ----- */
 function absentPanel(c, x, D) {
   const abs = !!x.ch.play.absent;
-  const btn = `<button class="btn ghost sm" data-act="absent" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(abs)}>Absent: DM runs them</button>`;
+  const btn = `<button class="btn ghost sm" data-act="absent" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(abs)}>${abs ? 'Mark present' : 'Mark absent'}</button>`;
   if (!abs) return `<div class="row small">${btn}</div>`;
   UI.cur = { cid: x.ch.id, owner: x.owner };   // the sheet's own buttons act on UI.cur
   return `<div class="row small">${btn}<span class="pill brass">${c.id === cbt().cur ? 'Their turn: you run it' : 'You run this character'}</span></div><div class="cbsheet">${sheetView(x.ch, D, !canEditChar(x.owner), x)}</div>`;
@@ -8372,7 +8376,7 @@ function absentBanner(cb) {
 }
 const absentBtn = (ch, owner) => {
   const p = ch.play;
-  return isDMish() ? `<div class="row small">${p.absent ? '<span class="pill brass">Absent · DM runs them</span>' : ''}<button class="btn ghost sm" data-act="absent" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}"${pressed(!!p.absent)}>Absent: DM runs them</button></div>` : p.absent ? '<div class="row small"><span class="pill brass">Absent · DM runs them</span></div>' : '';
+  return isDMish() ? `<div class="row small">${p.absent ? '<span class="pill brass">Absent · DM runs them</span>' : ''}<button class="btn ghost sm" data-act="absent" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}"${pressed(!!p.absent)}>${p.absent ? 'Mark present' : 'Mark absent'}</button></div>` : p.absent ? '<div class="row small"><span class="pill brass">Absent · DM runs them</span></div>' : '';
 };
 
 /* ----- DM party actions and the board's extra columns ----- */
