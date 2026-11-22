@@ -2430,6 +2430,35 @@ function saveDM(patch) {
   if (S.mode === 'live') { if (S.me.isOwner) { queueWrite('dm/state', patch, 250); keepDM(); } }
   else LS.set('dm', S.dm);
 }
+/* Prep (NPCs, quests, sessions, loot tables): the DM's copy lives in dm/prep. What players may see is derived from it
+   into campaign/story (known NPCs, visible quests, the shared session summary) every time the DM saves. */
+const PREP_BLANK = () => ({ npcs: [], quests: [], sessions: [], tables: [], share: '' });
+function storyOf(p) {
+  const npc = id => p.npcs.find(n => n.id === id), sess = p.sessions.find(s => s.id === p.share);
+  return {
+    people: p.npcs.filter(n => n.known).map(n => ({ id: n.id, name: n.name, role: n.role || '', d: n.d || '' })),
+    quests: p.quests.filter(q => q.vis).map(q => ({ id: q.id, t: q.t, giver: (npc(q.giver) || {}).known ? npc(q.giver).name : '', status: q.status, objs: q.objs || [], reward: q.reward || '' })),
+    session: sess ? { date: sess.date || '', title: sess.title || '', summary: sess.summary || '' } : null,
+  };
+}
+function savePrep(patch) {
+  S.prep = Object.assign(PREP_BLANK(), S.prep, patch);
+  S.story = storyOf(S.prep);
+  if (S.mode === 'live') { if (S.me.isOwner) { queueWrite('dm/prep', patch, 300); queueWrite('campaign/story', S.story, 300); } }
+  else { LS.set('prep', S.prep); LS.set('story', S.story); }
+}
+function subscribePrep(onChange) {
+  if (!S.db || !S.me.isOwner || S.prepSub) return;
+  S.prepSub = true;
+  S.db.doc('dm/prep').onSnapshot(snap => {
+    if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;   // no internet yet: keep what is on screen
+    const q = WQ['dm/prep'];
+    let data = snap.exists ? clone(snap.data()) : {};
+    if (q && (q.pending || q.inflight)) data = deepMerge(data, deepMerge(clone(q.inflight || {}), clone(q.pending || {})));
+    S.prep = Object.assign(PREP_BLANK(), data); S.story = storyOf(S.prep);
+    onChange('prep');
+  }, () => { S.prepSub = false; });
+}
 const TAB = 't' + Math.random().toString(36).slice(2, 10);
 /* one DM window settles player rolls. Until the server has answered (no internet yet) a main DM window settles its own. */
 const isResolver = () => S.mode !== 'live' || (!!S.me.isOwner && (!!S.dmSolo || (S.dm || {}).resolver === TAB));
@@ -2474,6 +2503,7 @@ async function connect(onChange) {
   S.local = LS.get('chars', {});
   S.init = LS.get('init', { round: 1, cur: null, list: [] });
   S.dm = Object.assign({ combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' }, LS.get('dm', {}));
+  S.prep = Object.assign(PREP_BLANK(), LS.get('prep', {})); S.story = LS.get('story', {});
   S.settings = Object.assign({ off: [] }, LS.get('settings', {})); setOffSources(S.settings.off);
   try { S.localParts = await IDB.all(); } catch (e) { S.localParts = []; }
   refreshPacks();
@@ -2495,6 +2525,7 @@ async function startLive({ db, user, room, dl }, onChange) {
   if (!db || !S.me.id) { S.mode = 'local'; S.status = 'This device only'; onChange(); return; }
   S.mode = 'live'; S.status = 'Connecting\u2026';
   S.dm = { combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' };
+  S.prep = PREP_BLANK(); S.story = {};
   S.dmClaimed = false;
   if (S.me.canWrite === false && !S.me.isOwner) S.readOnly = true;
   onChange();
@@ -2548,6 +2579,8 @@ async function startLive({ db, user, room, dl }, onChange) {
     onChange('packs');
   }, () => {});
   subscribeDM(onChange);
+  subscribePrep(onChange);
+  db.doc('campaign/story').onSnapshot(snap => { if (S.me.isOwner) return; S.story = snap.exists ? clone(snap.data()) : {}; onChange('story'); }, () => {});
   mapSubscribe(db, onChange);
   if (room) {
     try {
@@ -2663,7 +2696,7 @@ function fselect(o) {
 function viewBar() {
   if (UI.view === 'table') return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Table display</span></div></div></header>`;
   if (UI.view === 'map' && MAP.tv) return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Battle map · what players see</span></div><span class="spacer"></span><button class="btn sm" data-act="mapzoom" data-v="fit">Fit</button></div></header>`;
-  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].filter(([k]) => !tabOff(k)).concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].filter(([k]) => !tabOff(k)).concat(isDMish() ? [['prep', 'Prep'], ['campaign', 'Campaign']] : []);
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
@@ -3394,7 +3427,7 @@ function viewParty() {
     ? `<div class="note" style="margin-bottom:12px">This page isn't connected to a shared campaign, so you only see characters made in this browser. ${window.PL_SITE ? 'Start a campaign with the button at the top and send your players the link.' : 'Open the published page in claude.ai and invite your players by email as Editors to see their sheets here.'} Players can also send you a character code.</div>`
     : S.me.isOwner ? '' : `<div class="note" style="margin-bottom:12px">Everyone in the campaign can see the party. Only the DM and each sheet's player can change it.</div>`;
   const hand = ((S.settings || {}).handouts || []);
-  const handouts = hand.length ? `<div class="panel stack" style="margin-bottom:12px"><div class="ph">From the DM</div>${hand.map(h => `<details class="feat" data-k="ho-${esc(h.id)}"><summary><b>${esc(h.title || 'Handout')}</b></summary><div class="body rt">${md(h.text)}</div></details>`).join('')}</div>` : '';
+  const handouts = storyPanel() + (hand.length ? `<div class="panel stack" style="margin-bottom:12px"><div class="ph">From the DM</div>${hand.map(h => `<details class="feat" data-k="ho-${esc(h.id)}"><summary><b>${esc(h.title || 'Handout')}</b></summary><div class="body rt">${md(h.text)}</div></details>`).join('')}</div>` : '');
   if (!list.length) return head + intro + handouts + `<div class="empty">No characters yet. When players create characters on this page, they appear here.</div>`;
   if (tab === 'table') {
     const rows = list.map(({ ch, owner }) => {
@@ -4540,7 +4573,7 @@ function render() {
   let body;
   try {
     if (S.dm && S.dm.combat && isDMish()) pruneGone(S.dm.combat);
-    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : UI.view === 'map' ? viewMap() : viewChars();
+    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'prep' ? viewPrep() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : UI.view === 'map' ? viewMap() : viewChars();
   } catch (err) {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
@@ -4662,7 +4695,7 @@ function addImportedChar(o) {
 function getD(ch) { return derive(ch); }
 
 const MODALS = {};   // extra dialogs registered by other files
-const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map'];
+const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map', 'prep'];
 const ACT = {
   view(el) { UI.view = el.dataset.v; UI.bmore = false; UI.chmore = false; if (!UI.fromUrl) LS.set('view', UI.view); queueRender(); window.scrollTo(0, 0); },
   open(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; LS.set('cur', UI.cur); UI.startSel = {}; UI.pk = {}; UI.flt = {}; queueRender(); },
@@ -5046,7 +5079,7 @@ function onInput(ev) {
   }
   if (LIVE_ACTS.includes(el.dataset.act)) { clearTimeout(searchTimer); searchTimer = setTimeout(() => ACT[el.dataset.act](el), 220); }
 }
-const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq'];   // text inputs that act while typing; every other text input with a data-act commits on change
+const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq', 'ppq'];   // text inputs that act while typing; every other text input with a data-act commits on change
 function onChange(ev) {
   const el = ev.target;
   flushTyping();
@@ -5638,6 +5671,18 @@ function uniqueNames(cb, base, n) {
   while (out.length < n) { const nm = base + ' ' + i++; if (!used.has(nm)) out.push(nm); }
   return out;
 }
+/* put a saved encounter's monster groups into the fight (Combat's Load button and Prep's Send to combat) */
+function encAdd(list) {
+  const cb = cbt();
+  for (const g of list) {
+    const def = g.mid ? registry(g.rs || '2014').monsters.get(g.mid) : null;
+    for (const nm of uniqueNames(cb, g.name, g.n)) {
+      if (def) { addMonster(cb, def, g.rs || '2014', nm, !!g.hidden); const m = cb.list[cb.list.length - 1]; if (g.hp != null) m.hp = m.max = g.hp; if (g.ac != null) m.ac = g.ac; }
+      else cb.list.push({ id: uid('m'), kind: 'mon', name: nm, init: rnd(20) + (+g.ib || 0), ib: +g.ib || 0, hp: g.hp, max: g.hp, ac: g.ac, hidden: !!g.hidden, cond: [] });
+    }
+  }
+  sortCombat(cb); saveCombat(cb);
+}
 const seenName = c => c.hidden ? 'Something unseen' : c.name;
 function monAction(c, kind, name) { const d = monDef(c); return d ? (d[kind] || []).find(a => a.n === name) : null; }
 function rollDmgList(list, crit) {
@@ -5742,17 +5787,7 @@ Object.assign(ACT, {
     const enc = (S.dm.enc || []).concat([{ id: uid('e'), name, list: Array.from(groups.values()) }]);
     S.dm.enc = enc; saveDM({ enc }); nb.value = ''; toastMsg('Saved ' + name); queueRender();
   },
-  encload() {
-    const e = (S.dm.enc || []).find(x => x.id === $('#f-enc').value); if (!e) return; const cb = cbt();
-    for (const g of e.list) {
-      const def = g.mid ? registry(g.rs || '2014').monsters.get(g.mid) : null;
-      for (const nm of uniqueNames(cb, g.name, g.n)) {
-        if (def) { addMonster(cb, def, g.rs || '2014', nm, !!g.hidden); const m = cb.list[cb.list.length - 1]; if (g.hp != null) m.hp = m.max = g.hp; if (g.ac != null) m.ac = g.ac; }
-        else cb.list.push({ id: uid('m'), kind: 'mon', name: nm, init: rnd(20) + (+g.ib || 0), ib: +g.ib || 0, hp: g.hp, max: g.hp, ac: g.ac, hidden: !!g.hidden, cond: [] });
-      }
-    }
-    sortCombat(cb); saveCombat(cb); queueRender();
-  },
+  encload() { const e = (S.dm.enc || []).find(x => x.id === $('#f-enc').value); if (e) encAdd(e.list); queueRender(); },
   encdel() { const id = $('#f-enc').value; const enc = (S.dm.enc || []).filter(x => x.id !== id); S.dm.enc = enc; saveDM({ enc }); queueRender(); },
   cpend(el) { const m = (S.pendingAtk || []).splice(+el.dataset.i, 1)[0]; if (!m) return; const t = findTarget(m.tgt); if (t) settleAtk(m, t, el.dataset.v === 'hit'); queueRender(); },
   crest(el) {
@@ -6162,6 +6197,247 @@ Object.assign(ACT, {
     c.lvl = clamp(c.lvl + d, 1, 20);
     const def = look(ch, 'classes', c.id); if (def && c.lvl < (def.subLevel || 3)) c.sub = '';
     commit(ch);
+  },
+});
+
+'use strict';
+/* ===== Prep tab (DM only): encounter builder, NPCs, quests, session notes, loot tables ===== */
+const prep = () => S.prep || (S.prep = PREP_BLANK());
+const pp = () => UI.pp || (UI.pp = { t: 'enc', rs: '2024', eb: [], q: '', lv: '', nq: '', qq: '', npc: '', quest: '', sess: '', tbl: 'b0', gq: '', res: null, note: '' });
+/* DMG 2014 XP thresholds per character by level: Easy, Medium, Hard, Deadly */
+const XP14 = [[25, 50, 75, 100], [50, 100, 150, 200], [75, 150, 225, 400], [125, 250, 375, 500], [250, 500, 750, 1100], [300, 600, 900, 1400], [350, 750, 1100, 1700], [450, 900, 1400, 2100], [550, 1100, 1600, 2400], [600, 1200, 1900, 2800], [800, 1600, 2400, 3600], [1000, 2000, 3000, 4500], [1100, 2200, 3400, 5100], [1250, 2500, 3800, 5700], [1400, 2800, 4300, 6400], [1600, 3200, 4800, 7200], [2000, 3900, 5900, 8800], [2100, 4200, 6300, 9500], [2400, 4900, 7300, 10900], [2800, 5700, 8500, 12700]];
+/* DMG 2024 XP budget per character by level: Low, Moderate, High */
+const XP24 = [[50, 75, 100], [100, 150, 200], [150, 225, 400], [250, 375, 500], [500, 750, 1100], [600, 1000, 1400], [750, 1300, 1700], [1000, 1700, 2100], [1300, 2000, 2600], [1600, 2300, 3100], [1900, 2900, 4100], [2200, 3700, 4700], [2600, 4200, 5400], [2900, 4900, 6200], [3300, 5400, 7800], [3800, 6100, 9800], [4500, 7200, 11700], [5000, 8700, 14200], [5500, 10700, 17200], [6400, 13200, 22000]];
+const MULT14 = [.5, 1, 1.5, 2, 2.5, 3, 4, 5];   // DMG 2014 encounter multipliers, lowest to highest
+/* 2014: monster XP × a multiplier for their number (one step up for a party under 3, one down for 6 or more) against the party's thresholds.
+   2024: plain monster XP against the party's budget. xps = one XP value per monster. */
+function encDiff(rs, levels, xps) {
+  const lv = levels.map(l => clamp(Math.round(+l) || 1, 1, 20)), n = xps.length, raw = sum(xps);
+  if (!lv.length || !n) return null;
+  if (rs === '2024') {
+    const th = [0, 1, 2].map(i => sum(lv.map(l => XP24[l - 1][i]))), names = ['Low', 'Moderate', 'High'], i = th.findIndex(t => raw <= t);
+    return { raw, adj: raw, mult: 1, th, names, label: i < 0 ? 'Over High' : names[i] };
+  }
+  const k = clamp((n === 1 ? 1 : n === 2 ? 2 : n <= 6 ? 3 : n <= 10 ? 4 : n <= 14 ? 5 : 6) + (lv.length < 3 ? 1 : lv.length > 5 ? -1 : 0), 0, 7);
+  const adj = raw * MULT14[k], th = [0, 1, 2, 3].map(i => sum(lv.map(l => XP14[l - 1][i]))), names = ['Easy', 'Medium', 'Hard', 'Deadly'], i = th.filter(t => adj >= t).length - 1;
+  return { raw, adj, mult: MULT14[k], th, names, label: i < 0 ? 'Below Easy' : names[i] };
+}
+/* party levels: typed in the Prep box, else every character in the campaign */
+function ebParty() {
+  const man = String(pp().lv).split(/[\s,]+/).map(Number).filter(n => n >= 1 && n <= 20);
+  return man.length ? { lv: man, src: 'the levels typed above' } : { lv: chars().map(x => derive(x.ch).level), src: 'the campaign’s characters' };
+}
+/* the builder's monsters in the saved-encounter shape (Combat's encsave/encload use the same one) */
+const ebList = () => pp().eb.map(g => { const d = registry(g.rs).monsters.get(g.mid); return d && { mid: g.mid, rs: g.rs, name: d.name, n: g.n, hp: +d.hp || null, ac: d.ac == null ? null : +d.ac, ib: mod((d.ab || {}).dex || 10), hidden: false }; }).filter(Boolean);
+const ebXps = () => ebList().flatMap(g => Array(g.n).fill(monXp({ mid: g.mid, rs: g.rs })));
+const rsSeg = P => `<span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button class="mini" data-act="pprs" data-v="${r}"${pressed(P.rs === r)}>${r}</button>`).join('')}</span>`;
+/* a text/textarea/select field that edits one key of one list entry (npcs, quests, sessions, tables) */
+const pfield = (l, o, k, label, area) => `<label class="field"><span class="lbl">${label}</span>${area ? `<textarea id="f-pf-${k}" data-act="pf" data-l="${l}" data-v="${esc(o.id)}" data-k="${k}">${esc(o[k] || '')}</textarea>` : `<input type="text" id="f-pf-${k}" data-act="pf" data-l="${l}" data-v="${esc(o.id)}" data-k="${k}" value="${esc(o[k] || '')}">`}</label>`;
+const pdel = (l, id) => `<button class="btn ghost sm danger" data-act="ppdel" data-l="${l}" data-v="${esc(id)}">Delete</button>`;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function viewPrep() {
+  if (!isDMish()) return `<div class="empty">Only the DM sees Prep.</div>`;
+  const P = pp(), tabs = [['enc', 'Encounters'], ['npc', 'NPCs'], ['quest', 'Quests'], ['sess', 'Sessions'], ['loot', 'Loot']];
+  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Prep</h2><div class="seg" role="group" aria-label="Prep sections">${tabs.map(([k, l]) => `<button data-act="pptab" data-v="${k}"${pressed(P.t === k)}>${l}</button>`).join('')}</div></div>`
+    + { enc: prepEnc, npc: prepNpc, quest: prepQuest, sess: prepSess, loot: prepLoot }[P.t]();
+}
+const twoCol = (a, b) => `<div class="grid2 loglay" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:start">${a}${b}</div>`;
+const listBtn = (k, id, main, sub, pill) => `<button class="btn" style="justify-content:flex-start;text-align:left" data-act="ppsel" data-k="${k}" data-v="${esc(id)}"${pressed(id === pp()[k])}><b>${esc(main)}</b> <span class="small">${esc(sub)}</span>${pill || ''}</button>`;
+
+function prepEnc() {
+  const P = pp(), R = registry(P.rs), q = P.q.trim().toLowerCase(), enc = S.dm.enc || [];
+  const hits = q.length >= 2 ? R.list('monsters').filter(m => m.name.toLowerCase().includes(q)).slice(0, 12) : [];
+  const party = ebParty(), xps = ebXps(), dif = encDiff(P.rs, party.lv, xps);
+  const rows = P.eb.map((g, i) => { const d = registry(g.rs).monsters.get(g.mid); return d ? `<div class="row"><b class="grow">${esc(d.name)} <span class="small muted">CR ${crLabel(d.cr)} · ${fmtN(monXp({ mid: g.mid, rs: g.rs }))} XP each · ${g.rs}</span></b><input type="number" min="1" max="30" value="${g.n}" data-act="ebn" data-i="${i}" style="width:64px" aria-label="How many ${esc(d.name)}"><button class="btn ghost sm danger" data-act="ebrm" data-i="${i}" aria-label="Remove ${esc(d.name)}">${svgIcon('x', 16)}</button></div>` : ''; }).join('');
+  const verdict = !xps.length ? 'Add monsters to see how hard the fight is.' : !dif ? 'No characters in the campaign yet. Type the party’s levels above.'
+    : P.rs === '2024' ? `Monster XP ${fmtN(dif.raw)}. Budget for ${party.lv.length} character${party.lv.length === 1 ? '' : 's'}: ${dif.names.map((n, i) => n + ' ' + fmtN(dif.th[i])).join(' · ')}.`
+    : `Monster XP ${fmtN(dif.raw)} × ${dif.mult} = ${fmtN(dif.adj)} adjusted. Thresholds for ${party.lv.length} character${party.lv.length === 1 ? '' : 's'}: ${dif.names.map((n, i) => n + ' ' + fmtN(dif.th[i])).join(' · ')}.`;
+  const builder = `<div class="panel stack"><div class="ph">Encounter builder<span class="spacer"></span>${rsSeg(P)}</div>
+    <div class="row"><input type="search" id="f-ppq-q" data-act="ppq" data-k="q" placeholder="Search ${R.monsters.size} monsters" value="${esc(P.q)}" style="max-width:240px" aria-label="Search monsters"><label class="row" style="gap:6px">Party levels<input type="text" id="f-eblv" data-act="eblv" value="${esc(P.lv)}" placeholder="blank = campaign" style="width:150px" aria-label="Party levels, e.g. 5, 5, 4, 3"></label></div>
+    ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="ebadd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Homebrew monsters appear here too.</div>' : '')}
+    ${rows || '<div class="empty">No monsters yet. Search above and tap one to add it.</div>'}
+    <div class="row"><b>Difficulty</b>${dif ? `<span class="pill ${/Deadly|Over/.test(dif.label) ? 'bad' : 'acc'}" id="eb-diff">${esc(dif.label)}</span>` : ''}<span class="small muted grow" id="eb-note">${esc(verdict)} Party from ${esc(party.src)}.</span></div>
+    <div class="row"><input type="text" id="f-ebn" placeholder="Name this encounter" style="max-width:200px"><button class="btn sm" data-act="ebsave"${dis(!P.eb.length)}>Save encounter</button><button class="btn pri sm" data-act="ebsend"${dis(!P.eb.length)}>Send to combat</button></div></div>`;
+  const saved = `<div class="panel stack"><div class="ph">Saved encounters</div>
+    ${enc.map(e => `<div class="row"><b class="grow">${esc(e.name)} <span class="small muted">${sum(e.list.map(g => g.n))} monsters</span></b><button class="btn sm" data-act="ebedit" data-v="${esc(e.id)}">Edit in builder</button><button class="btn sm" data-act="ebsend" data-v="${esc(e.id)}">Send to combat</button><button class="btn ghost sm danger" data-act="ebdel" data-v="${esc(e.id)}">Delete</button></div>`).join('') || '<span class="small muted">Nothing saved yet. This is the same list as the Load menu on the Combat screen.</span>'}</div>`;
+  return `<div class="stack">${builder}${saved}</div>`;
+}
+/* a plain read-only stat block for an NPC's linked monster */
+const monBrief = d => `<div class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)} · AC ${esc(d.ac)} · HP ${esc(d.hp)} · ${esc(d.speed || '')}</div>
+  <div class="small">${ABIL.map(a => a.toUpperCase() + ' ' + ((d.ab || {})[a] || 10) + ' (' + sgn(mod((d.ab || {})[a])) + ')').join(' · ')}</div>
+  ${[['traits', 'Traits'], ['actions', 'Actions'], ['bonus', 'Bonus actions'], ['reactions', 'Reactions'], ['legendary', 'Legendary actions']].filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl">${l}</div>${d[k].map(a => `<div class="rt small"><b>${esc(a.n)}.</b> ${md(a.d).replace(/^<p>/, '').replace(/<\/p>$/, '')}</div>`).join('')}`).join('')}`;
+function prepNpc() {
+  const P = pp(), npcs = prep().npcs, q = P.nq.trim().toLowerCase(), n = npcs.find(x => x.id === P.npc);
+  const shown = npcs.filter(x => !q || [x.name, x.role, x.loc].join(' ').toLowerCase().includes(q));
+  const list = `<div class="panel stack"><div class="ph">NPCs<span class="spacer"></span><button class="btn sm" data-act="ppnew" data-l="npcs">New NPC</button></div>
+    <input type="search" id="f-ppq-nq" data-act="ppq" data-k="nq" placeholder="Search NPCs" value="${esc(P.nq)}" aria-label="Search NPCs">
+    ${shown.map(x => listBtn('npc', x.id, x.name || 'Unnamed', [x.role, x.loc].filter(Boolean).join(' · '), x.known ? ' <span class="pill acc">known</span>' : '')).join('') || '<span class="small muted">No NPCs yet.</span>'}</div>`;
+  if (!n) return twoCol(list, `<div class="panel"><div class="empty">Pick an NPC, or make a new one.</div></div>`);
+  const [mrs, mid] = String(n.mon || '').split('|'), d = mid ? registry(mrs).monsters.get(mid) : null;
+  const monOpts = ['2024', '2014'].flatMap(rs => registry(rs).list('monsters').map(m => opt(rs + '|' + m.id, `${m.name} (${rs}, CR ${crLabel(m.cr)})`, n.mon === rs + '|' + m.id))).join('');
+  const ed = `<div class="panel stack"><div class="ph">${esc(n.name || 'Unnamed')}<span class="spacer"></span>${pdel('npcs', n.id)}</div>
+    <div class="grid2">${pfield('npcs', n, 'name', 'Name')}${pfield('npcs', n, 'role', 'Role or faction')}${pfield('npcs', n, 'loc', 'Location')}</div>
+    <label class="chk"><input type="checkbox" data-act="pf" data-l="npcs" data-v="${esc(n.id)}" data-k="known"${n.known ? ' checked' : ''}> Known to players <span class="small muted">(their Party tab shows name, role and the description below)</span></label>
+    ${pfield('npcs', n, 'd', 'Description (players see this once known)', 1)}${pfield('npcs', n, 'sec', 'Secrets (DM only)', 1)}${pfield('npcs', n, 'notes', 'Notes (DM only)', 1)}
+    <label class="field"><span class="lbl">Stat block</span><select data-act="pf" data-l="npcs" data-v="${esc(n.id)}" data-k="mon" aria-label="Linked monster">${opt('', 'None', !n.mon)}${monOpts}</select></label>
+    ${d ? `<details class="feat" data-k="npcmon"><summary><b>${esc(d.name)}</b></summary><div class="body">${monBrief(d)}</div></details>` : ''}</div>`;
+  return twoCol(list, ed);
+}
+function prepQuest() {
+  const P = pp(), quests = prep().quests, npcs = prep().npcs, q = quests.find(x => x.id === P.quest), ST = [['rumour', 'Rumour'], ['active', 'Active'], ['done', 'Done'], ['failed', 'Failed']];
+  const list = `<div class="panel stack"><div class="ph">Quests<span class="spacer"></span><button class="btn sm" data-act="ppnew" data-l="quests">New quest</button></div>
+    ${quests.map(x => listBtn('quest', x.id, x.t || 'Untitled', (ST.find(s => s[0] === x.status) || [, x.status])[1], x.vis ? ' <span class="pill acc">visible</span>' : '')).join('') || '<span class="small muted">No quests yet.</span>'}</div>`;
+  if (!q) return twoCol(list, `<div class="panel"><div class="empty">Pick a quest, or make a new one.</div></div>`);
+  const ed = `<div class="panel stack"><div class="ph">${esc(q.t || 'Untitled')}<span class="spacer"></span>${pdel('quests', q.id)}</div>
+    ${pfield('quests', q, 't', 'Title')}
+    <div class="grid2"><label class="field"><span class="lbl">Quest giver</span><select data-act="pf" data-l="quests" data-v="${esc(q.id)}" data-k="giver" aria-label="Quest giver">${opt('', 'Nobody in particular', !q.giver)}${npcs.map(x => opt(x.id, x.name || 'Unnamed', q.giver === x.id)).join('')}</select></label>
+      <label class="field"><span class="lbl">Status</span><select data-act="pf" data-l="quests" data-v="${esc(q.id)}" data-k="status" aria-label="Status">${ST.map(([k, l]) => opt(k, l, q.status === k)).join('')}</select></label></div>
+    <label class="chk"><input type="checkbox" data-act="pf" data-l="quests" data-v="${esc(q.id)}" data-k="vis"${q.vis ? ' checked' : ''}> Visible to players <span class="small muted">(Party tab: title, status, objectives, reward)</span></label>
+    <div class="stack"><span class="lbl">Objectives</span>${(q.objs || []).map((o, i) => `<div class="row"><input type="checkbox" data-act="qo" data-v="${esc(q.id)}" data-i="${i}" data-k="done"${o.done ? ' checked' : ''} aria-label="Done"><input type="text" id="f-qo-${i}" class="grow" data-act="qo" data-v="${esc(q.id)}" data-i="${i}" data-k="t" value="${esc(o.t)}" aria-label="Objective"><button class="btn ghost sm danger" data-act="qorm" data-v="${esc(q.id)}" data-i="${i}" aria-label="Remove objective">${svgIcon('x', 16)}</button></div>`).join('')}
+      <div class="row"><input type="text" id="f-qonew" class="grow" placeholder="New objective" aria-label="New objective"><button class="btn sm" data-act="qoadd" data-v="${esc(q.id)}">Add objective</button></div></div>
+    ${pfield('quests', q, 'reward', 'Reward')}${pfield('quests', q, 'notes', 'DM notes (never shown to players)', 1)}</div>`;
+  return twoCol(list, ed);
+}
+function prepSess() {
+  const P = pp(), all = prep().sessions, sorted = all.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))), s = all.find(x => x.id === P.sess), shared = prep().share;
+  const list = `<div class="panel stack"><div class="ph">Sessions<span class="spacer"></span><button class="btn sm pri" data-act="sessnew">Start new session</button></div>
+    ${sorted.map(x => listBtn('sess', x.id, x.title || 'Untitled', x.date || '', x.id === shared ? ' <span class="pill acc">shared</span>' : '')).join('') || '<span class="small muted">No sessions yet.</span>'}</div>`;
+  if (!s) return twoCol(list, `<div class="panel"><div class="empty">Pick a session, or start a new one.</div></div>`);
+  const ed = `<div class="panel stack"><div class="ph">${esc(s.title || 'Untitled')}<span class="spacer"></span>${pdel('sessions', s.id)}</div>
+    <div class="grid2">${pfield('sessions', s, 'date', 'Date (YYYY-MM-DD)')}${pfield('sessions', s, 'title', 'Title')}</div>
+    ${pfield('sessions', s, 'summary', 'Summary (what players may read)', 1)}
+    <div class="row"><button class="btn${s.id === shared ? '' : ' pri'}" data-act="sessshare" data-v="${esc(s.id)}">${s.id === shared ? 'Stop sharing' : 'Share this summary with players'}</button><span class="small muted">One summary is shared at a time. It shows on the Party tab.</span></div>
+    ${pfield('sessions', s, 'notes', 'Private notes (DM only)', 1)}</div>`;
+  return twoCol(list, ed);
+}
+
+/* ----- loot: tables of rows { w: weight "3" or dice range "31-60", i: item or coin, q: quantity dice } ----- */
+const COINS = ['cp', 'sp', 'ep', 'gp', 'pp'];
+/* DMG 2014 individual treasure by challenge rating: coins only (rows: d100 range, then "coin dice" entries) */
+const LOOT_BUILTIN = [
+  ['b0', 'Individual treasure, CR 0–4 (DMG)', [['1-30', 'cp 5d6'], ['31-60', 'sp 4d6'], ['61-70', 'ep 3d6'], ['71-95', 'gp 3d6'], ['96-100', 'pp 1d6']]],
+  ['b1', 'Individual treasure, CR 5–10 (DMG)', [['1-30', 'cp 4d6*100, ep 1d6*10'], ['31-60', 'sp 6d6*10, gp 2d6*10'], ['61-70', 'ep 3d6*10, gp 2d6*10'], ['71-95', 'gp 4d6*10'], ['96-100', 'gp 2d6*10, pp 3d6']]],
+  ['b2', 'Individual treasure, CR 11–16 (DMG)', [['1-20', 'sp 4d6*100, gp 1d6*100'], ['21-35', 'ep 1d6*100, gp 1d6*100'], ['36-75', 'gp 2d6*100, pp 1d6*10'], ['76-100', 'gp 2d6*100, pp 2d6*10']]],
+  ['b3', 'Individual treasure, CR 17+ (DMG)', [['1-15', 'ep 2d6*1000, gp 8d6*100'], ['16-55', 'gp 1d6*1000, pp 1d6*100'], ['56-100', 'gp 1d6*1000, pp 2d6*100']]],
+].map(([id, name, rows]) => ({ id, name, rows: rows.map(([w, s]) => ({ w, x: s.split(', ').map(e => { const [i, q] = e.split(' '); return { i, q }; }) })) }));
+/* a quantity like 3, 2d6 or 4d6*100 */
+function qty(expr) {
+  const s = String(expr == null || String(expr).trim() === '' ? 1 : expr).toLowerCase().replace(/(\d*)d(\d+)/g, (m, n, d) => rollExpr((n || 1) + 'd' + d).total).replace(/(\d)\s*[×x]\s*(\d)/g, '$1*$2').replace(/×/g, '*');
+  if (!/^[\d+\-*/() .]+$/.test(s)) return 1;
+  try { const v = calc(s); return isFinite(v) ? Math.max(0, Math.floor(v)) : 1; } catch (e) { return 1; }
+}
+/* a row's chance: its weight, or the width of its dice range (31-60 is 30), so a d100 table is just weights */
+const rowW = r => { const m = /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(String(r.w == null ? '' : r.w)); return m ? Math.max(0, +m[2] - +m[1] + 1) : Math.max(0, +r.w || 0); };
+function rollTable(t) {
+  const rows = t.rows.filter(r => rowW(r) > 0), tot = sum(rows.map(rowW)); if (!tot) return null;
+  const roll = rnd(tot); let at = roll, row = rows[rows.length - 1];
+  for (const r of rows) { if (at <= rowW(r)) { row = r; break; } at -= rowW(r); }
+  const lines = (row.x || [{ i: row.i, q: row.q }]).map(e => { const i = String(e.i || '').trim(), coin = COINS.includes(i.toLowerCase()); return { coin, i: coin ? i.toLowerCase() : i, name: i, n: qty(e.q) }; }).filter(l => l.i && l.n > 0);
+  return { table: t.name, die: tot, roll, lines };
+}
+const lineText = l => l.coin ? `${fmtN(l.n)} ${l.i}` : `${l.n > 1 ? l.n + ' × ' : ''}${l.name}`;
+/* put coins and items into one character's sheet (the DM may write any sheet); an item that isn't in that character's rules becomes a custom item */
+function giveLoot(x, lines) {
+  const ch = x.ch, R = registry(ch.ruleset); ch.money = Object.assign({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, ch.money);
+  for (const l of lines) {
+    if (l.coin) { ch.money[l.i] = (+ch.money[l.i] || 0) + l.n; continue; }
+    const d = R.items.get(l.i) || R.list('items').find(m => m.name.toLowerCase() === String(l.name || l.i).toLowerCase());
+    const ex = ch.inv.find(y => !!d ? (y.id === d.id && !y.custom) : (y.custom && y.custom.name === (l.name || l.i)));
+    if (ex) ex.q = qOf(ex) + l.n; else ch.inv.push(d ? { id: d.id, q: l.n, eq: false } : { id: uid('ci'), q: l.n, custom: { name: l.name || l.i, cat: 'gear', d: '' } });
+  }
+  saveChar(ch); queueRender();
+}
+const whoSel = id => `<select id="${id}" aria-label="Give to">${chars().map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('') || opt('', 'No characters')}</select>`;
+const whoPick = id => { const [o, c] = String(($('#' + id) || {}).value || '').split('|'); return findChar(c, o); };
+function prepLoot() {
+  const P = pp(), mine = prep().tables, all = LOOT_BUILTIN.concat(mine), t = all.find(x => x.id === P.tbl) || all[0], own = mine.some(x => x.id === t.id), r = P.res;
+  const roll = `<div class="panel stack"><div class="ph">Roll loot</div>
+    <div class="row"><select data-act="ppq" data-k="tbl" aria-label="Loot table">${all.map(x => opt(x.id, x.name, x.id === t.id)).join('')}</select><button class="btn pri" data-act="lootroll">Roll</button><button class="btn sm" data-act="ppnew" data-l="tables">New table</button></div>
+    ${r ? `<div class="todo-box stack" id="loot-res"><b>${esc(r.table)}: rolled ${r.roll} on d${r.die}</b><div id="loot-lines">${r.lines.map(l => `<div>${esc(lineText(l))}</div>`).join('') || 'Nothing.'}</div>
+      <div class="row"><label class="row" style="gap:6px">Give to ${whoSel('f-lwho')}</label><button class="btn sm pri" data-act="lootgive">Give to…</button><button class="btn sm" data-act="lootsplit">Split coins evenly</button></div>
+      ${P.note ? `<div class="small" id="loot-note">${esc(P.note)}</div>` : ''}</div>` : '<span class="small muted">Roll a table to see what turns up. Built-in tables are the DMG’s individual treasure by challenge rating (coins only).</span>'}</div>`;
+  const edit = own ? `<div class="panel stack"><div class="ph">${esc(t.name)}<span class="spacer"></span>${pdel('tables', t.id)}</div>
+    ${pfield('tables', t, 'name', 'Table name')}
+    <div class="small muted">Chance: a weight (3) or a dice range (31-60). Item: pick from the rules or type anything. Coins: cp, sp, ep, gp or pp. Quantity: a number or dice, e.g. 2d6 or 4d6*10.</div>
+    ${t.rows.map((x, i) => `<div class="row"><input type="text" id="f-tr-${i}-w" style="width:90px" data-act="tr" data-v="${esc(t.id)}" data-r="${i}" data-k="w" value="${esc(x.w)}" aria-label="Weight or dice range"><input type="text" id="f-tr-${i}-i" list="f-items" class="grow" data-act="tr" data-v="${esc(t.id)}" data-r="${i}" data-k="i" value="${esc(x.i)}" placeholder="Item or coin" aria-label="Item"><input type="text" id="f-tr-${i}-q" style="width:90px" data-act="tr" data-v="${esc(t.id)}" data-r="${i}" data-k="q" value="${esc(x.q)}" placeholder="1d4" aria-label="Quantity"><button class="btn ghost sm danger" data-act="trrm" data-v="${esc(t.id)}" data-r="${i}" aria-label="Remove row">${svgIcon('x', 16)}</button></div>`).join('')}
+    <datalist id="f-items">${registry(P.rs).list('items').map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
+    <div><button class="btn sm" data-act="tradd" data-v="${esc(t.id)}">Add row</button></div></div>` : '';
+  const gq = P.gq.trim().toLowerCase(), hits = gq.length >= 2 ? registry(P.rs).list('items').filter(i => i.name.toLowerCase().includes(gq)).slice(0, 12) : [];
+  const give = `<div class="panel stack"><div class="ph">Give an item<span class="spacer"></span>${rsSeg(P)}</div>
+    <div class="row"><input type="search" id="f-ppq-gq" data-act="ppq" data-k="gq" placeholder="Search items" value="${esc(P.gq)}" style="max-width:220px" aria-label="Search items"><label class="row" style="gap:6px">Give to ${whoSel('f-gwho')}</label><input type="number" id="f-gn" min="1" value="1" style="width:64px" aria-label="How many"></div>
+    ${hits.map(i => `<div class="row"><b class="grow">${esc(i.name)} <span class="small muted">${esc(i.cat === 'magic' ? i.rar || 'magic' : i.cat || '')}</span></b><button class="btn sm pri" data-act="giveitem" data-v="${esc(i.id)}">Give</button></div>`).join('') || (gq.length >= 2 ? '<div class="small muted">No items match.</div>' : '<div class="small muted">Search the rules’ items and hand one straight to a character, no coins taken.</div>')}</div>`;
+  return `<div class="grid2" style="align-items:start"><div class="stack">${roll}${edit}</div><div class="stack">${give}</div></div>`;
+}
+/* what players see on the Party tab: only what the DM published in campaign/story */
+function storyPanel() {
+  const s = S.story || {}, people = s.people || [], quests = s.quests || [], ses = s.session, ST = { rumour: 'Rumour', active: 'Active', done: 'Done', failed: 'Failed' };
+  if (!people.length && !quests.length && !ses) return '';
+  return `<div class="panel stack" style="margin-bottom:12px" id="story"><div class="ph">The story so far</div>
+    ${ses ? `<div class="stack"><span class="lbl">Last session${ses.date ? ' · ' + esc(ses.date) : ''}${ses.title ? ': ' + esc(ses.title) : ''}</span><div class="rt small">${md(ses.summary)}</div></div>` : ''}
+    ${quests.length ? `<div class="stack"><span class="lbl">Quests</span>${quests.map(q => `<div class="stack"><div class="row"><b>${esc(q.t)}</b><span class="pill${q.status === 'active' ? ' acc' : q.status === 'failed' ? ' bad' : ''}">${esc(ST[q.status] || q.status)}</span>${q.giver ? `<span class="small muted">from ${esc(q.giver)}</span>` : ''}</div>${(q.objs || []).map(o => `<label class="chk small"><input type="checkbox" disabled${o.done ? ' checked' : ''}> ${o.done ? '<s>' + esc(o.t) + '</s>' : esc(o.t)}</label>`).join('')}${q.reward ? `<div class="small muted">Reward: ${esc(q.reward)}</div>` : ''}</div>`).join('')}</div>` : ''}
+    ${people.length ? `<div class="stack"><span class="lbl">People</span>${people.map(n => `<div><b>${esc(n.name)}</b>${n.role ? ` <span class="small muted">${esc(n.role)}</span>` : ''}${n.d ? `<div class="small">${esc(n.d)}</div>` : ''}</div>`).join('')}</div>` : ''}</div>`;
+}
+const qUpd = (id, fn) => savePrep({ quests: prep().quests.map(q => q.id === id ? fn(Object.assign({}, q)) : q) });
+Object.assign(ACT, {
+  pptab(el) { pp().t = el.dataset.v; queueRender(); },
+  pprs(el) { pp().rs = el.dataset.v; queueRender(); },
+  ppq(el) { const P = pp(), k = el.dataset.k; if (k === 'tbl' && P.tbl !== el.value) { P.res = null; P.note = ''; } P[k] = el.value; queueRender(); },
+  ppsel(el) { pp()[el.dataset.k] = el.dataset.v; queueRender(); },
+  /* edit one field of one entry in prep().<list> */
+  pf(el) { const l = el.dataset.l, id = el.dataset.v; savePrep({ [l]: prep()[l].map(x => x.id === id ? Object.assign({}, x, { [el.dataset.k]: el.type === 'checkbox' ? el.checked : el.value }) : x) }); queueRender(); },
+  ppnew(el) {
+    const l = el.dataset.l, id = uid(l[0]);
+    const o = { npcs: { name: 'New NPC', role: '', loc: '', d: '', sec: '', notes: '', mon: '', known: false }, quests: { t: 'New quest', giver: '', status: 'active', objs: [], reward: '', notes: '', vis: false },
+      tables: { name: 'New table', rows: [{ w: '1', i: 'gp', q: '1d6' }] } }[l];
+    savePrep({ [l]: prep()[l].concat([Object.assign({ id }, o)]) });
+    if (l === 'tables') pp().tbl = id; else pp()[l === 'npcs' ? 'npc' : 'quest'] = id;
+    queueRender();
+  },
+  ppdel(el) { const l = el.dataset.l, id = el.dataset.v; confirmBox('Delete this?', 'It is removed for good, and players stop seeing it.', 'Delete', () => { savePrep({ [l]: prep()[l].filter(x => x.id !== id) }); queueRender(); }, true); },
+  qo(el) { qUpd(el.dataset.v, q => Object.assign(q, { objs: q.objs.map((o, i) => i === +el.dataset.i ? Object.assign({}, o, { [el.dataset.k]: el.type === 'checkbox' ? el.checked : el.value }) : o) })); queueRender(); },
+  qorm(el) { qUpd(el.dataset.v, q => Object.assign(q, { objs: q.objs.filter((o, i) => i !== +el.dataset.i) })); queueRender(); },
+  qoadd(el) { const nb = $('#f-qonew'), t = (nb.value || '').trim(); if (!t) return; qUpd(el.dataset.v, q => Object.assign(q, { objs: (q.objs || []).concat([{ t, done: false }]) })); queueRender(); },
+  sessnew() { const all = prep().sessions, s = { id: uid('s'), date: todayStr(), title: 'Session ' + (all.length + 1), summary: '', notes: '' }; savePrep({ sessions: [s].concat(all) }); pp().sess = s.id; queueRender(); },
+  sessshare(el) { savePrep({ share: prep().share === el.dataset.v ? '' : el.dataset.v }); queueRender(); },
+  /* encounter builder */
+  ebadd(el) { const P = pp(), g = P.eb.find(x => x.mid === el.dataset.v && x.rs === P.rs); if (g) g.n = Math.min(30, g.n + 1); else P.eb.push({ mid: el.dataset.v, rs: P.rs, n: 1 }); queueRender(); },
+  ebn(el) { pp().eb[+el.dataset.i].n = clamp(Math.round(+el.value) || 1, 1, 30); queueRender(); },
+  ebrm(el) { pp().eb.splice(+el.dataset.i, 1); queueRender(); },
+  eblv(el) { pp().lv = el.value; queueRender(); },
+  ebsave() {
+    const list = ebList(); if (!list.length) return; const nb = $('#f-ebn');
+    const enc = (S.dm.enc || []).concat([{ id: uid('e'), name: (nb.value || '').trim() || 'Encounter ' + ((S.dm.enc || []).length + 1), list }]);
+    S.dm.enc = enc; saveDM({ enc }); toastMsg('Saved.'); queueRender();
+  },
+  ebedit(el) { const e = (S.dm.enc || []).find(x => x.id === el.dataset.v); if (!e) return; pp().eb = e.list.filter(g => g.mid && registry(g.rs || '2014').monsters.has(g.mid)).map(g => ({ mid: g.mid, rs: g.rs || '2014', n: g.n })); queueRender(); },
+  ebsend(el) {
+    const e = el.dataset.v ? (S.dm.enc || []).find(x => x.id === el.dataset.v) : { list: ebList() };
+    if (!e || !e.list.length) return; encAdd(e.list); toastMsg(`Sent ${sum(e.list.map(g => g.n))} monsters to Combat.`); queueRender();
+  },
+  ebdel(el) { const enc = (S.dm.enc || []).filter(x => x.id !== el.dataset.v); S.dm.enc = enc; saveDM({ enc }); queueRender(); },
+  /* loot */
+  tr(el) { const id = el.dataset.v; savePrep({ tables: prep().tables.map(t => t.id !== id ? t : Object.assign({}, t, { rows: t.rows.map((r, i) => i === +el.dataset.r ? Object.assign({}, r, { [el.dataset.k]: el.value }) : r) })) }); queueRender(); },
+  trrm(el) { const id = el.dataset.v; savePrep({ tables: prep().tables.map(t => t.id !== id ? t : Object.assign({}, t, { rows: t.rows.filter((r, i) => i !== +el.dataset.r) })) }); queueRender(); },
+  tradd(el) { const id = el.dataset.v; savePrep({ tables: prep().tables.map(t => t.id !== id ? t : Object.assign({}, t, { rows: t.rows.concat([{ w: '1', i: '', q: '1' }]) })) }); queueRender(); },
+  lootroll() {
+    const P = pp(), t = LOOT_BUILTIN.concat(prep().tables).find(x => x.id === P.tbl) || LOOT_BUILTIN[0];
+    P.res = rollTable(t); P.note = ''; if (!P.res) toastMsg('Give at least one row a weight first.'); queueRender();
+  },
+  lootgive() {
+    const P = pp(), x = whoPick('f-lwho'); if (!x || !P.res) return;
+    giveLoot(x, P.res.lines); P.note = `Gave ${P.res.lines.map(lineText).join(', ') || 'nothing'} to ${x.ch.name}.`; queueRender();
+  },
+  lootsplit() {
+    const P = pp(), xs = chars(), coins = P.res ? P.res.lines.filter(l => l.coin) : []; if (!xs.length || !coins.length) { toastMsg('There are no coins to split.'); return; }
+    const each = coins.map(l => Object.assign({}, l, { n: Math.floor(l.n / xs.length) })).filter(l => l.n > 0), left = coins.filter(l => l.n % xs.length);
+    for (const x of xs) giveLoot(x, each);
+    P.note = `Split ${xs.length} ways: ${each.map(lineText).join(', ') || 'nothing'} each.` + (left.length ? ` Left over: ${left.map(l => l.n % xs.length + ' ' + l.i).join(', ')}.` : '') + (P.res.lines.some(l => !l.coin) ? ' Items are not split: use Give to.' : '');
+    queueRender();
+  },
+  giveitem(el) {
+    const P = pp(), x = whoPick('f-gwho'), d = registry(P.rs).items.get(el.dataset.v); if (!x || !d) return;
+    const n = clamp(Math.round(+$('#f-gn').value) || 1, 1, 999); giveLoot(x, [{ i: d.id, name: d.name, n }]); toastMsg(`Gave ${n > 1 ? n + ' × ' : ''}${d.name} to ${x.ch.name}.`);
   },
 });
 
@@ -7625,7 +7901,7 @@ function bottomNav() {
   if (S.needCampaign || UI.view === 'table' || (UI.view === 'map' && typeof MAP !== 'undefined' && MAP.tv)) return '';
   const f = fightState(), hasMap = typeof viewMap === 'function';
   const main = [['chars', 'Sheet', 'sheet'], ['combat', 'Combat', 'swords'], hasMap ? ['map', 'Map', 'map'] : ['log', 'Dice', 'dice'], ['party', 'Party', 'party']].filter(m => !tabOff(m[0]));
-  const more = [['homebrew', 'Homebrew']].concat(hasMap ? [['log', 'Dice log']] : []).filter(m => !tabOff(m[0])).concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  const more = [['homebrew', 'Homebrew']].concat(hasMap ? [['log', 'Dice log']] : []).filter(m => !tabOff(m[0])).concat(isDMish() ? [['prep', 'Prep'], ['campaign', 'Campaign']] : []);
   const inMore = more.some(m => m[0] === UI.view);
   const cur = k => UI.view === k || (k === 'combat' && UI.view === 'init');
   return `<nav class="bnav" aria-label="Views" style="grid-template-columns:repeat(${main.length + (more.length ? 1 : 0)},minmax(0,1fr))">${main.map(([k, l, ic]) => `<button class="bn" data-act="view" data-v="${k}" aria-current="${cur(k)}">${b23Icon(ic, 22)}<span>${l}</span>${k === 'combat' && f.on ? `<i class="bdot${f.mine ? ' turn' : ''}" aria-hidden="true"></i><span class="sr-only">${f.mine ? ', your turn' : ', a fight is on'}</span>` : ''}</button>`).join('')}
