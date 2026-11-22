@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Party Ledger</title>
 <meta name="description" content="D&amp;D 5e and 5.5e character builder with a live party view for the DM.">
-<meta name="theme-color" content="#f3efe6" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0a0e19" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#e9dfc8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13100e" media="(prefers-color-scheme: dark)">
 <script>try { var t = JSON.parse(localStorage.getItem("pl.theme") || "\"\""); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) { }</script>
 <link rel="manifest" href="party-manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="party-icon-192.png">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+SC:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
@@ -43,49 +43,52 @@ img { max-width: 100%; }
 [hidden] { display: none !important; }
 /* Layout: sticky ledger bar on top; roster rail on the left, working sheet on the right; stacks to one column on phones. */
 :root {
-  /* Night Sky, light mode ("dawn"): paper the colour of first light, night-blue ink, sun gold */
-  --bg: #f3efe6;
-  --surface: #fffcf6;
-  --surface-2: #ebe5d8;
-  --line: #d3c9b5;
-  --field: #8a8170;
-  --ink: #141a2e;
-  --ink-2: #4f5568;
-  --accent: #1e2b52;
-  --accent-soft: #dfe3ef;
-  --accent-ink: #f8e7b8;
-  --brass: #7a5a10;
-  --danger: #a8322b;
+  /* Arcane tome, light mode: aged parchment, iron-gall ink, dark gold, crimson rubrics */
+  --bg: #e9dfc8;
+  --surface: #f3ead6;
+  --surface-2: #e4d8bd;
+  --line: #bca98a;
+  --field: #8a765a;
+  --ink: #2a2118;
+  --ink-2: #5b4b3a;
+  --accent: #755412;
+  --accent-soft: #e6d6a8;
+  --accent-ink: #f8efd8;
+  --brass: #6e4f0e;
+  --danger: #9c2f27;
+  --crimson: #9c2f27;
   --on-danger: #ffffff;
-  --good: #2a6b3c;
+  --good: #2f6b55;
   --warn: #8a560c;
-  --sun: #b98512;
-  --moon: #5d6b8c;
-  --shadow: 0 1px 0 rgba(20, 26, 46, .05), 0 12px 26px -16px rgba(20, 26, 46, .4);
-  --f-display: "Cormorant SC", "Palatino Linotype", Georgia, serif;
-  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
-  --f-label: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
-  --r: 8px;
-  --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #626876;
+  --sun: #a07818;
+  --moon: #6b5b46;
+  --glow: #f6eed9;
+  --rule: color-mix(in srgb, var(--line) 60%, transparent);
+  --shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5px var(--rule);
+  --f-display: "Alegreya SC", "Palatino Linotype", Georgia, serif;
+  --f-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --f-label: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --r: 3px;
+  --tst-crit: #e3bd62; --tst-fail: #ee8a7e; --ph: #6f604b;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a0e19; --surface: #11172a; --surface-2: #192038; --line: #29324e; --field: #5b6687; --ink: #eef0f7; --ink-2: #a9b0c6;
-    --accent: #f2c14e; --accent-soft: #2d2715; --accent-ink: #17120a; --brass: #f0b95c; --danger: #ff8579; --on-danger: #1b0d0b; --good: #84d79e; --warn: #f2a95e; --sun: #f2c14e; --moon: #c9d2ea; --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #8e95ab;
-    --shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 14px 30px -16px rgba(0, 0, 0, .8);
+    --bg: #13100e; --surface: #1c1814; --surface-2: #251f1a; --line: #3b3129; --field: #76675a; --ink: #ece2d0; --ink-2: #b2a38c;
+    --accent: #c9a24f; --accent-soft: #2e2514; --accent-ink: #17120a; --brass: #d6b36a; --danger: #e5766b; --crimson: #b3433a; --on-danger: #1b0d0b; --good: #6fb09b; --warn: #d9a04e; --sun: #c9a24f; --moon: #cdbfa6; --tst-crit: #e3bd62; --tst-fail: #ee8a7e; --ph: #9a8b76;
+    --glow: #2b2219;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --bg: #0a0e19; --surface: #11172a; --surface-2: #192038; --line: #29324e; --field: #5b6687; --ink: #eef0f7; --ink-2: #a9b0c6;
-    --accent: #f2c14e; --accent-soft: #2d2715; --accent-ink: #17120a; --brass: #f0b95c; --danger: #ff8579; --on-danger: #1b0d0b; --good: #84d79e; --warn: #f2a95e; --sun: #f2c14e; --moon: #c9d2ea; --tst-crit: #f2c14e; --tst-fail: #ff8a7e; --ph: #8e95ab;
-    --shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 14px 30px -16px rgba(0, 0, 0, .8);
+    --bg: #13100e; --surface: #1c1814; --surface-2: #251f1a; --line: #3b3129; --field: #76675a; --ink: #ece2d0; --ink-2: #b2a38c;
+    --accent: #c9a24f; --accent-soft: #2e2514; --accent-ink: #17120a; --brass: #d6b36a; --danger: #e5766b; --crimson: #b3433a; --on-danger: #1b0d0b; --good: #6fb09b; --warn: #d9a04e; --sun: #c9a24f; --moon: #cdbfa6; --tst-crit: #e3bd62; --tst-fail: #ee8a7e; --ph: #9a8b76;
+    --glow: #2b2219;
     color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 html, body { background: var(--bg); color: var(--ink); }
-body { font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+body { font-family: var(--f-body); font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
@@ -103,7 +106,7 @@ a { text-underline-offset: .18em; }
 .num { font-family: var(--f-label); font-variant-numeric: tabular-nums; }
 .lbl { font-family: var(--f-label); font-weight: 600; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .muted { color: var(--ink-2); }
-.small { font-size: 13px; }
+.small { font-size: 14px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .spacer { flex: 1; }
@@ -289,6 +292,7 @@ button.vital:hover { border-color: var(--accent); }
 .cond button { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 3px 11px; min-height: 28px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
 @media (pointer: coarse) { .cond button { min-height: 34px; } }
 .btn.exh { min-width: 28px; padding-inline: 6px; }
+.ph:has(.exh) { flex-wrap: wrap; row-gap: 8px; }
 .cond button[aria-pressed="true"] { background: var(--danger); border-color: var(--danger); color: #fff; }
 .crules { display: flex; flex-direction: column; gap: 6px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); border-radius: var(--r); padding: 8px 12px; font-size: 14px; }
 .crules p { margin: 0; max-width: 70ch; }
@@ -349,7 +353,7 @@ button.vital:hover { border-color: var(--accent); }
 .abgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 @media (max-width: 520px) { .abgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .abgrid input, .abgrid select { width: 100%; }
-.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 22px; text-align: center; color: var(--ink-2); }
+.drop { border: 2px dashed var(--line); border-radius: 4px; padding: 22px; text-align: center; color: var(--ink-2); }
 .drop.on { border-color: var(--accent); color: var(--accent); }
 .bar-prog { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
 .bar-prog > i { display: block; height: 100%; background: var(--accent); }
@@ -456,6 +460,8 @@ button.vital:hover { border-color: var(--accent); }
 .tok.movable { cursor: grab; }
 .tok.mon { background: #f3d2cf; border-color: #a33a34; color: #3a1210; }
 .tok.mine { background: #ffffff; }
+.tok.mark { border-radius: 22%; border-color: rgba(0,0,0,.6); color: #14110c; }
+.tok.mark .thp { display: none; }
 .tok.cur { box-shadow: 0 0 0 .14em #f4c95d, 0 .3em .7em rgba(0, 0, 0, .55); }
 .tok.sel { outline: .09em dashed #ffffff; outline-offset: .12em; }
 .tok:focus-visible { outline: max(2px, .1em) solid #ffffff; outline-offset: .14em; box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #16201c; }
@@ -483,55 +489,87 @@ button.vital:hover { border-color: var(--accent); }
 .maphelp { margin: 0; }
 .tvwrap { max-width: none; padding: 0; }
 
-/* ===== Build 15: Night Sky. Built from the campaign's own world (Legacy of the Gods): a night ground,
-   sun gold for what you act on and whose turn it is, moon silver for what is quiet. Dawn paper in light mode. ===== */
-body { background: radial-gradient(1100px 520px at 88% -8%, color-mix(in srgb, var(--sun) 9%, transparent), transparent 62%), var(--bg); background-attachment: fixed; }
-.bar { border-bottom-color: color-mix(in srgb, var(--sun) 32%, var(--line)); }
-.brand h1 { font-size: 26px; font-weight: 600; letter-spacing: .05em; }
-@media (max-width: 600px) { .brand h1 { font-size: 22px; } .brand:has(.lchip) .themebtn { display: none; } }
+/* ===== Build 24: dark arcane tome. Warm ink pages, gold leaf for what you act on, crimson for harm,
+   verdigris for what is well. Light mode is the same book in daylight: parchment and iron-gall ink. ===== */
+body { background: radial-gradient(ellipse 90% 65% at 50% 0%, var(--glow), transparent 72%), var(--bg); background-attachment: fixed; font-variant-numeric: lining-nums; }
+h1, h2 { font-family: var(--f-display); font-weight: 500; letter-spacing: .04em; }
+.bar { padding-block: 4px; border-bottom-color: color-mix(in srgb, var(--sun) 40%, var(--line)); }
+.bar-in { gap: 10px 14px; }
+.brand h1 { font-size: 24px; font-weight: 700; letter-spacing: .07em; color: var(--accent); }
+@media (max-width: 600px) { .brand h1 { font-size: 21px; } .brand:has(.lchip) .themebtn { display: none; } }
 /* small phones: the DM / Player tag gives way so the brand row never wraps, even before the web fonts load */
 @media (max-width: 420px) { .brand > .pill { display: none; } }
-.tab { font-size: 16px; }
-.tab[aria-current="true"], .seg button[aria-pressed="true"], .btn[aria-pressed="true"], .secnav button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.panel { border-radius: 14px; box-shadow: var(--shadow); }
-.panel > h3, .ph { font-family: var(--f-display); font-weight: 600; font-size: 20px; letter-spacing: .05em; text-transform: none; color: var(--ink); }
-.ph .small, .panel > h3 .small, .ph .pill, .ph .seg { font-family: var(--f-body); }
+.sync { border-radius: 2px; padding: 1px 7px; font-size: 11.5px; letter-spacing: .08em; }
+.tab { font-family: var(--f-display); font-weight: 500; font-size: 16px; letter-spacing: .06em; border-radius: 0; padding: 6px 11px; color: var(--ink-2); }
+.tab:hover { background: none; color: var(--ink); }
+.tab[aria-current="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.seg button[aria-pressed="true"], .btn[aria-pressed="true"], .secnav button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.lbl { font-size: 12.5px; letter-spacing: .1em; }
+.num, .ab .mod, .ab .score, .vital .v, .hpnum, .stat .v, .irow .iv, .lg .tot, .crow .ini, .tst .big, .ln .b, .roll { font-variant-numeric: lining-nums tabular-nums; }
+
+/* panels: a book page, hairline plus a faint inner rule */
+.panel, .pc, .hp, .vital, .modal, .xpbox, .irow, .crow, .lg, .turnbar, .stat, .ab, .choice, .picked, .rowed, .empty, .note, .crules, .todo-box, .popmenu, .bmenu { border-radius: 4px; }
+.panel, .pc, .hp, .modal, .popmenu, .bmenu { box-shadow: var(--shadow); }
+.panel > h3, .ph { font-family: var(--f-display); font-weight: 500; font-size: 17px; letter-spacing: .08em; text-transform: none; color: var(--accent); padding-bottom: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.ph .small, .panel > h3 .small, .ph .pill, .ph .seg { font-family: var(--f-body); letter-spacing: 0; }
 .ph .seg button { font-family: var(--f-label); }
-.chead { border-bottom: 1px solid color-mix(in srgb, var(--sun) 55%, var(--line)); }
-.chead .cname { font-size: 40px; letter-spacing: .02em; }
-@media (max-width: 600px) { .chead .cname { font-size: 34px; } }
-.sigil { font-family: var(--f-display); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--moon) 35%, var(--surface)), var(--surface-2)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--moon) 40%, var(--line)); }
-.who[aria-current="true"] { border-color: color-mix(in srgb, var(--sun) 70%, var(--line)); }
-.vital, .hp, .modal { border-radius: 14px; }
-.ab { border-radius: 14px 14px 24px 24px; }
-.ab .score { background: var(--surface-2); border-color: color-mix(in srgb, var(--sun) 40%, var(--line)); }
-.hp { box-shadow: var(--shadow); }
-.hpnum { font-size: 40px; }
-.btn, .btn.sm, .roll.pri, .seg { border-radius: 99px; }
-.btn { padding-inline: 14px; }
-input[type=text], input[type=number], input[type=search], select, textarea { border-color: var(--field); }
-.cond button[aria-pressed="true"] { color: var(--on-danger); }
+.chead { border-bottom: 3px double var(--line); }
+.chead .cname { font-size: 34px; font-weight: 500; letter-spacing: .03em; }
+@media (max-width: 600px) { .chead .cname { font-size: 29px; } }
+.sigil { font-family: var(--f-display); background: var(--surface-2); color: var(--accent); border: 1px solid color-mix(in srgb, var(--sun) 55%, var(--line)); }
+.who { border-radius: 4px; }
+.who[aria-current="true"] { border-color: color-mix(in srgb, var(--sun) 70%, var(--line)); box-shadow: inset 3px 0 0 var(--accent); }
+.ab { background: var(--surface); }
+.ab .score { background: var(--surface-2); border-radius: 3px; border-color: color-mix(in srgb, var(--sun) 40%, var(--line)); }
+.hpnum { font-size: 38px; }
+.hpbar { border-radius: 2px; }
+.hpbar > i { border-radius: 2px; }
+.hpbar > i.low { background: var(--crimson); }
+.hp.down { border-color: var(--crimson); }
+
+/* buttons: gold leaf primary, outlined secondary, squarer pills */
+.btn { padding-inline: 14px; background: transparent; border-color: var(--field); }
+.btn:hover { border-color: var(--accent); background: var(--surface-2); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.pri:hover { background: var(--accent); filter: brightness(1.1); }
+.btn.ghost { border-color: transparent; }
+.btn.ghost:hover { background: var(--surface-2); border-color: transparent; }
+.btn.danger { border-color: color-mix(in srgb, var(--crimson) 70%, var(--field)); }
+.seg { border-color: var(--field); }
+.seg button { background: transparent; }
+.pill { border-radius: 2px; font-size: 12px; padding: 0 6px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
+.pill.bad { background: color-mix(in srgb, var(--crimson) 18%, var(--surface)); }
+.cond button { border-radius: 3px; }
+.cond button[aria-pressed="true"] { background: var(--crimson); border-color: var(--crimson); color: #fff; }
+.lchip, .secnav button, .roll, .tdot.mon { border-radius: 3px; }
+.roll.pri { border-radius: 3px; }
+input[type=text], input[type=number], input[type=search], select, textarea { background: var(--bg); border-color: var(--field); }
 .lchip.turn { border-color: var(--sun); background: color-mix(in srgb, var(--sun) 20%, var(--surface)); }
 .turnbar.on { border-color: var(--sun); background: color-mix(in srgb, var(--sun) 14%, var(--surface)); }
-.modal-bg { background: rgba(5, 8, 18, .62); }
-/* roll results are a night card in both modes, so a natural 20 always reads gold */
-.tst:not(.msg) { background: #0f1426; color: #eef0f7; border: 1px solid #2a3452; }
+.modal-bg { background: rgba(10, 7, 4, .72); }
+/* roll results are an ink-black card in both modes, so a natural 20 always reads gold */
+.tst:not(.msg) { background: #17120e; color: #ece2d0; border: 1px solid #3b3129; border-radius: 4px; box-shadow: none; }
+.tst.msg { border-radius: 4px; box-shadow: none; }
 .themebtn { padding: 4px 8px; }
-/* the map board keeps its night backdrop; tokens take the new colours */
-.mapmount { background: #0d1220; }
-.mapempty { color: #e6e9f2; }
-.mapempty .muted { color: #a9b0c6; }
-.tok { color: #141a2e; background: #eef1f8; border-color: #1e2b52; }
-.tok.mine { background: #fff6dc; border-color: #b98512; }
-.maphud, .maphint { background: #0f1426; color: #eef0f7; }
-.maphint .btn { background: #f2c14e; color: #17120a; }
-.tok:focus-visible { box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #0f1426; }
-.mapover .fogsel { fill: rgba(201, 210, 234, .18); stroke: #c9d2ea; }
+
+/* the map board keeps its dark backdrop in both themes */
+.mapmount { background: #14110e; border-radius: 4px; }
+.mapempty { color: #ece2d0; }
+.mapempty .muted { color: #b2a38c; }
+.tok { color: #1a140d; background: #ece2d0; border-color: #5a4a2c; }
+.tok.mine { background: #f3dfa8; border-color: #c9a24f; }
+.maphud, .maphint { background: #1c1814; color: #ece2d0; border-radius: 3px; }
+.maphint .btn { background: #c9a24f; color: #17120a; border-radius: 3px; }
+.tok:focus-visible { box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #1c1814; }
+.mapover .fogsel { fill: rgba(205, 191, 166, .18); stroke: #cdbfa6; }
+
+/* footer: the SRD credit, one small quiet line */
+footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color: var(--ink-2); border-top: 1px solid var(--line); margin-top: 8px; }
 /* Build 22: experience and the players' combat screen */
 @keyframes plflash { from { box-shadow: 0 0 0 3px var(--brass); } to { box-shadow: 0 0 0 0 transparent; } }
-.sheet.flash .vitals, .sheet.flash .hp { animation: plflash 2.4s ease-out; border-radius: 12px; }
+.sheet.flash .vitals, .sheet.flash .hp { animation: plflash 2.4s ease-out; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .sheet.flash .vitals, .sheet.flash .hp { animation: none; outline: 2px solid var(--brass); } }
-.xpbox { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.xpbox { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
 .xpbox.ready { border-color: var(--brass); }
 .xpbar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .xpbar i { display: block; height: 100%; background: var(--brass); }
@@ -592,16 +630,16 @@ input[type=text], input[type=number], input[type=search], select, textarea { bor
 .bnav, .chmorewrap { display: none; }
 .popbg { position: fixed; inset: 0; z-index: 24; background: transparent; }
 .chmorewrap { position: relative; }
-.popmenu, .bmenu { position: absolute; z-index: 26; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px -12px rgba(0, 0, 0, .55); }
+.popmenu, .bmenu { position: absolute; z-index: 26; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .6); }
 .popmenu { top: calc(100% + 6px); }
-.popmenu button, .bmenu button { min-height: 48px; text-align: left; padding: 0 14px; border: 0; background: none; border-radius: 10px; font-size: 16px; cursor: pointer; color: var(--ink); }
+.popmenu button, .bmenu button { min-height: 48px; text-align: left; padding: 0 14px; border: 0; background: none; border-radius: 3px; font-size: 16px; cursor: pointer; color: var(--ink); }
 .popmenu button:hover, .bmenu button:hover { background: var(--surface-2); }
 .popmenu button.danger { color: var(--danger); }
 .bmenu button[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
 .atkcan { display: none; }
 .pbar { display: none; }
 @media (max-width: 1100px) {
-  .pbar { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 8; display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-top: 12px; padding: 8px 12px; border-radius: 14px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--sun) 60%, var(--line)); box-shadow: 0 10px 26px -12px rgba(0, 0, 0, .55); }
+  .pbar { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 8; display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-top: 12px; padding: 8px 12px; border-radius: 4px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--sun) 60%, var(--line)); box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .6); }
   .pbar.turn { background: color-mix(in srgb, var(--sun) 16%, var(--surface)); }
 }
 @media (max-width: 700px) {
@@ -611,9 +649,9 @@ input[type=text], input[type=number], input[type=search], select, textarea { bor
   body:has(.bnav) .pbar { bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); }
   .bnav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; position: fixed; z-index: 31; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid color-mix(in srgb, var(--sun) 32%, var(--line)); box-shadow: 0 -8px 20px -14px rgba(0, 0, 0, .5);
     padding: 4px max(6px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px)); }
-  .bn { position: relative; width: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; border-radius: 12px; cursor: pointer; color: var(--ink-2); font-family: var(--f-label); font-weight: 600; font-size: 12.5px; letter-spacing: .03em; }
+  .bn { position: relative; width: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; border-radius: 3px; cursor: pointer; color: var(--ink-2); font-family: var(--f-display); font-weight: 500; font-size: 13.5px; letter-spacing: .04em; }
   .bn > span:not(.sr-only) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bn[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
+  .bn[aria-current="true"] { background: none; color: var(--accent); box-shadow: inset 0 2px 0 var(--accent); }
   .bn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .bdot { position: absolute; top: 6px; left: calc(50% + 9px); width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); box-shadow: 0 0 0 2px var(--surface); }
   .bdot.turn { background: var(--sun); }
@@ -2543,7 +2581,7 @@ function fselect(o) {
 function viewBar() {
   if (UI.view === 'table') return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Table display</span></div></div></header>`;
   if (UI.view === 'map' && MAP.tv) return `<header class="bar"><div class="bar-in"><div class="brand"><h1>Party Ledger</h1><span class="sync">Battle map · what players see</span></div><span class="spacer"></span><button class="btn sm" data-act="mapzoom" data-v="fit">Fit</button></div></header>`;
-  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  const tabs = [['chars', 'Characters'], ['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']].filter(([k]) => !tabOff(k)).concat(isDMish() ? [['campaign', 'Campaign']] : []);
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
@@ -2563,7 +2601,7 @@ function viewChars() {
     <div class="stack"><div class="lbl">Your characters</div><div class="roster">${mine.map(item).join('') || '<div class="small muted">None yet.</div>'}${e && !S.readOnly ? `<button class="who addnew" data-act="newopen"><span class="sigil">${svgIcon('plus', 16)}</span><span class="grow"><span class="nm">New character</span></span></button>` : ''}</div></div>
     ${S.mode === 'live' && others.length ? `<div class="stack"><div class="lbl">Rest of the party</div><div class="roster">${others.map(item).join('')}</div></div>` : ''}
     <div class="panel stack newpanel"><div class="lbl">New character</div>
-      <div class="seg" role="group" aria-label="Rules">${['2024', '2014'].map(r => `<button data-act="newrs" data-v="${r}"${pressed(UI.newRs === r)}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Rules">${['2024', '2014'].map(r => `<button data-act="newrs" data-v="${r}"${pressed(newRsEff() === r)}${dis(!rsAllowed(r))}${rsAllowed(r) ? '' : ` title="${esc(rsNote())}"`}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</button>`).join('')}</div>${rsNote() ? `<span class="small muted">${esc(rsNote())}</span>` : ''}
       <button class="btn pri" data-act="newchar"${dis(S.readOnly)}>Create character</button>
       <button class="btn" data-act="pastecode"${dis(S.readOnly)}>Paste a character code</button>
     </div>
@@ -2620,7 +2658,7 @@ function stepBasics0(ch, D, ro) {
   return `<div class="panel stack"><h3>Basics</h3>
     <div class="grid2">
       <label class="field"><span class="lbl">Name</span><input type="text" id="f-name2" data-in="name" value="${esc(ch.name)}"${dis(ro)}></label>
-      <div class="field"><span class="lbl">Rules</span><div class="seg">${['2024', '2014'].map(r => `<button data-act="setrs" data-v="${r}"${pressed(ch.ruleset === r)}${dis(ro)}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</button>`).join('')}</div></div>
+      <div class="field"><span class="lbl">Rules</span><div class="seg">${['2024', '2014'].map(r => `<button data-act="setrs" data-v="${r}"${pressed(ch.ruleset === r)}${dis(ro || !rsAllowed(r))}${rsAllowed(r) ? '' : ` title="${esc(rsNote())}"`}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</button>`).join('')}</div>${rsNote() ? `<span class="small muted">${esc(rsNote())}</span>` : ''}</div>
       <div class="field"><span class="lbl">Hit points per level</span><div class="seg">${[['avg', 'Fixed average'], ['roll', 'Rolled']].map(([k, l]) => `<button data-act="hpmode" data-v="${k}"${pressed(ch.hpMode === k)}${dis(ro)}>${l}</button>`).join('')}</div></div>
       <div class="field"><span class="lbl">Rule limits</span><div class="seg">${[['0', 'Enforced'], ['1', 'DM exceptions allowed']].map(([k, l]) => `<button data-act="free" data-v="${k}"${pressed(!!ch.free === (k === '1'))}${dis(ro || !bend)}>${l}</button>`).join('')}</div>
         <span class="small muted">${bend ? 'With exceptions on, limits on spells, feature choices, multiclassing and scores above 20 only warn.' : 'Only the DM can allow exceptions for this character.'}</span></div>
@@ -3108,13 +3146,13 @@ function sheetView(ch, D, ro, e) {
       <td><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="roll pri" data-act="attack" data-i="${i}">${sgn(a.atk)}</button>${a.two ? `<button class="roll" data-act="attack" data-i="${i}" data-g="two" title="Two-handed">2H</button>` : ''}${a.off ? `<button class="roll" data-act="attack" data-i="${i}" data-g="off" title="Off-hand attack (bonus action)">Off</button>` : ''}</span></td>
       <td>${a.flat ? `<span class="num">${esc(a.dmg)}</span>` : `<button class="roll" data-act="dmgroll" data-label="${esc(a.name)} damage" data-x="${esc(a.dmg)}" data-i="${i}">${esc(a.dmg)}</button>`} <span class="small muted">${esc(a.dt)}</span></td>
       <td class="small muted">${esc([a.props, a.range ? a.range + ' ft.' : ''].filter(Boolean).join(' · '))}${a.mastery ? `<div><button class="btn ghost sm" style="padding:0 4px;min-height:0;font-size:inherit" data-act="mastinfo" data-v="${esc(a.mastery)}" title="${esc(MASTERY_RULES[a.mastery] || '')}">Mastery: ${esc(a.mastery)}</button></div>` : a.mAvail ? `<div>${esc(a.mAvail)} mastery not chosen</div>` : ''}${am ? `<div class="${am.none || !(+am.it.q) ? 'warnline' : ''}">${am.none ? 'No ammunition in your gear' : esc(am.d.name) + ': ' + (+am.it.q || 0)}</div>` : ''}</td></tr>`; }).join('')}
-    </tbody></table></div><p class="small muted" style="margin-top:6px">The big button rolls to hit and damage together, doubling the dice on a critical hit. Equip weapons under Gear.</p></div>`;
+    </tbody></table></div></div>`;
   const res = (D.res.length || D.info.length) ? `<div class="panel stack"><h3>Class resources</h3>
     ${D.info.length ? `<div class="row small">${D.info.map(([k, v]) => `<span class="pill">${esc(k)}: <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
     ${D.res.map(r => { const u = +(p.res || {})[r.key] || 0; const left = Math.max(0, r.max - u); return `<div class="row"><span class="grow"><b>${esc(r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}" data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)} ${i + 1} of ${r.max}, ${i < left ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`}</div>`; }).join('')}
     ${ro ? '' : `<details data-k="resadd"><summary class="small" style="cursor:pointer">Track something else</summary><div class="row" style="margin-top:6px"><input type="text" id="f-crn" placeholder="Name (e.g. Superiority dice)"><input type="text" id="f-crm" placeholder="Max (e.g. 4 or proficiency)" style="width:170px"><select id="f-crr">${opt('short', 'Short rest')}${opt('long', 'Long rest')}</select><button class="btn sm" data-act="addres">Add</button></div>${(ch.customRes || []).map((r, i) => `<div class="row small" style="margin-top:4px"><span>${esc(r.n)} (${esc(r.max)})</span><button class="btn ghost sm danger" data-act="rmres" data-i="${i}">Remove</button></div>`).join('')}</details>`}
   </div>` : '';
-  const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm exh" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
+  const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px;flex-wrap:nowrap">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm exh" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
     <div class="cond">${CONDITIONS.map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>
     ${(p.cond || []).length || +p.exh ? `<div class="crules">${(p.cond || []).filter(c => COND_RULES[c]).map(c => `<p><b>${esc(c)}.</b> ${esc(COND_RULES[c])}</p>`).join('')}${+p.exh ? `<p><b>Exhaustion.</b> ${esc(exhRule(+p.exh, ch.ruleset).replace(/^Exhaustion \d+: /, ''))}</p>` : ''}</div>` : '<p class="small muted">Tap a condition to see what it does. Rolls change to match where the rules say so.</p>'}
     <label class="row small"><span class="lbl">Concentrating on</span><input type="text" id="f-conc" data-play="conc" value="${esc(p.conc || '')}" placeholder="Nothing" style="flex:1"${dis(ro)}></label></div>`;
@@ -3180,7 +3218,7 @@ function viewParty() {
   const list = chars();
   const isDM = isDMish();
   const tab = UI.partyTab === 'table' ? 'table' : 'cards';
-  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">The party</h2><div class="seg">${[['cards', 'Cards'], ['table', 'Cheat sheet']].map(([k, l]) => `<button data-act="ptab" data-v="${k}"${pressed(tab === k)}>${l}</button>`).join('')}</div><span class="spacer"></span>${advSeg()}${isDM ? `<button class="btn" data-act="pastecode">Add from a character code</button>` : ''}</div>`;
+  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">The party</h2><div class="seg">${[['cards', 'Cards'], ['table', 'Cheat sheet']].map(([k, l]) => `<button data-act="ptab" data-v="${k}"${pressed(tab === k)}>${l}</button>`).join('')}</div><span class="spacer"></span>${isDM ? `<button class="btn" data-act="pastecode">Add from a character code</button>` : ''}</div>`;
   const intro = S.mode !== 'live'
     ? `<div class="note" style="margin-bottom:12px">This page isn't connected to a shared campaign, so you only see characters made in this browser. ${window.PL_SITE ? 'Start a campaign with the button at the top and send your players the link.' : 'Open the published page in claude.ai and invite your players by email as Editors to see their sheets here.'} Players can also send you a character code.</div>`
     : S.me.isOwner ? '' : `<div class="note" style="margin-bottom:12px">Everyone in the campaign can see the party. Only the DM and each sheet's player can change it.</div>`;
@@ -4305,12 +4343,13 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 23</span></footer>`;
+const FOOTER = `<footer class="wrap">Rules text: System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder.</footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
   const app = document.getElementById('app');
   if (!app) return;
+  if (tabOff(UI.view)) UI.view = 'chars';   // a tab the DM has hidden from players (also when it came from ?v=)
   if (typeof mapBusy === 'function' && mapBusy()) { MAP.later = true; return; }
   const a = document.activeElement;
   const inApp = !!(a && app.contains(a));
@@ -4588,9 +4627,9 @@ const ACT = {
     UI.modal = { kind: 'hb', type: t, pack: UI.hb.pack, entry, isNew: true }; renderModal();
   },
   openfull(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; LS.set('cur', UI.cur); UI.view = 'chars'; UI.tab = 'sheet'; LS.set('view', 'chars'); queueRender(); window.scrollTo(0, 0); },
-  newrs(el) { UI.newRs = el.dataset.v; LS.set('rs', UI.newRs); queueRender(); },
+  newrs(el) { if (!rsAllowed(el.dataset.v)) { toastMsg(rsNote()); return; } UI.newRs = el.dataset.v; LS.set('rs', UI.newRs); queueRender(); },
   newchar() {
-    const ch = newChar(UI.newRs);
+    const ch = newChar(newRsEff());
     if (S.mode === 'live') ch._owner = S.me.id;
     saveChar(ch);
     UI.cur = { cid: ch.id, owner: S.me.id || 'local' }; LS.set('cur', UI.cur);
@@ -4598,6 +4637,7 @@ const ACT = {
     queueRender();
   },
   sample() {
+    if (!rsAllowed('2024')) { toastMsg(rsNote()); return; }
     const ch = newChar('2024');
     Object.assign(ch, {
       name: 'Wren Ashdown (example)', species: 'elf', sub: 'elven-lineage-wood-elf', bg: 'criminal', bgBonus: { dex: 2, con: 1 },
@@ -4640,7 +4680,19 @@ const ACT = {
   confirmok() { const fn = UI.modal && UI.modal.fn; closeModal(); if (fn) fn(); },
   closemodal() { closeModal(); },
   bgclose(el, ev) { if (ev.target === el) closeModal(); },
-  setrs(el) { const ch = C(); if (!ch || ch.ruleset === el.dataset.v) return; ch.ruleset = el.dataset.v; commit(ch); },
+  setrs(el) {
+    const ch = C(); if (!ch || ch.ruleset === el.dataset.v) return;
+    if (!rsAllowed(el.dataset.v)) { toastMsg(rsNote()); return; }
+    /* carry the inventory over: same id, else same name in the new edition, else keep it as a custom item so nothing is lost */
+    const R = registry(el.dataset.v), byName = new Map([...R.items.values()].map(i => [slug(i.name), i]));
+    ch.inv = (ch.inv || []).map(it => {
+      if (it.custom || R.items.has(it.id)) return it;
+      const d = itemDef(ch, it), m = d && byName.get(slug(d.name));
+      if (m) return Object.assign({}, it, { id: m.id });
+      return d ? Object.assign({}, it, { id: uid('ci'), custom: Object.assign({}, d) }) : it;
+    });
+    ch.ruleset = el.dataset.v; commit(ch);
+  },
   hpmode(el) { const ch = C(); ch.hpMode = el.dataset.v; commit(ch); },
   spab(el) { const ch = C(); const D = getD(ch); const a = el.dataset.v; if (ch.spBonus[a]) delete ch.spBonus[a]; else ch.spBonus[a] = (D.sp.abChoice || {}).amt || 1; commit(ch); },
   lang(el) { const ch = C(); toggleIn(ch, 'langs', el.dataset.v); commit(ch); },
@@ -5180,9 +5232,8 @@ function viewCombat() {
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
-      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button>${picks.length ? '' : '<span class="small muted">Tick rows above to use these.</span>'}<span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
-      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:150px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div>
-      <span class="small muted">Players get a Roll button on their screen. Monsters you selected roll by themselves. Damage is applied when each result comes in.</span></div>
+      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
+      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:150px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
     <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
       <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
@@ -5195,7 +5246,7 @@ function viewCombat() {
     ${reqs.length ? `<div class="panel stack"><div class="ph">Roll requests</div>${reqs.map(q => `<div><b class="small">${esc(q.label)}${q.dc ? ' · DC ' + q.dc : ''}</b><div class="row small">${(q.keys || []).map(k => { const a = q.answers[k]; const t = findTarget('pc|' + k); return `<span class="pill ${a ? (a.pass === false ? 'bad' : 'acc') : ''}">${esc(t ? t.name : '?')}: ${a ? a.total + (a.pass == null ? '' : a.pass ? ' ✓' : ' ✗') : 'waiting'}</span>`; }).join('')}</div></div>`).join('')}</div>` : ''}
     <div class="panel stack"><div class="ph">Dice<span class="spacer"></span>${advSeg()}</div>
       <div class="row">${['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'].map(d => `<button class="btn sm" data-act="quick" data-x="1${d}">${d}</button>`).join('')}<label class="chk small"><input type="checkbox" data-act="priv"${UI.priv ? ' checked' : ''}> roll privately</label></div>
-      <div class="log">${S.log.slice(0, 14).map(logRow).join('') || '<div class="small muted">Rolls show up here.</div>'}</div></div>
+      <div class="log">${S.log.slice(0, 14).map(logRow).join('')}</div></div>
   </div>`;
   return `<div class="run">${left}${right}</div>`;
 }
@@ -5613,6 +5664,12 @@ const playerBound = () => S.mode === 'live' && !S.me.isOwner;   // campaign rule
 function capLevel() { return playerBound() ? clamp(+(S.settings || {}).maxLevel || 20, 1, 20) : 20; }
 function methodAllowed(m) { const a = (S.settings || {}).methods; return !playerBound() || !Array.isArray(a) || !a.length || a.includes(m); }
 const buildLocked = () => playerBound() && !!(S.settings || {}).lock;
+/* what the DM lets players see and use: hidden tabs (settings.tabsOff), allowed edition (settings.rules), token lock (map meta) */
+const TAB_KEYS = [['party', 'Party'], ['combat', 'Combat'], ['map', 'Map'], ['homebrew', 'Homebrew'], ['log', 'Dice log']];
+const tabOff = k => playerBound() && ((S.settings || {}).tabsOff || []).includes(k);
+const rsAllowed = r => { const a = (S.settings || {}).rules; return !playerBound() || !a || a === 'both' || a === r; };
+const rsNote = () => { const a = (S.settings || {}).rules; return playerBound() && (a === '2014' || a === '2024') ? `The DM allows only ${a} rules at this table.` : ''; };
+const newRsEff = () => rsAllowed(UI.newRs) ? UI.newRs : (UI.newRs === '2024' ? '2014' : '2024');
 function viewCampaign() {
   if (!isDMish()) return `<div class="empty">Only the DM sees the campaign settings.</div>`;
   const st = S.settings || {}, live = S.mode === 'live';
@@ -5626,6 +5683,8 @@ function viewCampaign() {
       <label class="field"><span class="lbl">Level cap for players</span><input type="number" id="f-cap" min="1" max="20" data-act="setcap" value="${esc(st.maxLevel || 20)}"><span class="small muted">Players can't level past this. You can.</span></label>
       <div class="field"><span class="lbl">Character changes</span><div class="seg">${[['0', 'Open'], ['1', 'Locked']].map(([k, l]) => `<button data-act="setlock" data-v="${k}"${pressed(!!st.lock === (k === '1'))}>${l}</button>`).join('')}</div><span class="small muted">Locked: players can play from their sheet but not rebuild or level up.</span></div>
       <div class="field"><span class="lbl">Ability score methods players may use</span><div class="row">${ALL_METHODS.map(([k, l]) => `<label class="chk small"><input type="checkbox" data-act="setmethod" data-v="${k}"${methods.includes(k) ? ' checked' : ''}> ${l}</label>`).join('')}</div></div>
+      <div class="field"><span class="lbl">Tabs players see</span><div class="row">${TAB_KEYS.map(([k, l]) => `<label class="chk small"><input type="checkbox" data-act="settab" data-v="${k}"${(st.tabsOff || []).includes(k) ? '' : ' checked'}> ${l}</label>`).join('')}</div><span class="small muted">Characters is always shown. You always see every tab.</span></div>
+      <div class="field"><span class="lbl">Rules players may use</span><div class="seg">${[['both', 'Both'], ['2014', '2014 only'], ['2024', '2024 only']].map(([k, l]) => `<button data-act="setrules" data-v="${k}"${pressed((st.rules || 'both') === k)}>${l}</button>`).join('')}</div><span class="small muted">Players can't create or switch a character to another edition. Existing sheets stay as they are.</span></div>
       <label class="field"><span class="lbl">What players see of monster health</span><select data-act="sethp">${[['desc', 'A word: Healthy, Hurt, Bloodied, Critical'], ['none', 'Nothing'], ['exact', 'Exact numbers']].map(([k, l]) => opt(k, l, (st.showHp || 'desc') === k)).join('')}</select><span class="small muted">Monster AC is never shown to players.</span></label>
       <div class="field"><span class="lbl">Levelling</span><div class="seg">${[['xp', 'Experience points'], ['milestone', 'Milestones']].map(([k, l]) => `<button data-act="setadv" data-v="${k}"${pressed(advMode() === k)}>${l}</button>`).join('')}</div><span class="small muted">XP: sheets show progress and ending a fight hands out the monsters’ XP. Milestones: you level the party up from Party.</span></div>
     </div></div>`;
@@ -5650,6 +5709,8 @@ document.addEventListener('input', ev => {
 Object.assign(ACT, {
   setcap(el) { saveSettings({ maxLevel: clamp(Math.round(+el.value) || 20, 1, 20) }); queueRender(); },
   setlock(el) { saveSettings({ lock: el.dataset.v === '1' }); queueRender(); },
+  settab(el) { const off = new Set((S.settings || {}).tabsOff || []); if (el.checked) off.delete(el.dataset.v); else off.add(el.dataset.v); saveSettings({ tabsOff: Array.from(off) }); queueRender(); },
+  setrules(el) { saveSettings({ rules: el.dataset.v }); queueRender(); },
   sethp(el) { saveSettings({ showHp: el.value }); saveCombat(cbt()); queueRender(); },
   setmethod(el) {
     const st = S.settings || {}; const cur = new Set(Array.isArray(st.methods) && st.methods.length ? st.methods : ALL_METHODS.map(m => m[0]));
@@ -5814,10 +5875,24 @@ async function fbJoin(code, onChange) {
 function campaignLink() { return location.origin + location.pathname + '#' + (FB.code || ''); }
 
 /* ===== join screen & campaign menu ===== */
+/* campaigns this browser has opened before (written by fbJoin / campdm as pl.keep.<CODE>.meta) */
+function myCampaigns() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const m = (localStorage.key(i) || '').match(/^pl\.keep\.([A-Za-z0-9]+)\.meta$/); if (!m) continue;
+      const v = LS.get('keep.' + m[1] + '.meta', null);
+      if (v) out.push({ code: m[1], name: (v.data && v.data.name) || 'Campaign', isDM: !!v.isDM });
+    }
+  } catch (e) { }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
 function viewJoin() {
+  const mine = myCampaigns();
   return `<div style="max-width:760px;margin:24px auto" class="stack">
-    <div><h2 style="font-family:var(--f-display);font-size:30px">Join your table</h2><p class="muted">Your DM gives you a campaign code or link. No account needed: this browser remembers you.</p></div>
+    <div><h2 style="font-family:var(--f-display);font-size:30px">Your table</h2><p class="muted">Your DM gives you a campaign code or link. No account needed: this browser remembers you.</p></div>
     ${S.joinErr ? `<div class="errline">${esc(S.joinErr)}</div>` : ''}
+    ${mine.length ? `<div class="panel stack"><h3>Your campaigns</h3>${mine.map(c => `<div class="row"><b>${esc(c.name)}</b>${c.isDM ? '<span class="pill brass">DM</span>' : ''}<span class="small muted num">${esc(c.code)}</span><span class="spacer"></span><button class="btn pri" data-act="campopen" data-v="${esc(c.code)}">Open</button></div>`).join('')}</div>` : ''}
     <div class="grid2" style="align-items:start">
       <div class="panel stack"><h3>Join a campaign</h3>
         <label class="field"><span class="lbl">Campaign code</span><input type="text" id="f-jcode" placeholder="e.g. K7Q2MX" autocomplete="off" style="text-transform:uppercase" value="${esc(S.prefillCode || '')}"></label>
@@ -5829,6 +5904,11 @@ function viewJoin() {
         <label class="field"><span class="lbl">Your name</span><input type="text" id="f-cdm" value="${esc(LS.get('pname', ''))}"></label>
         <button class="btn" data-act="campstart">Start campaign</button></div>
     </div>
+    <div class="panel stack"><h3>Return as DM</h3>
+      <p class="small muted">Already running a campaign from another browser? Enter its code and your private DM key.</p>
+      <div class="grid2"><label class="field"><span class="lbl">Campaign code</span><input type="text" id="f-dcode" autocomplete="off" style="text-transform:uppercase"></label>
+        <label class="field"><span class="lbl">DM key</span><input type="text" id="f-djkey" autocomplete="off" placeholder="Your DM key"></label></div>
+      <button class="btn" data-act="campasdm" style="align-self:flex-start">Return as DM</button></div>
     <button class="btn ghost sm" style="align-self:flex-start" data-act="camplocal">Skip: just use this device</button>
   </div>`;
 }
@@ -5845,6 +5925,16 @@ function campModal() {
 }
 function fbSetupNote() {
   return `<div class="note" style="margin-bottom:12px">The campaign server isn't set up yet, so everything saves on this device only. Paste your Firebase settings into <b>firebase-config.js</b> next to this page to turn on the shared campaign.</div>`;
+}
+const dmKeyIn = v => String(v || '').replace(/\s+/g, '').toUpperCase();
+/* claim the DM seat in the current campaign (FB.code) with a key; returns '' on success, else a friendly error */
+async function dmClaim(k) {
+  try {
+    await fbSoon(FB.fs.doc(`campaigns/${FB.code}/dms/${FB.uid}`).set({ k }));
+    FB.isDM = true; FB.dmKey = k; S.me.isOwner = true; S.readOnly = false; subscribeDM(() => queueRender());
+    const c = Object.assign({}, S.campaign); delete c.code; LS.set('keep.' + FB.code + '.meta', { uid: FB.uid, data: c, isDM: true, k });
+    return '';
+  } catch (e) { return e && e.code === 'unavailable' ? 'No internet. Try again when you’re back online.' : 'That key doesn’t match this campaign.'; }
 }
 Object.assign(ACT, {
   async campjoin() {
@@ -5883,14 +5973,19 @@ Object.assign(ACT, {
     try { await S.db.doc('characters/' + FB.uid).update({ owner: FB.uid, player: nm }); toastMsg('Name saved.'); } catch (e) { toastMsg('Couldn’t save your name.'); }
   },
   async campdm() {
-    const k = ($('#f-dmkey').value || '').trim().toUpperCase();
+    const k = dmKeyIn($('#f-dmkey').value);
     if (!k) return;
-    try {
-      await fbSoon(FB.fs.doc(`campaigns/${FB.code}/dms/${FB.uid}`).set({ k }));
-      FB.isDM = true; FB.dmKey = k; S.me.isOwner = true; S.readOnly = false; subscribeDM(() => queueRender());
-      const c = Object.assign({}, S.campaign); delete c.code; LS.set('keep.' + FB.code + '.meta', { uid: FB.uid, data: c, isDM: true, k });
-      closeModal(); toastMsg('You’re the DM on this device now.'); queueRender();
-    } catch (e) { UI.modal.err = e && e.code === 'unavailable' ? 'No internet. Try again when you’re back online.' : 'That key doesn’t match this campaign.'; renderModal(); }
+    const err = await dmClaim(k);
+    if (err) { UI.modal.err = err; renderModal(); return; }
+    closeModal(); toastMsg('You’re the DM on this device now.'); queueRender();
+  },
+  async campopen(el) { await fbJoin(el.dataset.v, () => queueRender()); queueRender(); },
+  async campasdm() {
+    const code = ($('#f-dcode').value || '').trim().toUpperCase(), k = dmKeyIn($('#f-djkey').value);
+    if (!code || !k) { S.joinErr = 'Enter the campaign code and your DM key.'; queueRender(); return; }
+    if (!(await fbJoin(code, () => queueRender()))) { queueRender(); return; }
+    if (!FB.isDM) { const err = await dmClaim(k); toastMsg(err || 'You’re the DM on this device now.'); }
+    queueRender();
   },
   async install() {
     if (!PWA.prompt) return;
@@ -5921,15 +6016,7 @@ function pwaBoot() {
 }
 function installNote() {
   if (!window.PL_SITE || PWA.standalone) return '';
-  const ua = navigator.userAgent || '';
-  const ios = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-  let how;
-  if (PWA.prompt) how = `<button class="btn sm pri" data-act="install">Install Party Ledger</button>`;
-  else if (ios) how = `On iPhone or iPad: tap Share, then <b>Add to Home Screen</b>.`;
-  else if (/firefox/i.test(ua) && /android/i.test(ua)) how = `In Firefox on Android: open the menu, then <b>Install</b> or <b>Add to Home screen</b>.`;
-  else if (/firefox/i.test(ua)) how = `In Firefox on Windows: click the web app button in the address bar. Other browsers on a PC: open this page in Chrome or Edge and use the install icon in the address bar.`;
-  else how = `Use your browser’s menu and pick <b>Install</b> or <b>Add to Home screen</b>.`;
-  return `<details class="wrap small muted" data-k="install" style="padding-block:0 10px"><summary>Use it like an app</summary><div class="stack" style="margin-top:6px"><div>${how}</div><div>It gets its own icon and window, and opens without internet: your sheets from last time are shown, and changes are sent when you’re back online.${PWA.sw ? '' : ' Offline opening starts working after one more visit with internet.'}</div></div></details>`;
+  return PWA.prompt ? `<div class="wrap"><button class="btn sm pri" data-act="install">Install Party Ledger</button></div>` : '';
 }
 pwaBoot();
 
@@ -6196,10 +6283,14 @@ function mapTokens() {
     const hp = hpOf(ch, D);
     out.push({
       key: 'pc|' + x.owner + '|' + ch.id, kind: 'pc', name: ch.name || 'Adventurer', who: playerName(x.owner), pos: at(ch.play.pos), sz: 1,
-      canMove: !S.readOnly && (canAll || x.owner === S.me.id || S.mode !== 'live'), mine: x.mine,
+      canMove: !S.readOnly && (canAll || (!mapLocked() && (x.owner === S.me.id || S.mode !== 'live'))), mine: x.mine,
       cur: !!(curEntry && curEntry.kind === 'pc' && curEntry.cid === ch.id), pct: D.maxHp ? clamp(hp / D.maxHp * 100, 0, 100) : 100,
       down: hp <= 0, conds: ch.play.cond || [], hpText: hp + ' / ' + D.maxHp, ac: D.ac,
     });
+  }
+  for (const m of meta.marks || []) {
+    if (m.hidden && !dm) continue;
+    out.push({ key: 'mk|' + m.id, kind: 'mark', name: m.name, pos: at(m.pos), sz: 1, canMove: canAll, hidden: !!m.hidden, color: m.color, pct: 100, conds: [] });
   }
   if (isDMish()) {
     for (const c of cbt().list) {
@@ -6218,6 +6309,10 @@ function mapTokens() {
   }
   return out;
 }
+/* DM markers (NPC, door, trap, loot…) live in the map doc: meta.marks = [{ id, name, color, hidden, pos }] */
+const MARK_COLORS = [['Red', '#e7716c'], ['Gold', '#f4c95d'], ['Green', '#7fcf8f'], ['Blue', '#7fb4f0'], ['Purple', '#c39be8']];
+const mapLocked = () => playerBound() && !!(MAP.meta || {}).plock;   // DM switched off player token moves
+function mapMark(key, patch) { mapSaveMeta({ marks: (MAP.meta.marks || []).map(m => 'mk|' + m.id === key ? Object.assign({}, m, patch) : m) }, true); }
 function mapTok(key) { return mapTokens().find(t => t.key === key) || null; }
 function mapMove(t, x, y) {
   const meta = MAP.meta; if (!meta || !t || !t.canMove) return;
@@ -6226,6 +6321,7 @@ function mapMove(t, x, y) {
   if (t.kind === 'pc' || t.kind === 'pcoff') {
     const [, owner, cid] = t.key.split('|'); const x2 = findChar(cid, owner); if (!x2) return;
     savePlay(x2.ch, { pos });
+  } else if (t.kind === 'mark') { mapMark(t.key, { pos });
   } else {
     const cb = cbt(), c = cb.list.find(c => c.id === t.key); if (!c) return;
     c.pos = pos; saveCombat(cb);
@@ -6235,6 +6331,7 @@ function mapMove(t, x, y) {
 function mapOff(key) {
   const t = mapTok(key); if (!t || !t.canMove) return;
   if (t.kind === 'pc') { const [, owner, cid] = key.split('|'); const x = findChar(cid, owner); if (x) savePlay(x.ch, { pos: null }); }
+  else if (t.kind === 'mark') mapMark(key, { pos: null });
   else { const cb = cbt(), c = cb.list.find(c => c.id === key); if (c) { c.pos = null; saveCombat(cb); } }
   if (MAP.sel === key) MAP.sel = '';
   queueRender();
@@ -6377,7 +6474,7 @@ function mapDrawTokens() {
     const size = t.sz * G.cell, pad = G.cell * 0.06;
     if (!(MAP.g && MAP.g.key === t.key)) { d.style.left = (G.sx + t.pos.x * G.cell + pad) + 'px'; d.style.top = (G.sy + t.pos.y * G.cell + pad) + 'px'; }
     d.style.width = d.style.height = (size - pad * 2) + 'px';
-    d.style.fontSize = (G.cell * 0.36) + 'px';
+    d.style.fontSize = (G.cell * 0.36) + 'px'; d.style.background = t.color || '';
     d.style.borderWidth = Math.max(1.5, G.cell * 0.07) + 'px';
     d.querySelector('.tl').textContent = mapLabel(t.name);
     d.querySelector('.thp b').style.width = t.pct + '%';
@@ -6549,7 +6646,7 @@ document.addEventListener('keydown', e => {
 function viewMap() {
   mapBootLocal();
   const meta = MAP.meta, edit = mapCanEdit(), dm = mapIsDM(), tv = MAP.tv;
-  const mount = `<div id="mapmount" class="mapmount${tv ? ' tv' : ''}">${!meta ? `<div class="mapempty">${edit ? `<div class="stack" style="align-items:center;text-align:center;max-width:420px">${svgIcon('map', 40)}<h3>Put up a battle map</h3><p class="small muted">Drop a picture of your map here, or choose one. Players see it on their own screens, and each of them moves their own token.</p><label class="btn pri">Choose a map picture<input class="hidden-input" type="file" id="f-mapfile" accept="image/*"></label><span class="small muted">PNG, JPG or WebP. Big pictures are shrunk to 2400 pixels so everyone can load them.</span>${MAP.busy ? `<b class="small">${esc(MAP.busy)}</b>` : ''}</div>` : `<div class="stack" style="align-items:center;text-align:center;max-width:360px">${svgIcon('map', 40)}<h3>No map yet</h3><p class="small muted">Your DM hasn't put up a battle map. It appears here as soon as they do.</p></div>`}</div>` : !MAP.img ? `<div class="mapempty"><div class="stack" style="align-items:center"><div class="bar-prog" style="width:200px"><i style="width:55%"></i></div><span class="small muted">${esc(MAP.err && !MAP.loading ? MAP.err : 'Loading the map…')}</span></div></div>` : ''}</div>`;
+  const mount = `<div id="mapmount" class="mapmount${tv ? ' tv' : ''}">${!meta ? `<div class="mapempty">${edit ? `<div class="stack" style="align-items:center;text-align:center;max-width:420px">${svgIcon('map', 40)}<h3>Put up a battle map</h3><p class="small muted">Drop a picture of your map here, or choose one. Players see it on their own screens, and each of them moves their own token.</p><label class="btn pri">Choose a map picture<input class="hidden-input" type="file" id="f-mapfile" accept="image/*"></label>${MAP.busy ? `<b class="small">${esc(MAP.busy)}</b>` : ''}</div>` : `<div class="stack" style="align-items:center;text-align:center;max-width:360px">${svgIcon('map', 40)}<h3>No map yet</h3><p class="small muted">Your DM hasn't put up a battle map. It appears here as soon as they do.</p></div>`}</div>` : !MAP.img ? `<div class="mapempty"><div class="stack" style="align-items:center"><div class="bar-prog" style="width:200px"><i style="width:55%"></i></div><span class="small muted">${esc(MAP.err && !MAP.loading ? MAP.err : 'Loading the map…')}</span></div></div>` : ''}</div>`;
   if (tv) return mount;
   const I = S.init || { list: [] };
   const turnList = isDMish() ? cbt().list : (I.list || []);
@@ -6578,27 +6675,32 @@ function viewMap() {
       <div class="row"><button class="btn sm" data-act="mapdetect">Find the grid in the picture</button><span class="small muted">Or count the squares along the top edge and type that number, then nudge until the lines sit on the picture's lines. The grid is ${G.cols} × ${G.rows} squares.</span></div>
       <div class="row"><label class="chk"><input type="checkbox" data-act="mapgrid" data-k="lines"${meta.lines !== false ? ' checked' : ''}> Draw grid lines</label>
         <label class="chk"><input type="checkbox" data-act="mapgrid" data-k="fog"${meta.fog ? ' checked' : ''}> Fog of war</label></div>
+      <div class="row"><label class="chk"><input type="checkbox" data-act="maplock"${meta.plock ? '' : ' checked'}> Players can move their tokens</label></div>
+      <div class="stack"><div class="lbl">DM markers</div>
+        ${(meta.marks || []).map(m => `<div class="row"><span class="tdot mark" style="background:${esc(m.color)};border-color:rgba(0,0,0,.6);color:#14110c;border-radius:22%">${esc(mapLabel(m.name))}</span><span class="grow small">${esc(m.name)}${m.hidden ? ' <span class="muted">(hidden)</span>' : ''}</span><button class="btn ghost sm" data-act="markhide" data-v="${esc(m.id)}">${m.hidden ? 'Show' : 'Hide'}</button><button class="btn ghost sm danger" data-act="markdel" data-v="${esc(m.id)}" aria-label="Remove ${esc(m.name)}">Remove</button></div>`).join('')}
+        <div class="row"><input type="text" id="f-mark-name" maxlength="40" placeholder="NPC, door, trap, loot…" aria-label="Marker name" style="width:150px"><select id="f-mark-col" aria-label="Marker colour">${MARK_COLORS.map(([l, c]) => opt(c, l)).join('')}</select><label class="chk small"><input type="checkbox" id="f-mark-hid"> Hidden from players</label><button class="btn sm" data-act="markadd">Add marker</button></div>
+        <span class="small muted">A new marker waits under “Not on the map” until you place it. Hidden markers stay off players’ screens until you show them.</span></div>
       ${meta.fog ? `<div class="row"><button class="btn sm" data-act="mapfogall" data-v="1">Reveal everything</button><button class="btn sm" data-act="mapfogall" data-v="0">Cover everything</button><span class="small muted">Then use Reveal and Hide on the toolbar.</span></div>` : ''}
       <div class="row"><label class="btn sm">Replace the picture<input class="hidden-input" type="file" id="f-mapfile" accept="image/*"></label><button class="btn sm danger" data-act="mapclear">Take the map down</button>${MAP.busy ? `<b class="small">${esc(MAP.busy)}</b>` : ''}</div>
     </div></details>` : '';
   const turn = cur ? `<div class="panel stack mapturn"><div class="lbl">Round ${esc(round || 1)}</div><div class="row"><b class="grow">${esc(cur.name)}’s turn</b>${isDMish() ? `<button class="btn sm pri" data-act="cnext">Next turn</button>` : ''}</div></div>` : '';
   let info = '';
   if (sel) {
-    const amt = isDMish() ? `<div class="row"><input type="number" id="f-map-amt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="mapdmg">Damage</button><button class="btn sm" data-act="mapheal">Heal</button></div>` : '';
+    const amt = isDMish() && sel.kind !== 'mark' ? `<div class="row"><input type="number" id="f-map-amt" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="mapdmg">Damage</button><button class="btn sm" data-act="mapheal">Heal</button></div>` : '';
     const hp = sel.kind === 'pc' || isDMish() ? (sel.hpText ? `<span class="num"><b>${esc(sel.hpText)}</b> HP</span>` : '') : `<span>${esc(sel.st || '')}</span>`;
     info = `<div class="panel stack mapinfo"><div class="row"><b class="grow">${esc(sel.name)}</b>${sel.hidden ? '<span class="pill">hidden</span>' : ''}<button class="btn ghost sm" data-act="mapsel" data-v="" aria-label="Close">${svgIcon('x', 16)}</button></div>
       <div class="row small">${hp}${sel.ac != null && (sel.kind === 'pc' || isDMish()) ? `<span class="num">AC ${esc(sel.ac)}</span>` : ''}${sel.kind === 'pc' ? `<span class="muted">${esc(sel.who || '')}</span>` : ''}</div>
       ${sel.conds.length ? `<div class="row small">${sel.conds.map(c => `<span class="pill bad">${esc(c)}</span>`).join('')}</div>` : ''}
       ${amt}
-      <div class="row">${sel.canMove ? `<button class="btn sm" data-act="mapoff" data-v="${esc(sel.key)}">Take off the map</button>` : ''}${isDMish() && sel.kind === 'mon' ? `<button class="btn sm" data-act="chide" data-v="${esc(sel.key)}">${sel.hidden ? 'Show to players' : 'Hide from players'}</button>` : ''}</div>
+      <div class="row">${sel.canMove ? `<button class="btn sm" data-act="mapoff" data-v="${esc(sel.key)}">Take off the map</button>` : ''}${isDMish() && sel.kind === 'mon' ? `<button class="btn sm" data-act="chide" data-v="${esc(sel.key)}">${sel.hidden ? 'Show to players' : 'Hide from players'}</button>` : ''}${isDMish() && sel.kind === 'mark' ? `<button class="btn sm" data-act="markhide" data-v="${esc(sel.key.slice(3))}">${sel.hidden ? 'Show to players' : 'Hide from players'}</button><button class="btn sm danger" data-act="markdel" data-v="${esc(sel.key.slice(3))}">Remove marker</button>` : ''}</div>
       ${sel.canMove ? '<span class="small muted">Tap a square on the map to move it there, or use the arrow keys.</span>' : ''}</div>`;
   }
   const tray = meta ? `<div class="panel stack"><div class="lbl">Not on the map</div>
-      ${off.length ? off.map(t => `<div class="row"><span class="tdot ${t.kind}">${esc(mapLabel(t.name))}</span><span class="grow small">${esc(t.name)}${t.hidden ? ' <span class="muted">(hidden)</span>' : ''}</span><button class="btn sm${MAP.placing === t.key ? ' pri' : ''}" data-act="mapplace" data-v="${esc(t.key)}">${MAP.placing === t.key ? 'Tap the map' : 'Place'}</button></div>`).join('') : '<span class="small muted">Everyone is on the map.</span>'}
+      ${off.length ? off.map(t => `<div class="row"><span class="tdot ${t.kind}"${t.color ? ` style="background:${esc(t.color)};border-color:rgba(0,0,0,.6);color:#14110c;border-radius:22%"` : ''}>${esc(mapLabel(t.name))}</span><span class="grow small">${esc(t.name)}${t.hidden ? ' <span class="muted">(hidden)</span>' : ''}</span><button class="btn sm${MAP.placing === t.key ? ' pri' : ''}" data-act="mapplace" data-v="${esc(t.key)}">${MAP.placing === t.key ? 'Tap the map' : 'Place'}</button></div>`).join('') : '<span class="small muted">Everyone is on the map.</span>'}
       ${isDMish() && off.filter(t => t.kind === 'pc').length > 1 ? `<button class="btn sm" data-act="mapparty">Put the whole party in the middle</button>` : ''}
       ${isDMish() && !cbt().list.some(c => c.kind === 'mon') ? '<span class="small muted">Monsters come from the Combat tab. Add them there and they show up here.</span>' : ''}
     </div>` : '';
-  const help = meta ? `<p class="small muted maphelp">Drag the map to look around, scroll or pinch to zoom, double-click or double-tap to ping everyone. To move a token, drag it, or tap it and then tap a square. ${isDMish() ? 'You can move every token; players move their own.' : 'You can move your own character.'}</p>` : '';
+  const help = meta ? `<p class="small muted maphelp">Drag the map to look around, scroll or pinch to zoom, double-click or double-tap to ping everyone. To move a token, drag it, or tap it and then tap a square. ${isDMish() ? 'You can move every token; players move their own.' : mapLocked() ? 'Tokens locked by the DM.' : 'You can move your own character.'}</p>` : '';
   return `<div class="row" style="margin-bottom:10px"><h2 style="font-family:var(--f-display);font-size:26px">Battle map</h2>${isDMish() && window.PL_SITE && meta ? `<a class="btn sm ghost" href="?v=map&pv=1${location.hash}" target="_blank" rel="noopener">Open a TV view</a>` : ''}</div>
     ${bar}
     <div class="maplay"><div class="mapmain">${mount}${help}</div><aside class="maptray stack">${turn}${info}${tray}${settings}</aside></div>`;
@@ -6636,6 +6738,16 @@ Object.assign(ACT, {
     if (k === 'ft') v = clamp(Math.round(v), 1, 100);
     mapSaveMeta({ [k]: v });
   },
+  maplock(el) { mapSaveMeta({ plock: !el.checked }); },
+  markadd() {
+    const nm = ((document.getElementById('f-mark-name') || {}).value || '').trim().slice(0, 40);
+    if (!MAP.meta || !nm) { toastMsg('Give the marker a name first.'); return; }
+    const color = (document.getElementById('f-mark-col') || {}).value, hidden = !!(document.getElementById('f-mark-hid') || {}).checked;
+    document.getElementById('f-mark-name').value = '';
+    mapSaveMeta({ marks: (MAP.meta.marks || []).concat([{ id: uid('mk'), name: nm, color: MARK_COLORS.some(c => c[1] === color) ? color : MARK_COLORS[0][1], hidden, pos: null }]) });
+  },
+  markhide(el) { const m = (MAP.meta.marks || []).find(m => m.id === el.dataset.v); if (m) mapMark('mk|' + m.id, { hidden: !m.hidden }); },
+  markdel(el) { if (MAP.sel === 'mk|' + el.dataset.v) MAP.sel = ''; mapSaveMeta({ marks: (MAP.meta.marks || []).filter(m => m.id !== el.dataset.v) }); },
   mapdetect() { mapDetectNow(false); },
   mapfogall(el) {
     const G = mapGeom(); const arr = new Uint8Array(Math.ceil(G.cols * G.rows / 8));
@@ -6808,8 +6920,7 @@ function partyXpPanel() {
   const box = list.map(({ ch, owner }) => `<label class="chk small"><input type="checkbox" class="xpwho" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}" checked> ${esc(ch.name)}</label>`).join('');
   return `<div class="panel stack" style="margin-bottom:12px"><div class="ph">${mode === 'xp' ? 'Give experience' : 'Milestone levelling'}<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${[['xp', 'XP'], ['milestone', 'Milestones']].map(([k, l]) => `<button class="mini" data-act="setadv" data-v="${k}"${pressed(mode === k)}>${l}</button>`).join('')}</span></div>
     <div class="row">${box}</div>
-    ${mode === 'xp' ? `<div class="row"><input type="number" id="f-xpn" min="0" placeholder="XP" style="width:110px" aria-label="Experience points"><label class="chk small"><input type="checkbox" id="f-xpsplit" checked> split between them</label><input type="text" id="f-xpwhy" placeholder="What for (optional)" style="flex:1;min-width:160px" aria-label="Reason"><button class="btn pri sm" data-act="xpgive">Give XP</button></div>
-      <span class="small muted">Ending a fight on the Combat screen also offers the monsters' XP.</span>`
+    ${mode === 'xp' ? `<div class="row"><input type="number" id="f-xpn" min="0" placeholder="XP" style="width:110px" aria-label="Experience points"><label class="chk small"><input type="checkbox" id="f-xpsplit" checked> split between them</label><input type="text" id="f-xpwhy" placeholder="What for (optional)" style="flex:1;min-width:160px" aria-label="Reason"><button class="btn pri sm" data-act="xpgive">Give XP</button></div>`
     : `<div class="row"><button class="btn pri sm" data-act="xpmile">Level up the ticked characters</button><span class="small muted">Each one gets a Level up button on their sheet.</span></div>`}</div>`;
 }
 MODALS.xpend = () => {
@@ -6999,13 +7110,13 @@ function b23After() { try { const bar = document.querySelector('.bar'); if (bar)
 function bottomNav() {
   if (S.needCampaign || UI.view === 'table' || (UI.view === 'map' && typeof MAP !== 'undefined' && MAP.tv)) return '';
   const f = fightState(), hasMap = typeof viewMap === 'function';
-  const main = [['chars', 'Sheet', 'sheet'], ['combat', 'Combat', 'swords'], hasMap ? ['map', 'Map', 'map'] : ['log', 'Dice', 'dice'], ['party', 'Party', 'party']];
-  const more = [['homebrew', 'Homebrew']].concat(hasMap ? [['log', 'Dice log']] : []).concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  const main = [['chars', 'Sheet', 'sheet'], ['combat', 'Combat', 'swords'], hasMap ? ['map', 'Map', 'map'] : ['log', 'Dice', 'dice'], ['party', 'Party', 'party']].filter(m => !tabOff(m[0]));
+  const more = [['homebrew', 'Homebrew']].concat(hasMap ? [['log', 'Dice log']] : []).filter(m => !tabOff(m[0])).concat(isDMish() ? [['campaign', 'Campaign']] : []);
   const inMore = more.some(m => m[0] === UI.view);
   const cur = k => UI.view === k || (k === 'combat' && UI.view === 'init');
-  return `<nav class="bnav" aria-label="Views">${main.map(([k, l, ic]) => `<button class="bn" data-act="view" data-v="${k}" aria-current="${cur(k)}">${b23Icon(ic, 22)}<span>${l}</span>${k === 'combat' && f.on ? `<i class="bdot${f.mine ? ' turn' : ''}" aria-hidden="true"></i><span class="sr-only">${f.mine ? ', your turn' : ', a fight is on'}</span>` : ''}</button>`).join('')}
-    <div class="bmorewrap"><button class="bn" data-act="bmore" aria-expanded="${!!UI.bmore}" aria-current="${inMore}">${b23Icon('more', 22)}<span>${inMore ? esc((more.find(m => m[0] === UI.view) || [])[1] || 'More') : 'More'}</span></button>
-    ${UI.bmore ? `<div class="popbg" data-act="popclose"></div><div class="bmenu" aria-label="More views">${more.map(([k, l]) => `<button data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</div>` : ''}</div></nav>`;
+  return `<nav class="bnav" aria-label="Views" style="grid-template-columns:repeat(${main.length + (more.length ? 1 : 0)},minmax(0,1fr))">${main.map(([k, l, ic]) => `<button class="bn" data-act="view" data-v="${k}" aria-current="${cur(k)}">${b23Icon(ic, 22)}<span>${l}</span>${k === 'combat' && f.on ? `<i class="bdot${f.mine ? ' turn' : ''}" aria-hidden="true"></i><span class="sr-only">${f.mine ? ', your turn' : ', a fight is on'}</span>` : ''}</button>`).join('')}
+    ${more.length ? `<div class="bmorewrap"><button class="bn" data-act="bmore" aria-expanded="${!!UI.bmore}" aria-current="${inMore}">${b23Icon('more', 22)}<span>${inMore ? esc((more.find(m => m[0] === UI.view) || [])[1] || 'More') : 'More'}</span></button>
+    ${UI.bmore ? `<div class="popbg" data-act="popclose"></div><div class="bmenu" aria-label="More views">${more.map(([k, l]) => `<button data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</div>` : ''}</div>` : ''}</nav>`;
 }
 function pturnBar(actingMine, list) {
   const t = UI.tgt ? list.find(c => c.id === UI.tgt) : null;
