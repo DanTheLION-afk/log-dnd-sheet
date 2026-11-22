@@ -2248,9 +2248,11 @@ const IDB = {
 };
 
 /* --- packs: parts (<=200KB each) grouped into packs --- */
+/* part keys: `<pack>~<type>~001` (one run of parts per type, so adding to one type rewrites only that type's last part); older packs have `<pack>~<n>` */
+const partRank = k => { const m = /~([a-z]+)~(\d+)$/.exec(k || ''), o = /~(\d+)$/.exec(k || ''); return m ? [1 + TYPES.indexOf(m[1]), +m[2]] : [0, o ? +o[1] : 0]; };
 function partsToPacks(parts, shared) {
   const by = new Map();
-  for (const p of parts) {
+  for (const p of parts.slice().sort((a, b) => { const x = partRank(a._key), y = partRank(b._key); return x[0] - y[0] || x[1] - y[1]; })) {
     if (!p || !p.pack) continue;
     const id = p.pack.id;
     if (!by.has(id)) by.set(id, { id, name: p.pack.name, ruleset: p.pack.ruleset || 'any', shared, origin: p.pack.origin || '', entries: {}, parts: [] });
@@ -2263,21 +2265,27 @@ function partsToPacks(parts, shared) {
 function refreshPacks() {
   bumpPacks([...partsToPacks(S.localParts, false), ...partsToPacks(S.sharedParts, true)]);
 }
+/* parts hold one type each; parts.keys[i] is the key of parts[i] */
 function splitIntoParts(pack, entries) {
-  const parts = []; let cur = null; let size = 0;
-  const start = () => { cur = { pack: { id: pack.id, name: pack.name, ruleset: pack.ruleset, origin: pack.origin || '' }, entries: {} }; size = 200; parts.push(cur); };
-  start();
-  for (const t of TYPES) for (const e of entries[t] || []) {
-    const s = JSON.stringify(e).length + 2;
-    if (size + s > 190000 && size > 200) start();
-    (cur.entries[t] = cur.entries[t] || []).push(e); size += s;
+  const parts = []; parts.keys = []; let cur = null; let size = 0;
+  for (const t of TYPES) {
+    let n = 0;
+    const start = () => { cur = { pack: { id: pack.id, name: pack.name, ruleset: pack.ruleset, origin: pack.origin || '' }, entries: {} }; size = 200; parts.push(cur); parts.keys.push(`${pack.id}~${t}~${String(n++).padStart(3, '0')}`); };
+    if (!(entries[t] || []).length) continue;
+    start();
+    for (const e of entries[t]) {
+      const s = JSON.stringify(e).length + 2;
+      if (size + s > 190000 && size > 200) start();
+      (cur.entries[t] = cur.entries[t] || []).push(e); size += s;
+    }
   }
+  if (!parts.length) { parts.push({ pack: { id: pack.id, name: pack.name, ruleset: pack.ruleset, origin: pack.origin || '' }, entries: {} }); parts.keys.push(`${pack.id}~${TYPES[0]}~000`); }   // an empty pack keeps one part so it still exists
   return parts;
 }
 async function savePack(pack, entries, shared, onProgress) {
   const parts = splitIntoParts(pack, entries);
   const old = (shared ? S.sharedParts : S.localParts).filter(p => p.pack && p.pack.id === pack.id).map(p => p._key);
-  const keys = parts.map((_, i) => pack.id + '~' + i);
+  const keys = parts.keys;
   const have = new Map((shared ? S.sharedParts : S.localParts).filter(p => p.pack && p.pack.id === pack.id).map(p => [p._key, p]));
   for (let i = 0; i < parts.length; i++) {
     const body = parts[i];
@@ -3793,17 +3801,25 @@ function hbModal() {
     ${m.err ? `<div class="errline">${esc(m.err)}</div>` : ''}
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button>${can ? `<button class="btn pri" data-act="hbsave">Save</button>` : ''}</div></div>`;
 }
-async function hbCommit(pack, mutate) {
+/* ui (optional): { progress(i, n), error(text) } so the open pop-up can show "Saving… 3 of 12" and a failure */
+async function hbCommit(pack, mutate, ui) {
   const entries = clone(pack.entries || {});
   mutate(entries);
   try {
-    await savePack({ id: pack.id, name: pack.name, ruleset: pack.ruleset, origin: pack.origin }, entries, pack.shared);
+    await savePack({ id: pack.id, name: pack.name, ruleset: pack.ruleset, origin: pack.origin }, entries, pack.shared, ui && ui.progress);
     if (pack.shared) { pack.entries = entries; }
     return true;
   } catch (e) {
-    toastMsg(e && e.code === 'quota_exceeded' ? 'Campaign storage is full. Keep this pack on your device instead, or delete unused packs.' : 'Couldn’t save the pack: ' + ((e && e.message) || e));
+    const msg = e && e.code === 'quota_exceeded' ? 'Campaign storage is full. Keep this pack on your device instead, or delete unused packs.' : 'Couldn’t save the pack: ' + ((e && e.message) || e);
+    toastMsg(msg); if (ui && ui.error) ui.error(msg);
     return false;
   }
+}
+/* the pop-up's main button shows the progress and stays disabled until the save ends; a failure goes in the pop-up's red line */
+function hbSaving(m) {
+  const btn = () => document.querySelector('#modal [data-act="hbsave"], #modal [data-act="confirmok"]'), show = t => { const b = btn(); if (b) { b.disabled = true; b.textContent = t; } };
+  m.busy = true; m.err = ''; show('Saving…');
+  return { progress: (i, n) => show(`Saving… ${i} of ${n}`), error: msg => { m.busy = false; m.err = msg; renderModal(); } };
 }
 
 /* ===== import ===== */
@@ -4738,7 +4754,7 @@ function renderModal() {
   else if (UI.modal.kind === 'text') inner = textModal();
   else if (UI.modal.kind === 'camp' && typeof campModal === 'function') inner = campModal();
   else if (MODALS[UI.modal.kind]) inner = MODALS[UI.modal.kind]();
-  else if (UI.modal.kind === 'confirm') inner = `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(UI.modal.title)}</h2><p>${esc(UI.modal.body)}</p><div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri ${UI.modal.danger ? 'danger' : ''}" data-act="confirmok">${esc(UI.modal.ok || 'OK')}</button></div></div>`;
+  else if (UI.modal.kind === 'confirm') inner = `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(UI.modal.title)}</h2><p>${esc(UI.modal.body)}</p>${UI.modal.err ? `<div class="errline">${esc(UI.modal.err)}</div>` : ''}<div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri ${UI.modal.danger ? 'danger' : ''}" data-act="confirmok">${esc(UI.modal.ok || 'OK')}</button></div></div>`;
   const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('#modal') ? focusKey(document.activeElement) : null;
   host.innerHTML = `<div class="modal-bg" data-act="bgclose">${inner}</div>`;
   { const dlg = host.querySelector('.modal'); if (dlg) { dlg.setAttribute('tabindex', '-1'); if (!dlg.getAttribute('aria-label') && !dlg.getAttribute('aria-labelledby')) { const h = dlg.querySelector('h2'); if (h) { h.id = h.id || 'dlg-title'; dlg.setAttribute('aria-labelledby', h.id); } }
@@ -5010,7 +5026,7 @@ const ACT = {
     if (!(await saveFile(slug(ch.name) + '.json', text))) openModal({ kind: 'text', title: 'Character JSON', html: '<p>Saving files isn’t available here. Copy this text into a .json file instead.</p>', text, readonly: true, tall: true });
   },
   delchar() { const e = E(); if (!e) return; confirmBox('Delete ' + e.ch.name + '?', 'This removes the character' + (S.mode === 'live' ? ' from the campaign for everyone.' : ' from this browser.') + ' Copy its code first if you might want it back.', 'Delete', () => { deleteChar(e.ch); UI.cur = null; LS.set('cur', null); queueRender(); }, true); },
-  confirmok() { const fn = UI.modal && UI.modal.fn; closeModal(); if (fn) fn(); },
+  confirmok() { const m = UI.modal, fn = m && m.fn; if (m && m.busy) return; if (!(m && m.keep)) closeModal(); if (fn) fn(m && m.keep ? m : undefined); },
   closemodal() { closeModal(); },
   bgclose(el, ev) { if (ev.target === el) closeModal(); },
   setrs(el) {
@@ -5116,23 +5132,24 @@ const ACT = {
   hbrowadd(el) { const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); const arr = getP(m.entry, el.dataset.p) || []; arr.push({}); setP(m.entry, el.dataset.p, arr); renderModal(); },
   hbrowrm(el) { const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); const arr = getP(m.entry, el.dataset.p) || []; arr.splice(+el.dataset.i, 1); setP(m.entry, el.dataset.p, arr); renderModal(); },
   async hbsave() {
-    const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); if (!p) return;
-    let x = readForm(m.type, p.ruleset || 'any', m.entry);
+    const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); if (!p || m.busy) return;
+    let x = readForm(m.type, p.ruleset || 'any', m.entry); const raw = x;
     if (!x.name) { m.entry = x; m.err = 'Give it a name.'; renderModal(); return; }
     if (m.type === 'subspecies' && !x.of) { m.entry = x; m.err = 'Pick the species it belongs to.'; renderModal(); return; }
     if (m.type === 'subclasses' && !x.cls) { m.entry = x; m.err = 'Pick the class it belongs to.'; renderModal(); return; }
     x = hbEntryFromForm(m.type, x);
-    const t = m.type;
+    const t = m.type; m.entry = raw; m.err = '';   // kept so a failed save redraws the form as typed
     const ok = await hbCommit(p, entries => {
       const list = entries[t] = entries[t] || [];
       if (m.isNew) { let id = slug(x.name); const taken = new Set([...list.map(e => e.id), ...((SRD[p.ruleset === 'any' ? '2024' : p.ruleset] || {})[t] || []).map(e => e.id)]); let n = 2; const base = id; while (taken.has(id)) id = base + '-' + n++; x.id = id; list.push(x); }
       else { const i = list.findIndex(e => e.id === m.id); x.id = m.id; if (i >= 0) list[i] = x; else list.push(x); }
-    });
+    }, hbSaving(m));
     if (ok) { closeModal(); toastMsg('Saved ' + x.name); queueRender(); }
   },
   hbdel(el) {
     const p = PACKS.find(x => x.id === UI.hb.pack); const t = UI.hb.type; const e = ((p.entries || {})[t] || []).find(x => x.id === el.dataset.v);
-    confirmBox('Delete ' + (e ? e.name : 'entry') + '?', 'Characters that use it will show it as missing, unless they carry their own copy.', 'Delete', async () => { await hbCommit(p, entries => { entries[t] = (entries[t] || []).filter(x => x.id !== el.dataset.v); }); queueRender(); }, true);
+    confirmBox('Delete ' + (e ? e.name : 'entry') + '?', 'Characters that use it will show it as missing, unless they carry their own copy.', 'Delete', async m => { if (await hbCommit(p, entries => { entries[t] = (entries[t] || []).filter(x => x.id !== el.dataset.v); }, hbSaving(m))) closeModal(); queueRender(); }, true);
+    UI.modal.keep = true;   // stay open while it saves, to show progress and any error
   },
   hbdelpack() { const p = PACKS.find(x => x.id === UI.hb.pack); if (!p) return; confirmBox('Delete ' + p.name + '?', p.shared ? 'This removes the pack for the whole party.' : 'This removes the pack from this device.', 'Delete pack', async () => { try { await deletePack(p); } catch (e) { toastMsg('Couldn’t delete: ' + ((e && e.message) || e)); } UI.hb.pack = null; queueRender(); }, true); },
   async hbexport() {
@@ -5165,7 +5182,7 @@ const ACT = {
         const pack = { id: old ? old.id : uid('p'), name: m.name, ruleset: m.rs, origin: r.aurora ? 'Aurora import' : 'JSON import' };
         await savePack(pack, r.entries, shared, (i, n) => { m.progress = i / n; renderModal(); });
         if (shared && old) S.sharedParts = S.sharedParts.filter(p => !(p.pack && p.pack.id === pack.id));
-        if (shared) { S.sharedParts = S.sharedParts.concat(splitIntoParts(pack, r.entries).map((p, i) => Object.assign({ _key: pack.id + '~' + i }, p))); refreshPacks(); }
+        if (shared) { const sp = splitIntoParts(pack, r.entries); S.sharedParts = S.sharedParts.concat(sp.map((p, i) => Object.assign({ _key: sp.keys[i] }, p))); refreshPacks(); }
         UI.hb.pack = pack.id;
       }
       closeModal(); toastMsg('Imported ' + total + ' entries' + ((r.chars || []).length ? ' and ' + r.chars.length + ' character(s)' : '') + '.'); queueRender();
