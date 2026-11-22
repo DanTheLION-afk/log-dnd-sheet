@@ -285,7 +285,7 @@ button.vital:hover { border-color: var(--accent); }
 .tbl th { text-align: left; font-family: var(--f-label); font-weight: 600; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .tbl td { padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .tbl tr:last-child td { border-bottom: 0; }
-.scroll-x { overflow-x: auto; }
+.scroll-x { overflow-x: auto; position: relative; }   /* relative: sr-only cells inside must not widen the page */
 @media (max-width: 480px) { .prepseg { max-width: 100%; } .prepseg button { padding-inline: 5px; font-size: 14px; } }   /* five Prep sections fit a phone */
 @media (max-width: 480px) { .crow .pill { white-space: normal; } }   /* a long timed effect ("Frightened · 5 rounds · ends on WIS DC 13") wraps inside the row */
 @media (max-width: 480px) { .tbl.shop td.num { white-space: normal !important; } .tbl.shop th, .tbl.shop td { padding-inline: 4px; } }   /* phones: Buy and Add must not hide behind a sideways scroll */
@@ -303,7 +303,14 @@ button.vital:hover { border-color: var(--accent); }
 .spl:last-child { border-bottom: 0; }
 .spl .nm { font-weight: 600; cursor: pointer; }
 .spl .tags { font-size: 12px; color: var(--ink-2); }
-.splv { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; }
+.splv { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: 12px 0 2px; }
+.rl { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted var(--brass); text-underline-offset: 3px; }
+.rl:hover { color: var(--brass); }
+.pill.rl { padding: 2px 8px; text-decoration: none; font-weight: inherit; }
+.oc .ocstep { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--line); }
+.oc .ocstep:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.rl:not(.pill) { display: inline-flex; align-items: center; min-height: 24px; }
+@media (pointer: coarse) { .rl:not(.pill) { min-height: 40px; } }
 .splv h3 { font-family: var(--f-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; color: var(--ink); margin: 0; padding: 0; border: 0; display: block; }
 
 /* party */
@@ -421,7 +428,7 @@ button.vital:hover { border-color: var(--accent); }
 .secnav { display: none; }
 @media (max-width: 700px) {
   .sheet .colmid { order: -1; }
-  .secnav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+  .secnav { display: flex; gap: 4px; flex-wrap: wrap; }
   .secnav button { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 5px 12px; font-family: var(--f-label); font-weight: 600; letter-spacing: .04em; white-space: nowrap; cursor: pointer; }
   .secnav button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
   .sheet .sec { display: none; }
@@ -2824,8 +2831,7 @@ function buildView(ch, D, ro) {
   for (const i of D.issues) { count[i.step] = (count[i.step] || 0) + 1; if (i.hard) hard[i.step] = 1; }
   const steps = `<nav class="steps" aria-label="Build steps">${STEPS.map(([k, l]) => `<button class="step${count[k] ? (hard[k] ? ' bad' : ' todo') : ' done'}" data-act="step" data-v="${k}" aria-current="${UI.step === k}"><span class="grow">${l}</span>${count[k] ? `<span class="cnt">${count[k]}</span>` : ''}</button>`).join('')}</nav>`;
   const fn = { basics: stepBasics, species: stepSpecies, background: stepBackground, class: stepClass, abilities: stepAbilities, features: stepFeatures, spells: stepSpells, equipment: stepEquipment, story: stepStory }[UI.step] || stepBasics;
-  const here = D.issues.filter(i => i.step === UI.step);
-  const todo = here.length ? `<div class="todo-box${here.some(i => i.hard) ? ' bad' : ''}"><div class="lbl">Left to do here</div><ul>${here.map(i => `<li>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}</li>`).join('')}</ul></div>` : '';
+  const todo = openChoices(D);
   const idx = STEPS.findIndex(s => s[0] === UI.step);
   const last = idx >= STEPS.length - 1;
   const nav = `<div class="row" style="margin-top:14px">${idx > 0 ? `<button class="btn" data-act="step" data-v="${STEPS[idx - 1][0]}">← ${STEPS[idx - 1][1]}</button>` : ''}<span class="spacer"></span>${last && D.issues.length ? `<span class="small muted">${D.issues.length} thing${D.issues.length === 1 ? '' : 's'} left to do.</span><button class="btn" data-act="step" data-v="${D.issues[0].step}">Go to the next one</button>` : ''}${!last ? `<button class="btn pri" data-act="step" data-v="${STEPS[idx + 1][0]}">${STEPS[idx + 1][1]} →</button>` : `<button class="btn pri" data-act="tab" data-v="sheet">Open sheet</button>`}</div>`;
@@ -3246,7 +3252,7 @@ function stepEquipment(ch, D, ro) {
       return `<tr><td><b>${esc(it.name || (d ? d.name : it.id))}</b><div class="small muted">${esc(d ? [d.cat, d.rar, d.w ? d.w.dmg + ' ' + (d.w.dt || '') : '', d.a && d.a.base ? 'AC ' + d.a.base : '', up != null ? fmtCp(up / perOf(d)) + ' each' : '', d.wt ? Math.round(unitWt(d) * 100) / 100 + ' lb.' : ''].filter(Boolean).join(' · ') : 'Missing from content')}</div>
           <div class="row small" style="gap:8px"><label class="chk"><input type="checkbox" data-act="invcont" data-i="${i}"${isBag(ch, it) ? ' checked' : ''}${isBag(ch, it) && !it.cont ? ' disabled' : ''}${dis(ro)}> Container</label>${isBag(ch, it) ? `<label class="chk" title="A Bag of Holding always does this"><input type="checkbox" data-act="invnowt" data-i="${i}"${bagFree(ch, it) ? ' checked' : ''}${/holding/i.test(itemName(ch, it)) ? ' disabled' : ''}${dis(ro)}> Contents weigh nothing</label>` : ''}${(ch.inv || []).some(b => b !== it && isBag(ch, b) && !inside(ch, b, it)) ? `<select data-act="invin" data-i="${i}" aria-label="Carried in"${dis(ro)}>${opt('', 'Carried')}${ch.inv.filter(b => b !== it && isBag(ch, b) && !inside(ch, b, it)).map(b => opt(b.id, 'In: ' + itemName(ch, b), it.box === b.id)).join('')}</select>` : ''}</div></td>
         <td><input type="number" id="f-q-${i}" min="0" data-act="invq" data-i="${i}" value="${esc(qOf(it))}" style="width:62px"${dis(ro)}></td>
-        <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Use</label>${d.att ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
+        <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>${d.att ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
         <td><span class="row" style="gap:3px;flex-wrap:nowrap">${['ac', 'atk', 'dmg'].map(k => `<input type="number" id="f-ib-${k}-${i}" data-act="invb" data-k="${k}" data-i="${i}" value="${esc(it[k] || 0)}" style="width:46px" aria-label="${k} bonus"${dis(ro)}>`).join('')}</span></td>
         <td style="white-space:nowrap">${up != null && !it.custom ? `<button class="btn ghost sm" data-act="invsell" data-i="${i}" title="Sell one for half its price"${dis(ro)}>Sell</button>` : ''}<button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></td></tr>`;
     }).join('') || '<tr><td colspan="5" class="muted">Nothing carried yet.</td></tr>'}</tbody></table></div>
@@ -3282,27 +3288,28 @@ function advSeg() {
 }
 /* ===== Build 28: containers, companions and Wild Shape, custom sheet sections ===== */
 /* inventory with containers shown nested; each container folds away */
-function gearRows(ch, ro) {
+function gearLine(ch, it, i, ro) {
+  const d = itemDef(ch, it), eqable = d && ['weapon', 'armor', 'shield', 'magic'].includes(d.cat), nm = esc(it.name || (d ? d.name : it.id));
+  return `<span class="grow">${it.eq ? '<b>' : ''}${d ? `<button type="button" class="rl" data-act="iteminfo" data-i="${i}" title="Show the rules for ${nm}">${nm}</button>` : nm}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>` : ''}${d && d.att ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}`;
+}
+/* only(it, parent): which top-level items to list; equipped and attuned items are listed in their own groups, never inside a container */
+function gearRows(ch, ro, only) {
   const inv = ch.inv || [];
   const parent = it => it.box && inv.find(b => b !== it && b.id === it.box && isBag(ch, b));
-  const line = (it, i) => {
-    const d = itemDef(ch, it), eqable = d && ['weapon', 'armor', 'shield', 'magic'].includes(d.cat);
-    return `<span class="grow">${it.eq ? '<b>' : ''}${esc(it.name || (d ? d.name : it.id))}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Use</label>` : ''}${d && d.att ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}${d && d.d ? `<button class="btn ghost sm" data-act="iteminfo" data-i="${i}">Details</button>` : ''}`;
-  };
   const node = (it, i) => {
     const pad = 'padding:4px 0;border-bottom:1px solid var(--line)';
-    if (!isBag(ch, it)) return `<div class="row small" style="${pad}">${line(it, i)}</div>`;
-    const kids = inv.map((x, j) => [x, j]).filter(([x]) => x !== it && parent(x) === it);
-    return `<details class="bag" data-k="bag-${esc(it.id)}" open><summary class="row small" style="${pad}">${line(it, i)}<span class="pill">${kids.length} inside${bagFree(ch, it) ? ' · weightless' : ''}</span></summary><div class="bagrow">${kids.map(([x, j]) => node(x, j)).join('') || '<div class="small muted">Empty.</div>'}</div></details>`;
+    if (!isBag(ch, it)) return `<div class="row small" style="${pad}">${gearLine(ch, it, i, ro)}</div>`;
+    const kids = inv.map((x, j) => [x, j]).filter(([x]) => x !== it && parent(x) === it && !x.eq && !x.att);
+    return `<details class="bag" data-k="bag-${esc(it.id)}" open><summary class="row small" style="${pad}">${gearLine(ch, it, i, ro)}<span class="pill">${kids.length} inside${bagFree(ch, it) ? ' · weightless' : ''}</span></summary><div class="bagrow">${kids.map(([x, j]) => node(x, j)).join('') || '<div class="small muted">Empty.</div>'}</div></details>`;
   };
-  return inv.map((it, i) => [it, i]).filter(([it]) => !parent(it)).map(([it, i]) => node(it, i)).join('');
+  return inv.map((it, i) => [it, i]).filter(([it]) => only(it, parent)).map(([it, i]) => node(it, i)).join('');
 }
 /* tracked counter: pips for small maxima, otherwise a stepper */
 function resCtl(r, p, ro) {
   const u = +(p.res || {})[r.key] || 0, left = Math.max(0, r.max - u);
   return r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}" data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)} ${i + 1} of ${r.max}, ${i < left ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`;
 }
-const resRow = (r, p, ro) => `<div class="row"><span class="grow"><b>${esc(r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${resCtl(r, p, ro)}</div>`;
+const resRow = (r, p, ro) => `<div class="row"><span class="grow"><b>${ruleLink('Feature', r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${resCtl(r, p, ro)}</div>`;
 /* custom sections: one renderer for every field type (text, number, checkbox, counter) */
 const FIELD_TYPES = [['text', 'Notes'], ['num', 'Number'], ['check', 'Checkbox'], ['count', 'Counter']];
 const RESET_OPTS = [['long', 'Long rest'], ['short', 'Short rest'], ['none', 'No reset']];
@@ -3489,14 +3496,11 @@ function sheetView(ch, D, ro, e) {
     ...(D.bg && D.bg.feature ? [{ n: D.bg.feature.n, d: D.bg.feature.d, from: D.bg.name }] : []),
     ...D.feats.map(x => ({ n: x.f.name, d: x.f.d, from: 'Feat · ' + x.from })),
   ]) || '<p class="muted">Build the character to see features.</p>'}</div></div>`;
-  const nAtt = (ch.inv || []).filter(i => i.att).length;
-  const gear = `<div class="stack sec sec-gear"><div class="panel"><div class="ph">Equipment<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">${['pp', 'gp', 'ep', 'sp', 'cp'].filter(k => +ch.money[k]).map(k => ch.money[k] + ' ' + k).join(' · ') || 'No coins'}${nAtt ? ' · attuned ' + nAtt + '/3' : ''}</span></div>
-    ${(ch.inv || []).length ? `<div class="lines">${gearRows(ch, ro)}</div>` : '<p class="muted small">Nothing carried.</p>'}
-    <p class="small muted" style="margin-top:6px">Add or remove items in Build → Equipment.</p></div></div>`;
+  const gear = `<div class="stack sec sec-gear">${invPanel(ch, D, ro)}</div>`;
   const notes = `<div class="stack sec sec-notes"><div class="panel stack"><h3>Session notes</h3><textarea id="f-n-session" data-in="notes.session" placeholder="Names, clues, loot, plans…"${dis(ro)}>${esc(ch.notes.session || '')}</textarea></div>
     ${remPanel(ch, ro)}
     ${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].some(k => ch.notes[k]) ? `<div class="panel stack small"><h3>Character</h3>${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].filter(k => ch.notes[k]).map(k => `<div><span class="lbl">${k}</span><div class="rt">${md(ch.notes[k])}</div></div>`).join('')}</div>` : ''}${fieldsView(ch, D, ro)}</div>`;
-  const actions =`<div class="stack sec sec-actions">${atk}${typeof attackCantrips === 'function' ? attackCantrips(ch, D, known, ro) : ''}${res}${conds}${fx}</div>`;
+  const actions =`<div class="stack sec sec-actions">${whatCanIDo(ch, D, known, ro, !!me)}${atk}${typeof attackCantrips === 'function' ? attackCantrips(ch, D, known, ro) : ''}${res}${conds}${fx}</div>`;
   return `<div class="sheet${UI.flash && UI.flash.cid === ch.id && UI.flash.until > Date.now() ? ' flash' : ''}" data-sec="${sec}">${col1}<div class="stack colmid">${top}${actions}</div><div class="stack col3">${secSpells}${feats}${gear}${compView(ch, tg, ro)}${notes}</div></div>`;
 }
 
@@ -6139,7 +6143,7 @@ MODALS.lvl = () => {
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Level up"><div class="row"><h2>${esc(e.ch.name)} reaches ${esc(m.name)} ${m.lvl}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="row"><span class="pill acc">+${m.gain} hit points</span><span class="pill">Max ${m.max}</span><span class="pill">Character level ${D.level}</span><span class="pill">Proficiency ${sgn(D.pb)}</span></div>
     <div class="stack"><span class="lbl">New at this level</span>${fresh.length ? `<div>${featureList(fresh.map(x => ({ n: x.n, d: x.d, from: x.from })))}</div>` : '<span class="small muted">No new class features. Check your spells and hit points.</span>'}</div>
-    ${D.issues.length ? `<div class="todo-box"><div class="lbl">Choices to make</div>${D.issues.map(i => `<div class="row" style="margin-top:4px"><span class="grow">${esc(i.msg)}</span><button class="btn sm" data-act="lvlgo" data-v="${i.step}">Go</button></div>`).join('')}</div>` : '<div class="note">Nothing left to choose.</div>'}
+    ${D.issues.length ? `<div class="todo-box"><div class="lbl">Choices to make</div>${D.issues.map(i => `<div class="row" style="margin-top:4px"><span class="grow">${esc(i.msg)}<span class="small muted" style="display:block">${esc(issueHint(i))}</span></span><button class="btn sm" data-act="lvlgo" data-v="${i.step}">Go</button></div>`).join('')}</div>` : '<div class="note">Nothing left to choose.</div>'}
     <div class="row"><button class="btn ghost" data-act="lvlundo">Undo this level</button><span class="spacer"></span><button class="btn pri" data-act="closemodal">Done</button></div></div>`;
 };
 Object.assign(ACT, {
@@ -7885,7 +7889,7 @@ function viewCombatPlayer() {
       ${isMine ? `<button class="btn ghost sm" data-act="crx" data-v="${esc(c.id)}" title="Attack with your reaction">Reaction attack</button>` : ''}${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const notIn = chars().filter(x => x.mine && !mineIn.includes(x));
-  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : I.unseen ? '<span class="pill">Something unseen acts</span>' : cur ? `<span class="small muted">${esc(cur.name)} is acting</span>` : ''}</div>`;
+  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : ''}</div>`;
   if (!list.length) return head + `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`;
   const left = `<div class="stack"><div class="init">${rows}</div>
     ${me ? `<p class="small muted">Tap someone to target them, then attack or cast from your sheet. The DM's screen settles hits, saves and damage.</p>` : ''}
@@ -7897,7 +7901,7 @@ function viewCombatPlayer() {
       <div class="panel stack"><span class="lbl">Your timed effects</span>${(((list.find(c => c.kind === 'pc' && c.cid === me.ch.id) || {}).fx) || []).map(f => `<span class="row small" style="gap:0"><span class="pill bad">${esc(fxText(f))}</span><button class="btn ghost sm" data-act="pfxrm" data-cid="${esc(me.ch.id)}" data-owner="${esc(me.owner)}" data-i="${esc(f.id)}" aria-label="End ${esc(f.n)}">${svgIcon('x', 14)}</button></span>`).join('')}${fxForm(`<button class="btn sm" data-act="pfxadd" data-cid="${esc(me.ch.id)}" data-owner="${esc(me.owner)}">Add effect</button>`, me.ch.id)}</div>
       <div class="cbsheet">${sheetView(me.ch, D, ro, me)}</div></div>`;
   } else right = `<div class="panel stack"><p class="muted">None of your characters is in this fight.</p>${notIn.length ? '<p class="small muted">Tap Ask to join, or wait for the DM to add the party.</p>' : ''}</div>`;
-  return head + `<div class="pcwrap"><div class="run prun">${left}${right}</div>${typeof pturnBar === 'function' ? pturnBar(actingMine, list) : ''}</div>`;
+  return head + combatCue(I, list, me) + `<div class="pcwrap"><div class="run prun">${left}${right}</div>${typeof pturnBar === 'function' ? pturnBar(actingMine, list) : ''}</div>`;
 }
 Object.assign(ACT, {
   ptgt(el) { UI.tgt = UI.tgt === el.dataset.v ? '' : el.dataset.v; queueRender(); },
@@ -8569,7 +8573,7 @@ function palGo(i) {
   closeModal();
   if (x.run) x.run(); else openModal({ kind: 'text', title: x.n, html: x.d() });
 }
-const palBtn = () => S.needCampaign ? '' : `<button class="btn ghost sm chatbtn palbtn" data-act="pal" title="Search rules, characters and actions (Ctrl+K)" aria-label="Search (Ctrl+K)" aria-keyshortcuts="Control+K"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>`;
+const palBtn = () => S.needCampaign ? '' : `<button class="btn ghost sm chatbtn palbtn" data-act="pal" title="Search rules, characters and actions (Ctrl+K)" aria-label="Search (Ctrl+K)" aria-keyshortcuts="Control+K"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>Search</button>`;
 document.addEventListener('input', e => {
   if (!e.target || e.target.id !== 'f-pal') return;
   PAL.q = e.target.value; PAL.i = 0; PAL.hits = palFind(PAL.q);
@@ -8847,6 +8851,124 @@ Object.assign(ACT, {
       else { closeModal(); toastMsg('Added ' + added.map(c => c.name).join(', ')); }
       queueRender();
     } catch (e) { err.textContent = (e && e.message) || 'That didn’t work.'; go.disabled = false; go.textContent = 'Import'; }
+  },
+});
+
+/* ===== Player findability: what you can do, open choices, inventory, rules in place ===== */
+/* A name that opens its rules text. kind is a palette kind (Feature, Condition, Item); ACT.rule finds the entry with palItems(). */
+function ruleLink(kind, name, cls) {
+  return `<button type="button" class="${cls || 'rl'}" data-act="rule" data-k="${esc(kind)}" data-v="${esc(name)}" title="Show the rules for ${esc(name)}">${esc(name)}</button>`;
+}
+/* shortcut: activation is read from the feature's text (first mention of Bonus Action, Reaction or an Action); features that never say it land in Other. Add a structured field when the content gets one. */
+function actKind(text) {
+  const m = /\bBonus Action\b|\bReaction\b|\bMagic action\b|\bas an? Action\b/i.exec(text || '');
+  return !m ? 'Other' : /^bonus/i.test(m[0]) ? 'Bonus action' : /^reaction/i.test(m[0]) ? 'Reaction' : 'Action';
+}
+function whatCanIDo(ch, D, known, ro, inFight) {
+  const p = ch.play, used = p.used || {}, R = registry(ch.ruleset), G = { Action: [], 'Bonus action': [], Reaction: [], Other: [] };
+  const itemNames = new Set(R.list('items').map(d => d.name)), taken = new Set();
+  const row = (name, tags, ctl) => `<div class="spl"><div>${name}${tags ? `<div class="tags">${esc(tags)}</div>` : ''}</div><div class="row" style="gap:4px;justify-content:flex-end">${ctl || ''}</div></div>`;
+  D.attacks.forEach((a, i) => {
+    const am = ammoFor(ch, a), nm = itemNames.has(a.name) ? ruleLink('Item', a.name) : `<b>${esc(a.name)}</b>`;
+    const dmg = a.flat ? `<span class="num small">${esc(a.dmg)}</span>` : `<button class="roll" data-act="dmgroll" data-label="${esc(a.name)} damage" data-x="${esc(a.dmg)}" data-i="${i}" title="Roll damage">${esc(a.dmg)}</button>`;
+    G.Action.push(row(nm, [a.prof ? '' : 'Not proficient', a.range ? a.range + ' ft.' : '', am ? (am.none ? 'No ammunition' : am.d.name + ': ' + (+am.it.q || 0)) : ''].filter(Boolean).join(' · '),
+      `<button class="roll pri" data-act="attack" data-i="${i}" title="Attack roll">${sgn(a.atk)}</button>${a.two ? `<button class="roll" data-act="attack" data-i="${i}" data-g="two" title="Two-handed">2H</button>` : ''}${dmg}`));
+    if (a.off) G['Bonus action'].push(row(nm, 'Off-hand attack', `<button class="roll pri" data-act="attack" data-i="${i}" data-g="off" title="Off-hand attack roll">Off</button>`));
+  });
+  for (const { s, c } of known.slice().sort((a, b) => a.s.lvl - b.s.lvl || a.s.name.localeCompare(b.s.name))) {
+    const opts = s.lvl ? slotOptions(ch, D, s, c.id) : [], left = sum(opts.map(o => o.left)), m = spellMathFor(ch, D, s, s.lvl, c);
+    const k = /^bonus/i.test(s.t) ? 'Bonus action' : /^reaction/i.test(s.t) ? 'Reaction' : /^action/i.test(s.t) ? 'Action' : 'Other';
+    const tag = [s.lvl ? ORD(s.lvl) + ' level' : 'Cantrip', s.lvl ? (left ? left + (left === 1 ? ' slot' : ' slots') + ' left' : opts.length ? 'ritual only' : 'no slots left') : '', s.conc ? 'Concentration' : '', c.freeTxt || ''].filter(Boolean).join(' · ');
+    G[k].push(row(`<button type="button" class="rl" data-act="spellinfo" data-v="${esc(s.id)}" title="Show the rules for ${esc(s.name)}">${esc(s.name)}</button>`, tag,
+      `${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(dmgLabel(m))}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro || (s.lvl && !opts.length))}>Cast</button>`));
+  }
+  const nk = s => String(s).toLowerCase().replace(/[^a-z]/g, ''), rs = D.res.filter(r => !r.cf);
+  const feats = [...D.features.filter(x => !x.isFeat), ...D.traits.filter(t => !t.l || t.l <= D.level), ...(D.bg && D.bg.feature ? [D.bg.feature] : []), ...D.feats.map(x => ({ n: x.f.name, d: x.f.d }))];
+  for (const f of feats) {
+    if (/^(Spellcasting|Pact Magic|Ability Score Improvement)$|Subclass$/.test(f.n)) continue;
+    const r = nk(f.n).length > 3 && rs.find(z => !taken.has(z.key) && (nk(z.n).includes(nk(f.n)) || nk(f.n).includes(nk(z.n)))), k = actKind(f.d);
+    if (k === 'Other' && !r) continue;
+    if (r) taken.add(r.key);
+    G[k].push(row(ruleLink('Feature', f.n), f.from || '', r ? resCtl(r, p, ro) : ''));
+  }
+  for (const r of rs.filter(z => !taken.has(z.key))) G.Other.push(row(ruleLink('Feature', r.n), (r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest') + (r.note ? ' · ' + r.note : ''), resCtl(r, p, ro)));
+  const slots = D.slots.map((n, i) => n ? `${ORD(i + 1)}: ${n - (+(p.slots || {})[i + 1] || 0)} of ${n}` : '').filter(Boolean).concat(D.pact ? [`Pact: ${D.pact.n - (+p.pact || 0)} of ${D.pact.n}`] : []);
+  const key = { Action: 'a', 'Bonus action': 'b', Reaction: 'r' };
+  return `<div class="panel stack canpanel"><div class="ph">What you can do<span class="spacer"></span><button class="btn ghost sm" data-act="pal" title="Search rules, spells and items (Ctrl+K)">Look up a rule</button></div>
+    <p class="small muted">Everything you can use, by when you can use it. Tap a name to read its rules. Buttons roll or use it.</p>
+    ${slots.length ? `<div class="row small"><span class="lbl">Spell slots left</span>${slots.map(t => `<span class="pill">${t}</span>`).join('')}</div>` : ''}
+    ${Object.keys(G).filter(g => G[g].length).map(g => `<div><div class="splv"><h3>${g}</h3>${key[g] && inFight ? `<button class="btn ghost sm" data-act="used" data-k="${key[g]}"${pressed(!!used[key[g]])}${dis(ro)} title="Tracks it for this turn. Resets when your turn starts.">${used[key[g]] ? 'Used' : 'Mark used'}</button>` : ''}</div>${G[g].join('')}</div>`).join('')}</div>`;
+}
+
+/* Plain-English line for each open choice, matched on the message the audit wrote */
+const ISSUE_HINTS = [
+  [/too many|needs /i, 'Remove some, or ask your DM for an exception.'],
+  [/lineage|subrace/i, 'Adds the traits that set your people apart, like senses or resistances.'],
+  [/spellcasting ability/i, 'Sets which ability your spell attacks and save DCs use.'],
+  [/improvement|epic boon/i, 'Raises an ability score, or gives you a feat.'],
+  [/ability score/i, 'Ability scores add to almost every roll you make.'],
+  [/expertise/i, 'Doubles your proficiency bonus on those skills.'],
+  [/skill/i, 'Skills you are proficient in add your proficiency bonus to those checks.'],
+  [/tool/i, 'Tool proficiency adds your bonus to checks with that tool.'],
+  [/cantrip/i, 'Cantrips are spells you can cast as often as you like.'],
+  [/spell/i, 'These are the spells you can cast.'],
+  [/feat/i, 'A feat gives you a new ability or a boost.'],
+  [/^Choose an? [^ ]+ for /i, 'Adds new features to your class at set levels.'],
+];
+const STEP_HINTS = { basics: 'Name, rules edition and how hit points are worked out.', species: 'Your species sets your size, speed, senses and a few traits.', background: 'Your background gives skills, a feat and starting gear.', class: 'Your class sets your hit points, what you are good at and how you fight.', abilities: 'Ability scores add to almost every roll you make.', features: 'Features and feats are the special things you can do.', spells: 'Spells are what you can cast.', equipment: 'Gear is what you carry, wear and use.', story: 'Personality, bonds and backstory.' };
+function issueHint(i) { const h = ISSUE_HINTS.find(([re]) => re.test(i.msg)); return h ? h[1] : STEP_HINTS[i.step] || ''; }
+/* the whole list of open choices, on every build step; the step you are on comes first */
+function openChoices(D) {
+  if (!D.issues.length) return '';
+  const lab = k => (STEPS.find(s => s[0] === k) || [k, k])[1], order = k => (k === UI.step ? -1 : STEPS.findIndex(s => s[0] === k));
+  const steps = Array.from(new Set(D.issues.map(i => i.step))).sort((a, b) => order(a) - order(b)), n = D.issues.length;
+  return `<details class="todo-box oc${D.issues.some(i => i.hard) ? ' bad' : ''}" data-k="openchoices" open><summary class="lbl">${n} choice${n === 1 ? '' : 's'} still open</summary>
+    ${steps.map(st => { const mine = D.issues.filter(i => i.step === st), here = st === UI.step; return `<div class="ocstep"><div class="row"><b class="grow">${esc(lab(st))}${here ? ' <span class="pill">you are here</span>' : ` <span class="small muted">${mine.length} open</span>`}</b>${here ? '' : `<button class="btn sm" data-act="step" data-v="${st}">Go to ${esc(lab(st))}</button>`}</div>
+      ${here ? mine.map(i => `<div>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}<div class="small muted">${esc(issueHint(i))}</div></div>`).join('') : `<div class="small muted">${mine.map(i => (i.hard ? 'Rule: ' : '') + esc(i.msg)).join(' ')}</div>`}</div>`; }).join('')}</details>`;
+}
+
+/* Gear tab: search your gear or add from the item list, then Attuned / Equipped / Carried */
+function invPanel(ch, D, ro) {
+  const inv = ch.inv || [], q = (UI.gq || '').trim().toLowerCase(), R = registry(ch.ruleset), purse = walletCp(ch.money), pad = 'padding:4px 0;border-bottom:1px solid var(--line)';
+  const nAtt = inv.filter(i => i.att).length, canAtt = inv.some(it => (itemDef(ch, it) || {}).att);
+  const grp = (title, hint, html, empty) => `<div class="splv"><h3>${title}</h3>${hint ? `<span class="small muted">${hint}</span>` : ''}</div>${html || `<p class="small muted">${empty}</p>`}`;
+  let body;
+  if (q) {
+    const mine = inv.map((it, i) => [it, i]).filter(([it]) => itemName(ch, it).toLowerCase().includes(q));
+    const lib = ro ? [] : R.list('items').filter(d => d.name.toLowerCase().includes(q)).slice(0, 6);
+    body = grp('In your gear', `${mine.length} found`, mine.map(([it, i]) => `<div class="row small" style="${pad}">${gearLine(ch, it, i, ro)}</div>`).join(''), 'Nothing in your gear matches.')
+      + (ro ? '' : grp('Add from the item list', 'Add is free; Buy pays from your coins', lib.map(d => { const c = priceCp(d); return `<div class="row small" style="${pad}"><span class="grow"><button type="button" class="rl" data-act="shopinfo" data-v="${esc(d.id)}">${esc(d.name)}</button> <span class="muted">${c != null ? esc(fmtCp(c)) : ''}</span></span><button class="btn sm" data-act="invadd" data-v="${esc(d.id)}">Add</button><button class="btn sm" data-act="invbuy" data-v="${esc(d.id)}"${dis(c == null || c > purse)}>Buy</button></div>`; }).join(''), 'No item has that name. Make a custom item under Build → Equipment.'));
+  } else {
+    body = (canAtt || nAtt ? grp(`Attuned · ${nAtt} of 3`, 'Magic items that need attunement', gearRows(ch, ro, it => it.att), 'Nothing attuned yet. Tick Attuned on a magic item that needs it.') : '')
+      + grp('Equipped', 'Worn or in hand', gearRows(ch, ro, it => it.eq && !it.att), 'Nothing equipped. Tick Equipped on a weapon, armor or shield.')
+      + grp('Carried', '', gearRows(ch, ro, (it, par) => !it.eq && !it.att && !par(it)), inv.length ? 'Nothing else carried.' : 'Nothing carried yet. Search above to add an item.');
+  }
+  return `<div class="panel stack"><div class="ph">Equipment<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">${['pp', 'gp', 'ep', 'sp', 'cp'].filter(k => +ch.money[k]).map(k => ch.money[k] + ' ' + k).join(' · ') || 'No coins'}</span></div>
+    <input type="search" id="f-gq" data-act="gq" value="${esc(UI.gq || '')}" placeholder="${ro ? 'Search your gear' : 'Search your gear, or find an item to add'}" aria-label="Search your gear">
+    ${body}
+    <p class="small muted">Prices, selling and starting equipment: <button type="button" class="rl" data-act="gobuild" data-v="equipment">Build → Equipment</button></p></div>`;
+}
+
+/* A short "where am I" strip for players in a fight: round, whose turn, what is next, and my conditions */
+function combatCue(I, list, me) {
+  const n = list.length, ci = list.findIndex(c => c.id === I.cur), mine = me && list.find(c => c.kind === 'pc' && c.cid === me.ch.id);
+  const nm = c => esc(liveName(c)), nextC = ci >= 0 && n > 1 ? list[(ci + 1) % n] : null;
+  let line;
+  if (ci < 0) line = I.unseen ? 'Something unseen acts.' : 'No one has taken a turn yet.';
+  else if (mine && mine.id === I.cur) line = `<b>It is your turn.</b> ${nextC ? 'Next: ' + nm(nextC) + '.' : ''}`;
+  else { const away = mine ? (list.indexOf(mine) - ci + n) % n : null; line = `<b>${nm(list[ci])}</b> is acting. ${nextC ? 'Next: ' + nm(nextC) + '.' : ''}${away == null ? '' : away === 1 ? ' You are next.' : ` You go in ${away} turns.`}`; }
+  const cond = me ? (me.ch.play.cond || []) : [], exh = me ? +me.ch.play.exh || 0 : 0;
+  return `<div class="turnbar combatcue${mine && mine.id === I.cur ? ' on' : ''}" style="margin-bottom:12px"><span>${line}</span>${me ? `<span class="row small"><span class="lbl">Your conditions</span>${cond.map(k => ruleLink('Condition', k, 'pill bad pillbtn rl')).join('')}${exh ? `<span class="pill bad">Exhaustion ${exh}</span>` : ''}${cond.length || exh ? '' : '<span class="muted">None. Mark one under Conditions on your sheet.</span>'}</span>` : ''}</div>`;
+}
+LIVE_ACTS.push('gq');
+Object.assign(ACT, {
+  gq(el) { UI.gq = el.value; queueRender(); },
+  rule(el) {
+    const k = el.dataset.k, n = el.dataset.v, low = n.toLowerCase();
+    const all = palItems().filter(x => x.d && (x.k === k || (k === 'Feature' && x.k === 'Feat')));
+    const x = all.find(i => i.n === n) || all.find(i => i.n.toLowerCase().includes(low) || low.includes(i.n.toLowerCase()));
+    if (!x) { toastMsg('No rules text for ' + n + '. Try the search.'); return; }
+    openModal({ kind: 'text', title: x.n, html: x.d() });
   },
 });
 </script>
