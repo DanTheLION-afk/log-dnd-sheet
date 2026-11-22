@@ -6624,6 +6624,8 @@ async function fbConnect(onChange) {
     FB.fs = firebase.firestore();
     try { FB.fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { }
     const auth = firebase.auth();
+    /* currentUser is null until the saved sign-in (maybe a Google account) has loaded; signing in anonymously first would replace it */
+    if (auth.onAuthStateChanged) await new Promise(r => { const off = auth.onAuthStateChanged(u => { off(); r(u); }); });
     if (!auth.currentUser) await auth.signInAnonymously();
     FB.uid = auth.currentUser.uid;
   } catch (e) {
@@ -6683,8 +6685,11 @@ function myCampaigns() {
   } catch (e) { }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
+/* the signed-in Firebase user, or null in local mode */
+const gUser = () => { try { return fbConfigured() && window.firebase ? firebase.auth().currentUser : null; } catch (e) { return null; } };
 function viewJoin() {
   const mine = myCampaigns();
+  const gu = gUser();
   return `<div style="max-width:760px;margin:24px auto" class="stack">
     <div><h2 style="font-family:var(--f-display);font-size:30px">Your table</h2><p class="muted">Your DM gives you a campaign code or link. No account needed: this browser remembers you.</p></div>
     ${S.joinErr ? `<div class="errline">${esc(S.joinErr)}</div>` : ''}
@@ -6700,6 +6705,9 @@ function viewJoin() {
         <label class="field"><span class="lbl">Your name</span><input type="text" id="f-cdm" value="${esc(LS.get('pname', ''))}"></label>
         <button class="btn" data-act="campstart">Start campaign</button></div>
     </div>
+    ${gu && gu.isAnonymous ? `<div class="panel stack"><h3>Played here before on another browser?</h3>
+      <p class="small muted">Sign in with the Google account you used there and your characters come back. No codes needed.</p>
+      <button class="btn" data-act="gsignin" style="align-self:flex-start">Sign in with Google</button></div>` : ''}
     <div class="panel stack"><h3>Return as DM</h3>
       <p class="small muted">Already running a campaign from another browser? Enter its code and your private DM key.</p>
       <div class="grid2"><label class="field"><span class="lbl">Campaign code</span><input type="text" id="f-dcode" autocomplete="off" style="text-transform:uppercase"></label>
@@ -6709,12 +6717,14 @@ function viewJoin() {
   </div>`;
 }
 function campModal() {
-  const c = S.campaign || {};
+  const c = S.campaign || {}, gu = gUser();
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Campaign"><div class="row"><h2>${esc(c.name || 'Campaign')}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="stack"><span class="lbl">Invite players with this link</span><div class="row"><input type="text" id="f-camplink" readonly value="${esc(campaignLink())}" style="flex:1"><button class="btn" data-act="copylink">Copy</button></div><div class="small muted">Code <b class="num" style="font-size:16px">${esc(FB.code || '')}</b>. Anyone with it can join and edit their own sheet.</div></div>
     <div class="stack"><span class="lbl">Your name</span><div class="row"><input type="text" id="f-pname" value="${esc(LS.get('pname', ''))}" style="flex:1"><button class="btn" data-act="savepname">Save</button></div></div>
     ${FB.isDM ? `<div class="stack"><span class="lbl">DM key</span><div class="row"><input type="text" readonly value="${esc(FB.dmKey)}" style="flex:1;font-family:ui-monospace,monospace"><button class="btn" data-act="copydmkey">Copy</button></div><div class="small muted">Keep this private. Enter it on another device or browser to be DM there too.</div></div>`
       : `<div class="stack"><span class="lbl">Are you the DM on a new device?</span><div class="row"><input type="text" id="f-dmkey" placeholder="DM key" style="flex:1"><button class="btn" data-act="campdm">Become DM</button></div></div>`}
+    ${!gu ? '' : gu.isAnonymous ? `<div class="stack"><span class="lbl">Keep your characters on every browser</span><div class="row"><button class="btn" data-act="gsignin">Sign in with Google</button></div></div>`
+      : `<div class="small muted">Signed in as ${esc(gu.email || gu.displayName || 'Google')} (Google). Sign in with the same account on another browser to get your characters back.</div>`}
     ${UI.modal.err ? `<div class="errline">${esc(UI.modal.err)}</div>` : ''}
     <div class="row"><button class="btn ghost danger" data-act="campleave">Switch campaign</button><span class="spacer"></span><button class="btn" data-act="closemodal">Done</button></div>
   </div>`;
@@ -6788,6 +6798,29 @@ Object.assign(ACT, {
     const p = PWA.prompt; PWA.prompt = null;
     try { p.prompt(); await p.userChoice; } catch (e) { }
     queueRender();
+  },
+  /* shortcut: popups can fail on some mobile browsers, switch to signInWithRedirect if players report it */
+  async gsignin() {
+    const u = gUser(); if (!u) return;
+    const auth = firebase.auth(), p = new firebase.auth.GoogleAuthProvider();
+    const name = x => { if (x && x.displayName && !LS.get('pname', '')) LS.set('pname', x.displayName); };
+    try {
+      const r = await u.linkWithPopup(p);   // keeps this uid and its sheets; the anonymous account becomes permanent
+      name(r && r.user || auth.currentUser);
+      toastMsg('Signed in with Google. Use the same Google account on any browser to get your characters back.');
+      queueRender(); if (UI.modal) renderModal();
+    } catch (e) {
+      const code = e && e.code;
+      if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
+        /* this Google account already has characters from another browser: become that user */
+        try {
+          const r = await auth.signInWithCredential(firebase.auth.GoogleAuthProvider.credentialFromError(e));
+          name(r && r.user || auth.currentUser);
+          location.reload();
+        } catch (e2) { toastMsg('Couldn’t sign in with Google. Try again.'); }
+      } else if (/popup/.test(code || '')) toastMsg('The Google sign-in window was closed or blocked. Allow pop-ups for this page and try again.');
+      else toastMsg('Couldn’t sign in with Google: ' + ((e && e.message) || e));
+    }
   },
   campleave() { LS.set('camp', ''); try { history.replaceState(null, '', location.pathname); } catch (e) { } location.reload(); },
 });
