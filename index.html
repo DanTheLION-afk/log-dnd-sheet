@@ -550,7 +550,15 @@ input[type=text], input[type=number], input[type=search], select, textarea { bac
 /* roll results are an ink-black card in both modes, so a natural 20 always reads gold */
 .tst:not(.msg) { background: #17120e; color: #ece2d0; border: 1px solid #3b3129; border-radius: 4px; box-shadow: none; }
 .tst.msg { border-radius: 4px; box-shadow: none; }
-.themebtn { padding: 4px 8px; }
+.themebtn, .chatbtn { padding: 4px 8px; }
+.chatbtn { display: inline-flex; align-items: center; gap: 4px; }
+.ctlog { display: flex; flex-direction: column; gap: 6px; max-height: 58vh; overflow: auto; }
+.ctm { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.ctm.wh { border-style: dashed; }
+.ctm.me { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ctm .tx { white-space: pre-wrap; overflow-wrap: anywhere; }
+.hoimg { max-width: 100%; max-height: 260px; border-radius: 6px; cursor: zoom-in; border: 1px solid var(--line); }
+.hoimg-big { max-width: 100%; max-height: 82vh; object-fit: contain; align-self: center; }
 
 /* the map board keeps its dark backdrop in both themes */
 .mapmount { background: #14110e; border-radius: 4px; }
@@ -603,8 +611,8 @@ footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color:
   /* 16px stops phones zooming the page every time you tap a field */
   input:not([type]), input[type=text], input[type=number], input[type=search], select, textarea { font-size: 16px; min-height: 44px; }
   .chead .cname { font-size: 34px; }
-  .themebtn, .campbtn { min-height: 40px; }
-  .themebtn { min-width: 40px; }
+  .themebtn, .campbtn, .chatbtn { min-height: 40px; }
+  .themebtn, .chatbtn { min-width: 40px; }
   .step { min-height: 44px; }
   .seg button.mini { min-height: 40px; }
   summary { padding-block: 10px; }
@@ -705,8 +713,8 @@ const PACT = [[1, 1], [2, 1], [2, 2], [2, 2], [2, 3], [2, 3], [2, 4], [2, 4], [2
 const POINT_COST = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
 const STANDARD = [15, 14, 13, 12, 10, 8];
 const LANGS = ['Common', 'Common Sign Language', 'Dwarvish', 'Elvish', 'Giant', 'Gnomish', 'Goblin', 'Halfling', 'Orc', 'Abyssal', 'Celestial', 'Draconic', 'Deep Speech', 'Infernal', 'Primordial', 'Sylvan', 'Undercommon', 'Thieves’ Cant', 'Druidic'];
-const TYPES = ['classes', 'subclasses', 'species', 'subspecies', 'backgrounds', 'feats', 'spells', 'items', 'monsters'];
-const TYPE_LABEL = { classes: 'Class', subclasses: 'Subclass', species: 'Species', subspecies: 'Subspecies', backgrounds: 'Background', feats: 'Feat', spells: 'Spell', items: 'Item', monsters: 'Monster' };
+const TYPES = ['classes', 'subclasses', 'species', 'subspecies', 'backgrounds', 'feats', 'spells', 'items', 'monsters', 'conditions'];
+const TYPE_LABEL = { classes: 'Class', subclasses: 'Subclass', species: 'Species', subspecies: 'Subspecies', backgrounds: 'Background', feats: 'Feat', spells: 'Spell', items: 'Item', monsters: 'Monster', conditions: 'Condition' };
 const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
 const ORD = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 
@@ -1089,7 +1097,19 @@ function registry(rs) {
   regCache.set(key, R);
   return R;
 }
-function bumpPacks(packs) { PACKS = packs; packsVersion++; regCache.clear(); }
+function bumpPacks(packs) { PACKS = packs; packsVersion++; regCache.clear(); syncConds(); }
+/* homebrew conditions join the built-in lists (sheet, combat, effects) and their rules text; a built-in name always wins a clash */
+const BASE_CONDS = CONDITIONS.slice();
+function syncConds() {
+  CONDITIONS.length = BASE_CONDS.length;
+  for (const k of Object.keys(COND_FX)) if (!BASE_CONDS.includes(k)) delete COND_FX[k];
+  for (const k of Object.keys(COND_RULES)) if (!BASE_CONDS.includes(k)) delete COND_RULES[k];
+  for (const p of PACKS) for (const e of (p.entries || {}).conditions || []) {
+    if (!e.name || CONDITIONS.includes(e.name)) continue;
+    CONDITIONS.push(e.name); COND_RULES[e.name] = e.d || '';
+    if (Object.values(e.fx || {}).some(Boolean)) COND_FX[e.name] = e.fx;
+  }
+}
 
 /* lookup through registry, then the character's embedded entries */
 function look(ch, t, id) {
@@ -1477,6 +1497,7 @@ function derive(ch) {
   }
   if (armorIt && (armorIt.d.a || {}).str && D.sc.str < armorIt.d.a.str && !(sp && /dwarf/.test(sp.id))) speed -= 10;
   speed += +ch.bonus.speed || 0;
+  if (((ch.play || {}).cond || []).some(c => (COND_FX[c] || {}).speed0)) speed = 0;   // a homebrew condition that pins you down
   D.speed = speed;
   D.dv = Math.max(+(sp && sp.dv) || 0, +(sub && sub.dv) || 0, ...features.map(z => +(z.f && z.f.dv) || 0));
 
@@ -1999,7 +2020,7 @@ function fxMods(ch, D) {
   const M = { defs: [], ac: 0, advAtk: false, disAtk: false, disCheck: false, disSave: false, disDex: false, failSD: false, flat: 0, why: [] };
   const on = new Set(p.fx || []);
   for (const f of fxAvailable(ch, D)) { if (!on.has(f.id)) continue; M.defs.push(f); M.ac += +f.ac || 0; }
-  for (const c of p.cond || []) { const e = COND_FX[c]; if (!e) continue; if (e.disAtk) M.disAtk = true; if (e.disCheck) M.disCheck = true; if (e.advAtk) M.advAtk = true; if (e.disDex) M.disDex = true; if (e.failSD) M.failSD = true; M.why.push(c); }
+  for (const c of p.cond || []) { const e = COND_FX[c]; if (!e) continue; if (e.disAtk) M.disAtk = true; if (e.disCheck) M.disCheck = true; if (e.advAtk) M.advAtk = true; if (e.disDex) M.disDex = true; if (e.disSave) M.disSave = true; if (e.failSD) M.failSD = true; M.why.push(c); }
   if (D && D.encHeavy) { M.disHeavy = true; M.why.push('Heavily encumbered'); }
   const ex = +p.exh || 0;
   if (ex) { if (ch.ruleset === '2024') M.flat -= 2 * ex; else { M.disCheck = true; if (ex >= 3) { M.disAtk = true; M.disSave = true; } } M.why.push('Exhaustion ' + ex); }
@@ -2505,6 +2526,8 @@ async function connect(onChange) {
   S.dm = Object.assign({ combat: { round: 1, cur: null, list: [] }, enc: [], notes: '' }, LS.get('dm', {}));
   S.prep = Object.assign(PREP_BLANK(), LS.get('prep', {})); S.story = LS.get('story', {});
   S.settings = Object.assign({ off: [] }, LS.get('settings', {})); setOffSources(S.settings.off);
+  S.stash = LS.get('stash', {}); { const pv = LS.get('pollvote', null); if (pv) S.docs.local = { poll: pv }; }
+  talkSubscribe();
   try { S.localParts = await IDB.all(); } catch (e) { S.localParts = []; }
   refreshPacks();
   if (window.PL_SITE) return fbConnect(onChange);
@@ -2581,6 +2604,12 @@ async function startLive({ db, user, room, dl }, onChange) {
   subscribeDM(onChange);
   subscribePrep(onChange);
   db.doc('campaign/story').onSnapshot(snap => { if (S.me.isOwner) return; S.story = snap.exists ? clone(snap.data()) : {}; onChange('story'); }, () => {});
+  db.doc('campaign/stash').onSnapshot(snap => {
+    const q = WQ['campaign/stash'];
+    if (q && (q.pending || q.busy)) return;
+    S.stash = snap.exists ? clone(snap.data()) : {};
+    onChange('stash');
+  }, () => {});
   mapSubscribe(db, onChange);
   if (room) {
     try {
@@ -2700,7 +2729,7 @@ function viewBar() {
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
-    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${themeBtn()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
+    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${themeBtn()}${chatBtn()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
     <nav class="tabs" aria-label="Views">${tabs.map(([k, l]) => `<button class="tab" data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</nav>
   </div>${requestBanner()}</header>`;
 }
@@ -3427,7 +3456,7 @@ function viewParty() {
     ? `<div class="note" style="margin-bottom:12px">This page isn't connected to a shared campaign, so you only see characters made in this browser. ${window.PL_SITE ? 'Start a campaign with the button at the top and send your players the link.' : 'Open the published page in claude.ai and invite your players by email as Editors to see their sheets here.'} Players can also send you a character code.</div>`
     : S.me.isOwner ? '' : `<div class="note" style="margin-bottom:12px">Everyone in the campaign can see the party. Only the DM and each sheet's player can change it.</div>`;
   const hand = ((S.settings || {}).handouts || []);
-  const handouts = storyPanel() + (hand.length ? `<div class="panel stack" style="margin-bottom:12px"><div class="ph">From the DM</div>${hand.map(h => `<details class="feat" data-k="ho-${esc(h.id)}"><summary><b>${esc(h.title || 'Handout')}</b></summary><div class="body rt">${md(h.text)}</div></details>`).join('')}</div>` : '');
+  const handouts = sessionPanel() + stashPanel() + storyPanel() + (hand.length ? `<div class="panel stack" style="margin-bottom:12px"><div class="ph">From the DM</div>${hand.map(h => `<details class="feat" data-k="ho-${esc(h.id)}"${h.img ? ' open' : ''}><summary><b>${esc(h.title || 'Handout')}</b></summary><div class="body rt">${hoImg(h)}${md(h.text)}</div></details>`).join('')}</div>` : '');
   if (!list.length) return head + intro + handouts + `<div class="empty">No characters yet. When players create characters on this page, they appear here.</div>`;
   if (tab === 'table') {
     const rows = list.map(({ ch, owner }) => {
@@ -3470,6 +3499,8 @@ function viewLog() {
 'use strict';
 /* ===== homebrew: forms, packs, import/export ===== */
 const RULESET_OPTS = [['any', 'Both rulesets'], ['2014', '2014 only'], ['2024', '2024 only']];
+const MON_ROW = [['n', 'Name', 'text'], ['atk', 'To hit bonus', 'num'], ['dm', 'Damage dice, e.g. 2d6+3', 'text'], ['dty', 'Damage type', 'text'], ['d', 'Description', 'textarea']];
+const MON_LISTS = ['actions', 'bonus', 'reactions', 'legendary'];
 const FORMS = {
   spells: [['name', 'Name', 'text'], ['lvl', 'Level', 'select', [['0', 'Cantrip'], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => [String(n), 'Level ' + n])]], ['sch', 'School', 'select', SCHOOLS.map(s => [s, s])], ['t', 'Casting time', 'text'], ['r', 'Range', 'text'], ['comp', 'Components (V, S, M)', 'text'], ['mat', 'Material component', 'text'], ['dur', 'Duration', 'text'], ['conc', 'Concentration', 'bool'], ['rit', 'Ritual', 'bool'], ['cls', 'On these class spell lists', 'classes'], ['atk', 'Spell attack', 'select', [['', 'None'], ['melee', 'Melee'], ['ranged', 'Ranged']]], ['save', 'Saving throw', 'select', [['', 'None'], ...ABIL.map(a => [a, ABN[a]])]], ['dmg', 'Damage dice (e.g. 3d6)', 'text'], ['dt', 'Damage type', 'text'], ['d', 'Description', 'textarea'], ['hl', 'At higher levels', 'textarea']],
   feats: [['name', 'Name', 'text'], ['type', 'Feat type', 'select', [['general', 'General'], ['origin', 'Origin'], ['fighting-style', 'Fighting style'], ['epic-boon', 'Epic boon']]], ['prereq', 'Prerequisite', 'text'], ['lvl', 'Minimum level', 'num'], ['asi.from', 'Can raise one of these by 1', 'abchecks'], ['rep', 'Can be taken more than once', 'bool'], ['d', 'Description', 'textarea']],
@@ -3487,10 +3518,12 @@ const FORMS = {
     ['mc.req', 'Multiclass requirement (e.g. str 13, dex 13)', 'req'], ['mc.any', 'Any one of those is enough', 'bool'], ['mc.armor', 'Multiclass armor (comma separated)', 'csv'], ['mc.weapons', 'Multiclass weapons (comma separated)', 'csv'],
     ['features', 'Class features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ['usage', 'Uses (e.g. 1/Short Rest)', 'text'], ['asi', 'Ability Score Improvement', 'bool'], ['d', 'Description', 'textarea']]],
     ['resources', 'Tracked resources', 'rows', [['n', 'Name', 'text'], ['max', 'Max (number or formula like "cha" or "level")', 'text'], ['reset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]]]],
-  monsters: [['name', 'Name', 'text'], ['size', 'Size', 'text'], ['type', 'Type', 'text'], ['ac', 'Armor Class', 'num'], ['hp', 'Hit points', 'num'], ['hd', 'Hit dice (e.g. 4d8+4)', 'text'], ['speed', 'Speed', 'text'], ['cr', 'Challenge rating', 'num'], ['xp', 'XP', 'num'],
-    ['ab', 'Ability scores (blank = 10)', 'abil'], ['saves', 'Saving throw bonuses (only where proficient)', 'abil'], ['res', 'Resists (comma separated)', 'csv'], ['imm', 'Immune to (comma separated)', 'csv'], ['vuln', 'Vulnerable to (comma separated)', 'csv'], ['senses', 'Senses', 'text'], ['langs', 'Languages', 'text'],
+  monsters: [['name', 'Name', 'text'], ['size', 'Size', 'text'], ['type', 'Type', 'text'], ['ac', 'Armor Class', 'num'], ['hp', 'Hit points', 'num'], ['hd', 'Hit dice (e.g. 4d8+4)', 'text'], ['speed', 'Speed', 'text'], ['cr', 'Challenge rating (1/2 = 0.5)', 'num'], ['xp', 'XP', 'num'],
+    ['ab', 'Ability scores (blank = 10)', 'abil'], ['saves', 'Saving throw bonuses (only where proficient)', 'abil'], ['skills', 'Skills (e.g. Perception +5, Stealth +4)', 'skillb'], ['res', 'Damage resistances (comma separated)', 'csv'], ['imm', 'Damage immunities (comma separated)', 'csv'], ['vuln', 'Damage vulnerabilities (comma separated)', 'csv'], ['cimm', 'Condition immunities (comma separated)', 'csv'], ['senses', 'Senses', 'text'], ['langs', 'Languages', 'text'],
     ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['d', 'Description', 'textarea']]],
-    ['actions', 'Actions', 'rows', [['n', 'Name', 'text'], ['atk', 'To hit bonus', 'num'], ['dm', 'Damage dice, e.g. 2d6+3', 'text'], ['dty', 'Damage type', 'text'], ['d', 'Description', 'textarea']]]],
+    ['actions', 'Actions', 'rows', MON_ROW], ['bonus', 'Bonus actions', 'rows', MON_ROW], ['reactions', 'Reactions', 'rows', MON_ROW],
+    ['la', 'Legendary actions per round (blank = 3)', 'num'], ['legendary', 'Legendary actions', 'rows', MON_ROW], ['lair', 'Lair actions (text)', 'textarea']],
+  conditions: [['name', 'Name', 'text'], ['d', 'Rules text', 'textarea'], ['fx.disAtk', 'Disadvantage on attack rolls', 'bool'], ['fx.disCheck', 'Disadvantage on ability checks', 'bool'], ['fx.disSave', 'Disadvantage on saving throws', 'bool'], ['fx.speed0', 'Speed becomes 0', 'bool'], ['fx.advAgainst', 'Attacks against the creature have advantage', 'bool']],
   subclasses: [['name', 'Name', 'text'], ['cls', 'Class', 'class'], ['d', 'Description', 'textarea'], ['spell.ab', 'Subclass spellcasting (e.g. Eldritch Knight)', 'select', [['', 'None'], ...ABIL.map(a => [a, ABN[a]])]], ['spell.prog', 'Slot progression', 'select', [['third', 'Third caster'], ['half', 'Half caster'], ['full', 'Full caster']]], ['spell.list', 'Uses this class spell list', 'class'],
     ['spells', 'Always-prepared spells', 'rows', [['l', 'Class level', 'num'], ['s', 'Spell', 'spell']]], ['features', 'Features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ['usage', 'Uses (e.g. 1/Long Rest)', 'text'], ['d', 'Description', 'textarea']]]],
 };
@@ -3501,7 +3534,7 @@ function hbEntryForForm(type, e) {
   const x = clone(e || {});
   if (type === 'subclasses' && Array.isArray(x.spells)) x.spells = x.spells.map(s => Array.isArray(s) ? { l: s[0], s: s[1] } : s);
   if (type === 'classes' && x.unarmored && typeof x.unarmored === 'object') x.unarmored = (x.unarmored.add || [])[0] || '';
-  if (type === 'monsters') x.actions = (x.actions || []).map(a => Object.assign({}, a, { dm: a.dm || ((a.dmg || [])[0] || [])[0] || '', dty: a.dty || ((a.dmg || [])[0] || [])[1] || '' }));
+  if (type === 'monsters') for (const k of MON_LISTS) x[k] = (x[k] || []).map(a => Object.assign({}, a, { dm: a.dm || ((a.dmg || [])[0] || [])[0] || '', dty: a.dty || ((a.dmg || [])[0] || [])[1] || '' }));
   return x;
 }
 function hbEntryFromForm(type, x) {
@@ -3514,9 +3547,12 @@ function hbEntryFromForm(type, x) {
   if (type === 'items') { if (x.cat !== 'weapon') delete x.w; if (x.cat !== 'armor' && x.cat !== 'shield') delete x.a; if (x.cat === 'shield' && x.a) x.a = { base: +x.a.base || 2 }; }
   if (type === 'monsters') {
     x.ab = Object.assign({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, x.ab || {});
-    x.actions = (x.actions || []).map(a => { const o = Object.assign({}, a); const d = String(o.dm || '').replace(/\s+/g, ''); if (d) o.dmg = [[d, o.dty || '']].concat((a.dmg || []).slice(1)); else delete o.dmg; return o; });
+    for (const k of MON_LISTS) x[k] = (x[k] || []).map(a => { const o = Object.assign({}, a); const d = String(o.dm || '').replace(/\s+/g, ''); if (d) o.dmg = [[d, o.dty || '']].concat((a.dmg || []).slice(1)); else delete o.dmg; return o; });
     for (const k of ['res', 'imm', 'vuln']) x[k] = (x[k] || []).map(v => String(v).toLowerCase());
+    for (const k of ['res', 'imm', 'vuln', 'cimm', ...MON_LISTS.slice(1)]) if (!(x[k] || []).length) delete x[k];   // empty lists would still draw an empty line in the stat block
+    for (const k of ['la', 'lair', 'skills']) if (!x[k]) delete x[k];
   }
+  if (type === 'conditions') x.fx = Object.fromEntries(Object.entries(x.fx || {}).filter(([, v]) => v));
   if (type === 'classes' && x.unarmored) x.unarmored = { add: [x.unarmored], shield: x.unarmored === 'con' };
   else if (type === 'classes') delete x.unarmored;
   return x;
@@ -3534,6 +3570,7 @@ function fieldHTML(type, f, val, rs, prefix) {
   if (kind === 'select') return `<label class="field">${L}<select id="${id}">${extra.map(([v, l]) => opt(v, l, String(val == null ? '' : val) === v)).join('')}</select></label>`;
   if (kind === 'csv') return `<label class="field">${L}<input type="text" id="${id}" value="${esc(Array.isArray(val) ? val.join(', ') : (val || ''))}"></label>`;
   if (kind === 'csvnum') return `<label class="field">${L}<input type="text" id="${id}" value="${esc(Array.isArray(val) ? val.join(', ') : (val || ''))}"></label>`;
+  if (kind === 'skillb') return `<label class="field" style="grid-column:1/-1">${L}<input type="text" id="${id}" value="${esc(Object.entries(val || {}).map(([k, v]) => ((SKILL[k] || {}).name || k) + ' ' + sgn(+v)).join(', '))}"></label>`;
   if (kind === 'nums') return `<label class="field" style="grid-column:1/-1">${L}<input type="text" id="${id}" value="${esc(Array.isArray(val) ? val.join(', ') : (val || ''))}" placeholder="Leave blank if not used"></label>`;
   if (kind === 'req') return `<label class="field">${L}<input type="text" id="${id}" value="${esc(Array.isArray(val) ? val.map(r => r.join(' ')).join(', ') : '')}"></label>`;
   if (kind === 'abil') return `<div class="field" style="grid-column:1/-1">${L}<div class="abgrid">${ABIL.map(a => `<label class="field"><span class="small">${a.toUpperCase()}</span><input type="number" id="${id}-${a}" value="${esc((val || {})[a] || '')}"></label>`).join('')}</div></div>`;
@@ -3561,6 +3598,7 @@ function readField(f, rs, prefix, root) {
   if (kind === 'select' || kind === 'class' || kind === 'species' || kind === 'feat' || kind === 'spell') return v ? v.value : '';
   if (kind === 'csv') return csv(v && v.value);
   if (kind === 'csvnum' || kind === 'nums') { const a = csv(v && v.value).map(Number).filter(n => !isNaN(n)); return a.length ? a : null; }
+  if (kind === 'skillb') { const o = {}; for (const s of csv(v && v.value)) { const m = s.match(/^(.+?)\s*([+\-−]?\d+)$/); if (m) { const nm = m[1].trim().toLowerCase(); o[(SKILLS.find(k => k[1].toLowerCase() === nm || k[0] === slug(nm)) || [slug(nm)])[0]] = +m[2].replace('−', '-'); } } return Object.keys(o).length ? o : null; }
   if (kind === 'req') return csv(v && v.value).map(s => { const m = s.toLowerCase().match(/(str|dex|con|int|wis|cha)\w*\s*(\d+)/); return m ? [m[1], +m[2]] : null; }).filter(Boolean);
   if (kind === 'abil') { const o = {}; for (const a of ABIL) { const x = el(id + '-' + a); if (x && x.value !== '' && +x.value) o[a] = +x.value; } return o; }
   if (kind === 'abchecks') return ABIL.filter(a => { const x = el(id + '-' + a); return x && x.checked; });
@@ -3647,7 +3685,18 @@ function hbSummary(t, e) {
   if (t === 'items') return [e.cat, e.rar].filter(Boolean).join(' · ');
   if (t === 'feats') return [e.type, e.prereq].filter(Boolean).join(' · ');
   if (t === 'monsters') return ['CR ' + (e.cr == null ? '?' : e.cr), 'AC ' + (e.ac == null ? '?' : e.ac), (e.hp || '?') + ' HP'].join(', ');
+  if (t === 'conditions') return Object.keys(e.fx || {}).filter(k => e.fx[k]).map(k => ({ disAtk: 'attacks', disCheck: 'checks', disSave: 'saves', speed0: 'speed 0', advAgainst: 'attacked with advantage' }[k] || k)).join(', ') || 'rules text only';
   return e.src || '';
+}
+/* every rules and homebrew entry of one type, as [label, entry], for the editor's "Copy from…" box */
+function hbCopyOpts(type, rs) {
+  const out = new Map();
+  for (const r of rs === 'any' ? ['2024', '2014'] : [rs]) {
+    const R = registry(r);
+    const list = type === 'subspecies' ? R.list('species').flatMap(s => (s.subs || []).map(x => Object.assign({ of: s.id }, x))) : R.list(type);
+    for (const e of list) out.set(`${e.name} · ${e.src || ''}${rs === 'any' ? ' · ' + r : ''}`, e);
+  }
+  return Array.from(out);
 }
 function hbModal() {
   const m = UI.modal;
@@ -3656,6 +3705,7 @@ function hbModal() {
   const rs = (p && p.ruleset) || 'any';
   const e = m.entry;
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Edit entry"><div class="row"><h2>${m.isNew ? 'New' : can ? 'Edit' : 'View'} ${TYPE_LABEL[m.type].toLowerCase()}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    ${can ? `<div class="row"><input type="text" id="f-hbcp" list="f-hbcpl" placeholder="Copy from… (search the rules and homebrew)" aria-label="Copy from an existing entry" autocomplete="off" style="flex:1;min-width:200px"><datalist id="f-hbcpl">${hbCopyOpts(m.type, rs).map(([l]) => `<option value="${esc(l)}">`).join('')}</datalist><button class="btn sm" data-act="hbcopy">Fill the form</button></div>` : ''}
     <div class="grid2">${FORMS[m.type].map(f => fieldHTML(m.type, f, getP(e, f[0]), rs)).join('')}</div>
     ${m.err ? `<div class="errline">${esc(m.err)}</div>` : ''}
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button>${can ? `<button class="btn pri" data-act="hbsave">Save</button>` : ''}</div></div>`;
@@ -4573,7 +4623,7 @@ function render() {
   let body;
   try {
     if (S.dm && S.dm.combat && isDMish()) pruneGone(S.dm.combat);
-    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'prep' ? viewPrep() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : UI.view === 'map' ? viewMap() : viewChars();
+    body = (S.needCampaign && typeof viewJoin === 'function') ? viewJoin() : UI.view === 'party' ? viewParty() : (UI.view === 'combat' || UI.view === 'table') ? viewCombat() : UI.view === 'campaign' ? viewCampaign() : UI.view === 'prep' ? viewPrep() : UI.view === 'homebrew' ? viewHomebrew() : UI.view === 'log' ? viewLog() : UI.view === 'map' ? viewMap() : UI.view === 'chat' ? viewChat() : viewChars();
   } catch (err) {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
@@ -4695,7 +4745,7 @@ function addImportedChar(o) {
 function getD(ch) { return derive(ch); }
 
 const MODALS = {};   // extra dialogs registered by other files
-const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map', 'prep'];
+const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map', 'prep', 'chat'];
 const ACT = {
   view(el) { UI.view = el.dataset.v; UI.bmore = false; UI.chmore = false; if (!UI.fromUrl) LS.set('view', UI.view); queueRender(); window.scrollTo(0, 0); },
   open(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; LS.set('cur', UI.cur); UI.startSel = {}; UI.pk = {}; UI.flt = {}; queueRender(); },
@@ -4977,6 +5027,14 @@ const ACT = {
     catch (e) { toastMsg('Couldn’t create the pack: ' + ((e && e.message) || e)); }
   },
   hbedit(el) { const p = PACKS.find(x => x.id === UI.hb.pack); const e = ((p.entries || {})[UI.hb.type] || []).find(x => x.id === el.dataset.v); if (!e) return; openModal({ kind: 'hb', type: UI.hb.type, pack: p.id, entry: hbEntryForForm(UI.hb.type, e), isNew: false, id: e.id }); },
+  hbcopy() {
+    const m = UI.modal, p = PACKS.find(x => x.id === m.pack), rs = (p && p.ruleset) || 'any';
+    const hit = hbCopyOpts(m.type, rs).find(([l]) => l === (($('#f-hbcp') || {}).value || '').trim());
+    if (!hit) { m.entry = readForm(m.type, rs, m.entry); m.err = 'Pick an entry from the list that appears as you type.'; renderModal(); return; }
+    const typed = readForm(m.type, rs, m.entry).name, e = hbEntryForForm(m.type, hit[1]);
+    delete e.id; delete e.src; delete e.pack;
+    e.name = typed || e.name + ' (copy)'; m.entry = e; m.err = ''; renderModal();
+  },
   hbrowadd(el) { const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); const arr = getP(m.entry, el.dataset.p) || []; arr.push({}); setP(m.entry, el.dataset.p, arr); renderModal(); },
   hbrowrm(el) { const m = UI.modal; const p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); const arr = getP(m.entry, el.dataset.p) || []; arr.splice(+el.dataset.i, 1); setP(m.entry, el.dataset.p, arr); renderModal(); },
   async hbsave() {
@@ -5100,6 +5158,7 @@ function onChange(ev) {
   }
   if (el.id === 'f-files' || el.id === 'f-folder') readImportFiles(el.files);
   if (el.id === 'f-mapfile' && el.files && el.files[0]) { mapUpload(el.files[0]); el.value = ''; }
+  if (el.id === 'f-hoimg') { UI.hoFile = el.files && el.files[0] || null; queueRender(); }
 }
 function onClick(ev) {
   const el = ev.target.closest('[data-act]');
@@ -5112,6 +5171,7 @@ function onClick(ev) {
   if (fn) { if (el.dataset.act !== 'bgclose') ev.preventDefault(); fn(el, ev); }
 }
 function onKey(ev) {
+  if (ev.key === 'Enter' && ev.target.id === 'f-cttx') { ev.preventDefault(); ACT.ctsend(); return; }
   if (ev.key === 'Escape' && UI.modal) { closeModal(); return; }
   if (ev.key === 'Escape' && (UI.bmore || UI.chmore)) { closePops(); return; }
   if (ev.key === 'Tab' && UI.modal) {
@@ -5231,7 +5291,8 @@ function monExtra(d) {
   const all = [...(d.traits || []), ...(d.actions || []), ...(d.legendary || [])], txt = all.map(t => t.n + '. ' + t.d).join('\n');
   const lrE = all.find(t => /^legendary resistance/i.test(t.n)), lrM = lrE && (lrE.n + ' ' + lrE.d).match(/\((\d+)\/day/i), laM = txt.match(/(\d+) legendary actions/i);
   const lair = all.find(t => /^lair actions?/i.test(t.n));
-  return { la: (d.legendary || []).length || laM ? (laM ? +laM[1] : 3) : 0, lr: lrE ? (lrM ? +lrM[1] : 3) : 0, lair: lair ? lair.d : '' };
+  /* homebrew stat blocks can state both outright (d.la = legendary actions per round, d.lair = lair action text) */
+  return { la: (d.legendary || []).length || laM || +d.la ? (+d.la || (laM ? +laM[1] : 3)) : 0, lr: lrE ? (lrM ? +lrM[1] : 3) : 0, lair: d.lair || (lair ? lair.d : '') };
 }
 /* d20 for initiative; with a memo, creatures of one kind share the roll (group initiative). A surprised 2024 creature rolls with disadvantage. */
 function rollInit(c, memo) {
@@ -5318,6 +5379,15 @@ function findTarget(id) {
   if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); return x ? { kind: 'pc', x, name: x.ch.name, c } : null; }
   return { kind: 'mon', c, name: c.name, def: monDef(c) };
 }
+/* conditions on a target id (a fight row or pc|owner|cid), and whether attacks against it have advantage (homebrew conditions only) */
+function condsOf(id) {
+  id = String(id || '');
+  const pc = (cid, owner) => { const x = findChar(cid, owner); return x ? x.ch.play.cond || [] : []; };
+  if (id.startsWith('pc|')) { const [, owner, cid] = id.split('|'); return pc(cid, owner); }
+  const c = (isDMish() ? cbt().list : (S.init || {}).list || []).find(x => x.id === id);
+  return !c ? [] : c.kind === 'pc' ? pc(c.cid, c.owner) : c.cond || [];
+}
+const advVs = id => condsOf(id).some(c => (COND_FX[c] || {}).advAgainst);
 /* targets a sheet can aim at: the fight if one is running, otherwise the rest of the party */
 function targetsFor(ch, owner) {
   const I = S.init || {};
@@ -5378,14 +5448,14 @@ function logLine(m) {
   else if (m.kind === 'roll' && m.dmg != null && m.nat != null) e.detail = `${m.detail} · damage ${m.dmg} ${m.dt || ''} [${m.dmgDetail || ''}]`;
   else if (m.kind === 'save') { e.label = `${m.label}: ${String(m.ab || '').toUpperCase()} save${m.tgtNames ? ' → ' + m.tgtNames : ''}`; e.total = m.dmg; e.detail = m.dmg != null ? `${m.dmg} ${m.dt || ''} damage${m.half ? ', half on a success' : ''}` : ''; }
   else if (m.kind === 'apply') { e.label = `${m.label}${m.tgtNames ? ' → ' + m.tgtNames : ''}`; e.total = m.amount; e.detail = m.heal ? 'healing' : (m.dt || '') + ' damage'; }
-  else if (m.kind === 'res' || m.kind === 'req' || m.kind === 'note' || m.kind === 'turn') { e.text = m.kind === 'req' ? `The DM asks for ${m.label}` : m.text; e.hit = m.hit; }
+  else if (m.kind === 'res' || m.kind === 'req' || m.kind === 'note' || m.kind === 'turn' || m.kind === 'claim') { e.text = m.kind === 'req' ? `The DM asks for ${m.label}` : m.text; e.hit = m.hit; }
   return e;
 }
 function handleMsg(m) {
   if (!m || typeof m !== 'object') return;
   if (m.kind === 'ping') { if (!m.old) mapPing(m); return; }
   S.log.unshift(logLine(m)); S.log = S.log.slice(0, 150);
-  if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note' && m.kind !== 'turn') showRoll(S.log[0]);
+  if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note' && m.kind !== 'turn' && m.kind !== 'claim') showRoll(S.log[0]);
   if (m.kind === 'res' && !m.old) { S.lastResAt = Date.now(); toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); if (pend.vex && m.hit && +m.dealt > 0) { const x = findChar(pend.cid, pend.owner); if (x) savePlay(x.ch, { vex: pend.vex }); } } }
   if (m.kind === 'req') { S.reqs[m.rid] = Object.assign({}, m, { answers: {} }); if (!m.old && !m.isMe && myRequests().some(r => r.q.rid === m.rid)) { toastMsg('The DM asks for ' + m.label + '. Roll from the bar at the top.'); try { navigator.vibrate && navigator.vibrate(40); } catch (e) { } } }
   const q = m.ref && S.reqs[m.ref];
@@ -5406,6 +5476,7 @@ function handleMsg(m) {
     else if (m.kind === 'apply') resolveApply(m);
     else if (m.kind === 'init' && m.cid) setInitFor(m.cid, m.total);
     else if (m.kind === 'turn') resolveTurnMsg(m);
+    else if (m.kind === 'claim') resolveClaim(m);
   }
   if (typeof queueRender === 'function') queueRender();
 }
@@ -5518,7 +5589,7 @@ function fxRead(el) {
   return { n, r: +g('r') || null, ab, dc };
 }
 function crLabel(v) { return v === 0.125 ? '1/8' : v === 0.25 ? '1/4' : v === 0.5 ? '1/2' : String(v); }
-function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)}>${c}</button>`).join('')}</div>`; }
+function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>`; }
 function viewCombat() {
   if (UI.view === 'table') return viewCombatPublic(true);
   if (!isDMish()) return viewCombatPlayer();
@@ -5832,12 +5903,12 @@ Object.assign(ACT, {
   matk(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return;
     RUN.tgt = el.dataset.t != null ? el.dataset.t : ($('#f-mt') || {}).value || '';   // data-t: the target picked in the reaction-attack pop-up
-    const r = d20Roll({ bonus: +a.atk || 0, type: 'atk' }); const dm = rollDmgList(a.dmg || [], r.crit); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
+    const r = d20Roll({ bonus: +a.atk || 0, type: 'atk', vex: advVs(RUN.tgt) }); const dm = rollDmgList(a.dmg || [], r.crit); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
     sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: a.n, total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dm.total, dmgDetail: dm.detail, dt: dm.dt, tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: UI.priv });
   },
   mquick(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v); if (!c) return; RUN.tgt = ($('#f-mt') || {}).value || '';
-    const r = d20Roll({ bonus: +$('#f-qa').value || 0, type: 'atk' }); const expr = ($('#f-qd').value || '1').trim(); const dr = rollExpr(r.crit ? critExpr(expr) : expr); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
+    const r = d20Roll({ bonus: +$('#f-qa').value || 0, type: 'atk', vex: advVs(RUN.tgt) }); const expr = ($('#f-qd').value || '1').trim(); const dr = rollExpr(r.crit ? critExpr(expr) : expr); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
     sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: 'Attack', total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dr.total, dmgDetail: dr.detail, dt: '', tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: UI.priv });
   },
   msave(el) {
@@ -6022,7 +6093,7 @@ Object.assign(ACT, {
     const e = E(); if (!e) return; const ch = e.ch, D = getD(ch), M = fxMods(ch, D), a = D.attacks[+el.dataset.i]; if (!a) return;
     const g = el.dataset.g || '', am = ammoFor(ch, a);
     if (am && !am.none && !(+am.it.q) && !ch.free) { toastMsg(`Out of ${am.d.name.toLowerCase()}. Add more under Build → Equipment.`); return; }
-    const r = d20Roll({ M, a, bonus: a.atk, type: 'atk', critAt: critAt(D), vex: !!(ch.play.vex && UI.tgt && ch.play.vex === UI.tgt) });
+    const r = d20Roll({ M, a, bonus: a.atk, type: 'atk', critAt: critAt(D), vex: !!(ch.play.vex && UI.tgt && ch.play.vex === UI.tgt) || advVs(UI.tgt) });
     let expr = joinExpr(g === 'two' ? a.two : g === 'off' ? a.off : a.dmg, fxDamage(M, a, D)); if (r.crit) expr = critExpr(expr);
     const dr = rollExpr(expr), all = targetsFor(ch), t = all.find(x => x.id === UI.tgt), rid = uid('a');
     const once = M.defs.filter(f => f.once && fxApplies(f, a)).map(f => f.id);
@@ -6146,8 +6217,8 @@ function viewCampaign() {
     <div class="row"><button class="btn" data-act="backup">Download a campaign backup</button><button class="btn" data-act="hbimport">Restore characters from a backup</button></div></div>`;
   const hand = st.handouts || [];
   const handouts = `<div class="panel stack"><h3>Handouts for players</h3>
-    ${hand.map(h => `<div class="row"><b class="grow">${esc(h.title || 'Handout')}</b><button class="btn ghost sm danger" data-act="hodel" data-v="${esc(h.id)}">Remove</button></div>`).join('') || '<span class="small muted">Nothing shared yet. Handouts appear at the top of every player’s Party tab.</span>'}
-    <input type="text" id="f-hot" placeholder="Title, e.g. The letter from Baron Vey"><textarea id="f-hox" placeholder="Text the players can read"></textarea><button class="btn" data-act="hoadd" style="align-self:flex-start">Share handout</button></div>`;
+    ${hand.map(h => `<div class="row"><b class="grow">${esc(h.title || 'Handout')}${h.img ? ' <span class="pill">picture</span>' : ''}</b><button class="btn ghost sm danger" data-act="hodel" data-v="${esc(h.id)}">Remove</button></div>`).join('') || '<span class="small muted">Nothing shared yet. Handouts appear at the top of every player’s Party tab.</span>'}
+    <input type="text" id="f-hot" placeholder="Title, e.g. The letter from Baron Vey"><textarea id="f-hox" placeholder="Text the players can read"></textarea><label class="field"><span class="lbl">Picture (optional, shrunk for you)${UI.hoFile ? ': ' + esc(UI.hoFile.name) : ''}</span><input type="file" id="f-hoimg" accept="image/*"></label><button class="btn" data-act="hoadd" style="align-self:flex-start">Share handout</button></div>`;
   const notes = `<div class="panel stack"><h3>Private DM notes</h3><textarea id="f-dmnotes" style="min-height:180px" placeholder="Only you can read these.">${esc((S.dm || {}).notes || '')}</textarea><span class="small muted">Saved a moment after you stop typing.${live ? ' Stored where only the DM can read.' : ''}</span></div>`;
   const windows = window.PL_SITE ? `<div class="panel stack"><h3>More windows</h3><div class="row">${[['combat', 'Combat screen'], ['party', 'Party'], ['log', 'Dice log'], ['table', 'Table display for players'], ['map&pv=1', 'Battle map for a TV']].map(([k, l]) => `<a class="btn" href="?v=${k}${location.hash}" target="_blank" rel="noopener">${l}</a>`).join('')}</div><span class="small muted">Each opens in its own window and stays in sync. The table display shows the turn order with nothing secret on it, for a TV or shared screen.</span></div>` : '';
   return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Campaign</h2>${S.campaign ? `<span class="pill">${esc(S.campaign.name || '')}</span>` : ''}</div><div class="grid2" style="align-items:start"><div class="stack">${rules}${sheets}</div><div class="stack">${windows}${notes}${handouts}</div></div>`;
@@ -6170,12 +6241,19 @@ Object.assign(ACT, {
     if (!cur.size) { toastMsg('Leave at least one method on.'); queueRender(); return; }
     saveSettings({ methods: Array.from(cur) }); queueRender();
   },
-  hoadd() {
-    const tb = $('#f-hot'), xb = $('#f-hox'); const text = (xb.value || '').trim(); if (!text) { toastMsg('Write the handout text first.'); return; }
-    const list = ((S.settings || {}).handouts || []).concat([{ id: uid('h'), title: (tb.value || '').trim() || 'Handout', text: text.slice(0, 6000) }]);
-    tb.value = ''; xb.value = ''; saveSettings({ handouts: list }); toastMsg('Shared with the players.'); queueRender();
+  async hoadd() {
+    const tb = $('#f-hot'), xb = $('#f-hox'), file = UI.hoFile; const text = (xb.value || '').trim(); if (!text && !file) { toastMsg('Write the handout text first, or add a picture.'); return; }
+    const ho = { id: uid('h'), title: (tb.value || '').trim() || 'Handout', text: text.slice(0, 6000) };
+    if (file) { try { await hoimgPut(ho, file); } catch (e) { toastMsg((e && e.message) || 'The picture could not be uploaded.'); return; } }
+    const list = ((S.settings || {}).handouts || []).concat([ho]);
+    tb.value = ''; xb.value = ''; UI.hoFile = null; saveSettings({ handouts: list }); toastMsg('Shared with the players.'); queueRender();
   },
-  hodel(el) { saveSettings({ handouts: ((S.settings || {}).handouts || []).filter(h => h.id !== el.dataset.v) }); queueRender(); },
+  hodel(el) {
+    const old = ((S.settings || {}).handouts || []).find(h => h.id === el.dataset.v);
+    if (old && old.img && old.img.parts && S.db) for (let i = 0; i < old.img.parts; i++) S.db.doc(`campaign/hoimg-${old.id}-${i}`).delete().catch(() => { });
+    saveSettings({ handouts: ((S.settings || {}).handouts || []).filter(h => h.id !== el.dataset.v) }); queueRender();
+  },
+  hoview(el) { openModal({ kind: 'hoimg', id: el.dataset.v }); },
   moveto(el) {
     const cid = el.dataset.cid, from = el.dataset.owner, sel = document.getElementById(`f-mv-${from}-${cid}`), to = sel && sel.value;
     const src = S.docs[from]; if (!to || !src || !(src.chars || {})[cid]) return;
@@ -6348,7 +6426,8 @@ function giveLoot(x, lines) {
   }
   saveChar(ch); queueRender();
 }
-const whoSel = id => `<select id="${id}" aria-label="Give to">${chars().map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('') || opt('', 'No characters')}</select>`;
+const whoSel = id => `<select id="${id}" aria-label="Give to">${chars().map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('')}${opt('stash', 'Party stash')}</select>`;
+const toStash = id => ($('#' + id) || {}).value === 'stash';
 const whoPick = id => { const [o, c] = String(($('#' + id) || {}).value || '').split('|'); return findChar(c, o); };
 function prepLoot() {
   const P = pp(), mine = prep().tables, all = LOOT_BUILTIN.concat(mine), t = all.find(x => x.id === P.tbl) || all[0], own = mine.some(x => x.id === t.id), r = P.res;
@@ -6425,7 +6504,9 @@ Object.assign(ACT, {
     P.res = rollTable(t); P.note = ''; if (!P.res) toastMsg('Give at least one row a weight first.'); queueRender();
   },
   lootgive() {
-    const P = pp(), x = whoPick('f-lwho'); if (!x || !P.res) return;
+    const P = pp(), x = whoPick('f-lwho'); if (!P.res) return;
+    if (toStash('f-lwho')) { stashAdd(P.res.lines); P.note = `Put ${P.res.lines.map(lineText).join(', ') || 'nothing'} in the party stash.`; queueRender(); return; }
+    if (!x) return;
     giveLoot(x, P.res.lines); P.note = `Gave ${P.res.lines.map(lineText).join(', ') || 'nothing'} to ${x.ch.name}.`; queueRender();
   },
   lootsplit() {
@@ -6436,8 +6517,10 @@ Object.assign(ACT, {
     queueRender();
   },
   giveitem(el) {
-    const P = pp(), x = whoPick('f-gwho'), d = registry(P.rs).items.get(el.dataset.v); if (!x || !d) return;
-    const n = clamp(Math.round(+$('#f-gn').value) || 1, 1, 999); giveLoot(x, [{ i: d.id, name: d.name, n }]); toastMsg(`Gave ${n > 1 ? n + ' × ' : ''}${d.name} to ${x.ch.name}.`);
+    const P = pp(), x = whoPick('f-gwho'), d = registry(P.rs).items.get(el.dataset.v); if (!d || !(x || toStash('f-gwho'))) return;
+    const n = clamp(Math.round(+$('#f-gn').value) || 1, 1, 999);
+    if (!x) { stashAdd([{ i: d.id, name: d.name, n }]); toastMsg(`Put ${n > 1 ? n + ' × ' : ''}${d.name} in the party stash.`); return; }
+    giveLoot(x, [{ i: d.id, name: d.name, n }]); toastMsg(`Gave ${n > 1 ? n + ' × ' : ''}${d.name} to ${x.ch.name}.`);
   },
 });
 
@@ -6561,6 +6644,7 @@ async function fbJoin(code, onChange) {
   try { if (location.hash !== '#' + code) history.replaceState(null, '', '#' + code); } catch (e) { }
   S.needCampaign = false; S.joinErr = '';
   await startLive({ db: fbDb('campaigns/' + code), user: fbUser, room: fbRoom('campaigns/' + code), dl: fbDl }, onChange);
+  talkSubscribe();
   const nm = LS.get('pname', '');
   if (nm) S.db.doc('characters/' + FB.uid).update({ owner: FB.uid, player: nm }).catch(() => { });
   return true;
@@ -6909,26 +6993,30 @@ async function mapUpload(file) {
   if (!/^image\//.test(file.type || '') && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name || '')) { toastMsg('That isn’t a picture. Use a PNG, JPG or WebP map.'); return; }
   MAP.busy = 'Preparing the map…'; queueRender();
   try {
-    const url = URL.createObjectURL(file);
+    const { data, w, h, cv } = await imgShrink(file, MAP_MAXDIM, MAP_MAXPARTS);
+    MAP.busy = 'Looking for the grid in the picture…'; queueRender(); await new Promise(r => setTimeout(r, 30));
+    let grid = null; try { grid = mapDetectGrid(cv); } catch (e) { grid = null; }
+    return await mapPublish(data, w, h, grid, file.name);
+  } catch (e) { toastMsg((e && e.message) || 'The map could not be uploaded.'); }
+  finally { MAP.busy = ''; queueRender(); }
+}
+/* shrink a picture to a JPEG data URL that fits in `parts` chunks of MAP_PART (maps and handout pictures both use this); also returns the canvas */
+async function imgShrink(file, maxDim, parts) {
+  const url = URL.createObjectURL(file);
+  try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That picture could not be opened.')); i.src = url; });
     const ow = img.naturalWidth, oh = img.naturalHeight;
-    let scale = Math.min(1, MAP_MAXDIM / Math.max(ow, oh)), q = 0.85, data = '';
+    let scale = Math.min(1, maxDim / Math.max(ow, oh)), q = 0.85;
     for (let tries = 0; tries < 8; tries++) {
       const w = Math.max(1, Math.round(ow * scale)), h = Math.max(1, Math.round(oh * scale));
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       const cx = cv.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
-      data = cv.toDataURL('image/jpeg', q);
-      if (data.length <= MAP_PART * MAP_MAXPARTS) {
-        URL.revokeObjectURL(url);
-        MAP.busy = 'Looking for the grid in the picture…'; queueRender(); await new Promise(r => setTimeout(r, 30));
-        let grid = null; try { grid = mapDetectGrid(cv); } catch (e) { grid = null; }
-        return await mapPublish(data, w, h, grid, file.name);
-      }
+      const data = cv.toDataURL('image/jpeg', q);
+      if (data.length <= MAP_PART * parts) return { data, w, h, cv };
       if (q > 0.6) q -= 0.12; else scale *= 0.8;
     }
     throw new Error('That picture is too large even after shrinking it.');
-  } catch (e) { toastMsg((e && e.message) || 'The map could not be uploaded.'); }
-  finally { MAP.busy = ''; queueRender(); }
+  } finally { URL.revokeObjectURL(url); }
 }
 async function mapPublish(data, w, h, grid, fname) {
   const id = uid('map');
@@ -7405,7 +7493,8 @@ function svgIcon(n, s) {
   if (n === 'sun') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>`;
   if (n === 'moon') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>`;
   if (n === 'auto') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg>`;
-  if (n === 'plus') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+  if (n === 'chat') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.3-4.3A8 8 0 1 1 21 12z"/></svg>`;
+  if (n === 'plus') return`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
   if (n === 'x') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   if (n === 'map') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`;
   return '';
@@ -7896,7 +7985,7 @@ function b23Icon(n, s) {
   if (n === 'more') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>`;
   return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${B23_ICONS[n] || ''}</svg>`;
 }
-function b23After() { try { const bar = document.querySelector('.bar'); if (bar) document.documentElement.style.setProperty('--barh', bar.offsetHeight + 'px'); } catch (e) { } }
+function b23After() { try { const bar = document.querySelector('.bar'); if (bar) document.documentElement.style.setProperty('--barh', bar.offsetHeight + 'px'); const lg = document.getElementById('ctlog'); if (lg) lg.scrollTop = lg.scrollHeight; } catch (e) { } }
 function bottomNav() {
   if (S.needCampaign || UI.view === 'table' || (UI.view === 'map' && typeof MAP !== 'undefined' && MAP.tv)) return '';
   const f = fightState(), hasMap = typeof viewMap === 'function';
@@ -7939,6 +8028,207 @@ document.addEventListener('keydown', e => {
   const k = (e.key || '').toLowerCase(); if (k !== 'n' && k !== 'p') return;
   const cb = cbt(); if (!(cb.list || []).length) return;
   e.preventDefault(); if (k === 'n') ACT.cnext(); else ACT.cprev();
+});
+
+'use strict';
+/* ===== Build 30: chat with whispers, handout pictures, party stash, scheduling poll =====
+   chat:   campaigns/<code>/talk/<id> { by, to: 'all' | 'dm' | <uid>, name, text, at }. Only the sender, the addressee and the DM can read a whisper (firestore.rules),
+           so players listen with three filtered queries (to all, to me, by me) and the DM with one open query. Device-only in local mode.
+   images: handout pictures are shrunk like the map and stored as campaign/hoimg-<handout>-<n> chunks of ~900 KB.
+   stash:  campaign/stash { items: [{id, i, name, n}], coins }, DM-written. A player's Claim travels as a 'claim' message; the resolver DM window moves the item.
+   poll:   settings.poll { id, opts: [{id, t}], closed, pick } and settings.next; each voter's answers live in their own characters/<uid> doc as poll { pid, v: {optId: y|m|n} }. */
+const TALK = { list: [], parts: [], unsub: [], seen: 0 };
+const talkKey = () => 'talkseen.' + ((S.campaign && S.campaign.code) || '');
+const talkLive = () => S.mode === 'live' && !!FB.fs && !!FB.code && !!FB.uid;
+function talkMerge() {
+  const all = new Map(); for (const p of TALK.parts) for (const m of p || []) all.set(m.id, m);
+  TALK.list = Array.from(all.values()).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)).slice(-100);
+}
+function talkSubscribe() {
+  TALK.unsub.forEach(f => { try { f(); } catch (e) { } }); TALK.unsub = []; TALK.parts = []; S.talkErr = false;
+  if (!talkLive()) { TALK.list = LS.get('talk', []); TALK.seen = LS.get(talkKey(), 0); return; }
+  TALK.list = [];
+  TALK.seen = LS.get(talkKey(), null);
+  if (TALK.seen == null) { TALK.seen = Date.now(); LS.set(talkKey(), TALK.seen); }   // a device's first visit counts old messages as read
+  const col = FB.fs.collection('campaigns/' + FB.code + '/talk');
+  const mine = (f, v) => col.where(f, '==', v).orderBy(firebase.firestore.FieldPath.documentId(), 'desc').limit(100);   // equality plus document id needs no extra index; ids sort by time
+  const qs = S.me.isOwner ? [col.orderBy('at', 'desc').limit(100)] : [mine('to', 'all'), mine('to', FB.uid), mine('by', FB.uid)];
+  qs.forEach((q, i) => TALK.unsub.push(q.onSnapshot(snap => {
+    TALK.parts[i] = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); talkMerge(); queueRender();
+  }, () => { S.talkErr = true; queueRender(); })));
+}
+function talkSend(to, text) {
+  text = String(text || '').trim().slice(0, 500); if (!text) return false;
+  const m = { by: S.me.id || 'local', to, name: S.mode === 'live' && S.me.isOwner ? 'DM' : (LS.get('pname', '') || 'Player'), text, at: Date.now() };
+  if (talkLive()) {
+    const id = m.at.toString(36).padStart(9, '0') + Math.random().toString(36).slice(2, 6);
+    FB.fs.doc('campaigns/' + FB.code + '/talk/' + id).set(m).catch(e => { if (e && e.code === 'permission-denied') S.talkErr = true; else toastMsg('The message was not sent: ' + ((e && e.message) || e)); queueRender(); });
+  } else { m.id = uid('t'); TALK.list = TALK.list.concat(m).slice(-100); LS.set('talk', TALK.list); }
+  return true;
+}
+const talkUnread = () => UI.view === 'chat' ? 0 : TALK.list.filter(m => m.at > (TALK.seen || 0) && m.by !== (S.me.id || 'local')).length;
+const talkWho = id => id === 'all' ? 'everyone' : (id === S.me.id || (id === 'dm' && S.me.isOwner)) ? 'you' : id === 'dm' ? 'the DM' : ((S.docs[id] || {}).player || 'a player');
+function chatBtn() {
+  if (S.needCampaign) return '';
+  const n = talkUnread();
+  return `<button class="btn ghost sm chatbtn" data-act="chat"${pressed(UI.view === 'chat')} title="Chat and whispers" aria-label="Chat${n ? ', ' + n + ' unread' : ''}">${svgIcon('chat', 18)}${n ? `<span class="pill bad">${n}</span>` : ''}</button>`;
+}
+function viewChat() {
+  const me = S.me.id || 'local', live = talkLive(), dm = live && S.me.isOwner;
+  TALK.seen = Math.max(TALK.seen || 0, ...TALK.list.map(m => m.at)); LS.set(talkKey(), TALK.seen);
+  const people = live ? Object.keys(S.docs).filter(o => o !== me).map(o => [o, ((S.docs[o] || {}).player || 'Player') + ' (whisper)']) : [];
+  const targets = [['all', 'Everyone']].concat(live && !dm ? [['dm', 'The DM (whisper)']] : [], people);
+  const to = targets.some(t => t[0] === UI.ctTo) ? UI.ctTo : 'all';
+  const row = m => `<div class="ctm${m.to !== 'all' ? ' wh' : ''}${m.by === me ? ' me' : ''}"><div class="row small"><b>${esc(m.by === me ? 'You' : m.name || 'Someone')}</b>${m.to !== 'all' ? `<span class="pill brass">whisper to ${esc(talkWho(m.to))}</span>` : ''}<span class="spacer"></span><span class="muted">${new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>${dm ? `<button class="btn ghost sm danger" data-act="ctdel" data-v="${esc(m.id)}" aria-label="Delete this message">${svgIcon('x', 14)}</button>` : ''}</div><div class="tx">${esc(m.text)}</div></div>`;
+  return `<div class="stack" style="max-width:760px;margin:0 auto"><div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Chat</h2><span class="spacer"></span><button class="btn sm" data-act="chat">Back</button></div>
+    ${S.talkErr ? '<div class="warnline" id="ct-note">The DM needs to publish the new Firebase rules (firestore.rules) to turn on chat.</div>' : ''}
+    ${live ? '<p class="small muted">Everyone sees messages sent to Everyone. A whisper is seen only by you, the person you send it to, and the DM.</p>' : '<p class="small muted">This device only: messages stay here. Join a campaign to chat with your table.</p>'}
+    <div class="ctlog" id="ctlog" role="log" aria-label="Messages">${TALK.list.map(row).join('') || '<div class="empty">No messages yet.</div>'}</div>
+    <div class="row"><select id="f-ctto" data-act="ctto" aria-label="Send to">${targets.map(([v, l]) => opt(v, l, v === to)).join('')}</select><input type="text" id="f-cttx" maxlength="500" placeholder="Message" aria-label="Message" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" data-act="ctsend">Send</button></div></div>`;
+}
+
+/* ----- handout pictures ----- */
+const HOIMG = {};   // handout id -> object URL of the picture ('' while it loads)
+function dataToUrl(d) { const b = atob(String(d).split(',')[1] || ''), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return URL.createObjectURL(new Blob([u], { type: 'image/jpeg' })); }
+async function hoimgPut(ho, file) {
+  const { data, w, h } = await imgShrink(file, 1600, 3);
+  if (S.mode === 'live') {
+    const parts = Math.ceil(data.length / MAP_PART);
+    for (let i = 0; i < parts; i++) await S.db.doc(`campaign/hoimg-${ho.id}-${i}`).set({ id: ho.id, i, d: data.slice(i * MAP_PART, (i + 1) * MAP_PART) });
+    ho.img = { parts, w, h };
+  } else ho.img = { d: data, w, h };   // shortcut: device-only mode keeps the picture inside the handout (browser storage, about 5 MB), fine for one or two pictures
+  HOIMG[ho.id] = dataToUrl(data);
+}
+function hoSrc(ho) {
+  if (!(ho.id in HOIMG)) {
+    HOIMG[ho.id] = '';
+    if (ho.img.d) HOIMG[ho.id] = dataToUrl(ho.img.d);
+    else if (S.db) (async () => {
+      try { const ps = []; for (let i = 0; i < ho.img.parts; i++) { const g = await S.db.doc(`campaign/hoimg-${ho.id}-${i}`).get(); if (!g.exists) throw new Error('missing'); ps.push(g.data().d); } HOIMG[ho.id] = dataToUrl(ps.join('')); }
+      catch (e) { /* stays empty: shown as still loading until the page is reopened */ }
+      queueRender();
+    })();
+  }
+  return HOIMG[ho.id];
+}
+const hoImg = ho => { if (!ho.img) return ''; const s = hoSrc(ho); return s ? `<img class="hoimg" src="${s}" alt="${esc(ho.title || 'Handout')}" data-act="hoview" data-v="${esc(ho.id)}" role="button" tabindex="0" title="Tap to view full screen">` : '<div class="small muted">Loading the picture…</div>'; };
+MODALS.hoimg = () => {
+  const ho = ((S.settings || {}).handouts || []).find(x => x.id === UI.modal.id), s = ho && ho.img ? hoSrc(ho) : '';
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(ho ? ho.title : 'Picture')}" style="width:100%;min-height:calc(100vh - 32px)"><div class="row"><h2>${esc(ho ? ho.title : '')}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>${s ? `<img class="hoimg-big" src="${s}" alt="${esc(ho.title || 'Handout')}">` : '<p class="muted">The picture is not available.</p>'}</div>`;
+};
+
+/* ----- party stash ----- */
+const stashOf = () => { const s = clone(S.stash || {}); s.items = s.items || []; s.coins = s.coins || {}; return s; };
+function saveStash(st) {
+  S.stash = st;
+  if (S.mode === 'live') { if (S.me.isOwner) queueWrite('campaign/stash', st, 150); } else LS.set('stash', st);
+  queueRender();
+}
+/* lines are { coin, i, name, n } like the loot roller's */
+function stashAdd(lines) {
+  const st = stashOf();
+  for (const l of lines) {
+    if (l.coin) { st.coins[l.i] = (+st.coins[l.i] || 0) + l.n; continue; }
+    const name = l.name || l.i, ex = st.items.find(y => y.name === name);
+    if (ex) ex.n += l.n; else st.items.push({ id: uid('si'), i: l.i, name, n: l.n });
+  }
+  saveStash(st);
+}
+/* the DM window that settles rolls also settles claims: the item goes into the player's sheet and leaves the stash */
+function resolveClaim(m) {
+  const st = stashOf(), it = st.items.find(x => x.id === m.sid), x = findChar(m.cid, m.owner);
+  if (!x || (S.mode === 'live' && m.by && m.by !== x.owner)) return;
+  if (!it) { sendMsg({ kind: 'res', text: `${m.name || 'That item'} is already gone from the party stash.`, hit: false }); return; }
+  giveLoot(x, [{ i: it.i, name: it.name, n: it.n }]);
+  st.items = st.items.filter(y => y.id !== it.id); saveStash(st);
+  sendMsg({ kind: 'res', text: `${x.ch.name} takes ${it.n > 1 ? it.n + ' × ' : ''}${it.name} from the party stash.`, hit: true });
+}
+function stashPanel() {
+  const st = stashOf(), dm = isDMish(), coins = COINS.filter(c => +st.coins[c] > 0), mine = chars().filter(x => x.mine);
+  if (!dm && !st.items.length && !coins.length) return '';
+  return `<div class="panel stack" id="stash" style="margin-bottom:12px"><div class="ph">Party stash</div>
+    ${!dm && mine.length > 1 ? `<label class="row small" style="gap:6px">Claim for <select id="f-clwho" aria-label="Claim for">${mine.map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('')}</select></label>` : ''}
+    ${coins.length ? `<div class="row small">${coins.map(c => `<span class="pill">${fmtN(st.coins[c])} ${c}</span>`).join('')}${dm ? '<button class="btn sm" data-act="stsplit">Split evenly</button>' : '<span class="muted">The DM splits coins between you.</span>'}</div>` : ''}
+    ${st.items.map(it => `<div class="row"><b class="grow">${it.n > 1 ? it.n + ' × ' : ''}${esc(it.name)}</b>${dm ? `<button class="btn ghost sm danger" data-act="stdel" data-v="${esc(it.id)}">Remove</button>` : mine.length ? `<button class="btn sm pri" data-act="stclaim" data-v="${esc(it.id)}">Claim</button>` : ''}</div>`).join('')}
+    ${!st.items.length && !coins.length ? '<span class="small muted">Nothing in the stash yet. Add items and coins below, or send loot here from Prep.</span>' : ''}
+    ${dm ? `<div class="row"><input type="text" id="f-stn" list="f-stitems" placeholder="Item" aria-label="Item name" autocomplete="off" style="flex:1;min-width:140px"><datalist id="f-stitems">${registry('2024').list('items').map(i => `<option value="${esc(i.name)}">`).join('')}</datalist><input type="number" id="f-stq" min="1" value="1" style="width:64px" aria-label="How many"><button class="btn sm" data-act="stadd">Add item</button></div>
+    <div class="row">${COINS.map(c => `<label class="row small" style="gap:4px">${c}<input type="number" id="f-stc-${c}" min="0" style="width:68px" aria-label="${c}"></label>`).join('')}<button class="btn sm" data-act="stcoin">Add coins</button></div>` : ''}</div>`;
+}
+
+/* ----- scheduling poll ----- */
+const fmtWhen = t => { const d = new Date(t); return isNaN(d) ? String(t) : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+function pollTally(poll) {
+  const out = Object.fromEntries(poll.opts.map(o => [o.id, { y: [], m: [], n: [] }]));
+  for (const [owner, doc] of Object.entries(S.docs)) {
+    const pv = doc && doc.poll; if (!pv || pv.pid !== poll.id) continue;
+    for (const o of poll.opts) { const a = out[o.id][(pv.v || {})[o.id]]; if (a) a.push(playerName(owner)); }
+  }
+  return out;
+}
+function sessionPanel() {
+  const st = S.settings || {}, poll = st.poll, dm = isDMish(), me = S.me.id || 'local';
+  const next = st.next ? `<div class="note row" id="nextsess" style="margin-bottom:12px"><span><b>Next session:</b> ${esc(fmtWhen(st.next))}</span>${dm ? '<span class="spacer"></span><button class="btn ghost sm" data-act="nextclear">Clear</button>' : ''}</div>` : '';
+  if (!poll || !(poll.opts || []).length) {
+    return next + (dm ? `<details class="panel" data-k="pollnew" style="margin-bottom:12px"><summary class="ph" style="cursor:pointer;margin:0">Plan the next session</summary><div class="stack" style="margin-top:10px"><span class="small muted">Propose up to 6 dates. Everyone votes yes, maybe or no on each.</span><div class="grid2">${[0, 1, 2, 3, 4, 5].map(i => `<input type="datetime-local" id="f-pl${i}" aria-label="Date option ${i + 1}">`).join('')}</div><button class="btn pri" data-act="pollstart" style="align-self:flex-start">Start the poll</button></div></details>` : '');
+  }
+  const tally = pollTally(poll), cur = (S.docs[me] || {}).poll || {}, my = cur.pid === poll.id ? cur.v || {} : {};
+  const rows = poll.opts.map(o => {
+    const t = tally[o.id], who = [['y', 'Yes'], ['m', 'Maybe'], ['n', 'No']].filter(([k]) => t[k].length).map(([k, l]) => `${l}: ${esc(t[k].join(', '))}`).join(' · ');
+    return `<div class="stack" data-opt="${esc(o.id)}" style="gap:4px"><div class="row"><b class="grow">${esc(fmtWhen(o.t))}${poll.pick === o.id ? ' <span class="pill acc">chosen</span>' : ''}</b>
+      <span class="seg" role="group" aria-label="Your vote for ${esc(fmtWhen(o.t))}">${[['y', 'Yes'], ['m', 'Maybe'], ['n', 'No']].map(([k, l]) => `<button data-act="pollvote" data-o="${esc(o.id)}" data-v="${k}"${pressed(my[o.id] === k)}${dis(poll.closed)}>${l}</button>`).join('')}</span>
+      <span class="small" data-tally="${esc(o.id)}"><span class="pill acc">${t.y.length} yes</span> <span class="pill">${t.m.length} maybe</span> <span class="pill">${t.n.length} no</span></span>
+      ${dm && !poll.closed ? `<button class="btn sm" data-act="pollpick" data-o="${esc(o.id)}">Pick this</button>` : ''}</div>${who ? `<div class="small muted">${who}</div>` : ''}</div>`;
+  }).join('');
+  return next + `<div class="panel stack" id="poll" style="margin-bottom:12px"><div class="ph">When shall we meet?${poll.closed ? '<span class="pill">closed</span>' : ''}<span class="spacer"></span>${dm ? `<button class="btn ghost sm" data-act="pollcancel">${poll.closed ? 'Start a new poll' : 'Cancel the poll'}</button>` : ''}</div>${rows}</div>`;
+}
+Object.assign(ACT, {
+  chat() { if (UI.view === 'chat') UI.view = UI.chatBack || 'chars'; else { UI.chatBack = UI.view; UI.view = 'chat'; } UI.bmore = false; queueRender(); window.scrollTo(0, 0); },
+  ctto(el) { UI.ctTo = el.value; },
+  ctsend() { const tb = $('#f-cttx'); if (!tb) return; if (talkSend(($('#f-ctto') || {}).value || 'all', tb.value)) { tb.value = ''; queueRender(); } },
+  ctdel(el) {
+    if (talkLive()) FB.fs.doc('campaigns/' + FB.code + '/talk/' + el.dataset.v).delete().catch(() => { });
+    else { TALK.list = TALK.list.filter(m => m.id !== el.dataset.v); LS.set('talk', TALK.list); queueRender(); }
+  },
+  stadd() {
+    const nb = $('#f-stn'), n = (nb.value || '').trim(); if (!n) { toastMsg('Name the item first.'); return; }
+    const d = registry('2024').list('items').find(m => m.name.toLowerCase() === n.toLowerCase());
+    stashAdd([{ i: d ? d.id : n, name: d ? d.name : n, n: clamp(Math.round(+$('#f-stq').value) || 1, 1, 999) }]); nb.value = '';
+  },
+  stcoin() {
+    const lines = COINS.map(c => ({ coin: true, i: c, n: Math.max(0, Math.floor(+($('#f-stc-' + c) || {}).value || 0)) })).filter(l => l.n > 0);
+    if (!lines.length) { toastMsg('Type how many coins first.'); return; }
+    COINS.forEach(c => { $('#f-stc-' + c).value = ''; }); stashAdd(lines);
+  },
+  stdel(el) { const st = stashOf(); st.items = st.items.filter(x => x.id !== el.dataset.v); saveStash(st); },
+  stsplit() {
+    const st = stashOf(), xs = chars(), coins = COINS.filter(c => +st.coins[c] > 0).map(c => ({ coin: true, i: c, n: +st.coins[c] }));
+    if (!xs.length || !coins.length) { toastMsg('There are no coins to split.'); return; }
+    const each = coins.map(l => Object.assign({}, l, { n: Math.floor(l.n / xs.length) })).filter(l => l.n > 0);
+    for (const x of xs) giveLoot(x, each);
+    for (const l of coins) st.coins[l.i] = l.n % xs.length;
+    saveStash(st); toastMsg(`Split ${xs.length} ways: ${each.map(lineText).join(', ') || 'nothing'} each.`);
+  },
+  stclaim(el) {
+    const sel = $('#f-clwho'), [o, c] = String((sel && sel.value) || '').split('|'), x = sel ? findChar(c, o) : chars().find(y => y.mine), it = stashOf().items.find(y => y.id === el.dataset.v);
+    if (!x || !it) return;
+    sendMsg({ kind: 'claim', sid: it.id, cid: x.ch.id, owner: x.owner, who: x.ch.name, name: it.name, text: `${x.ch.name} claims ${it.name}` }); toastMsg('Claim sent to the DM.');
+  },
+  pollstart() {
+    const opts = [0, 1, 2, 3, 4, 5].map(i => ($('#f-pl' + i) || {}).value).filter(Boolean).map(t => ({ id: uid('o'), t }));
+    if (opts.length < 2) { toastMsg('Add at least two dates.'); return; }
+    saveSettings({ poll: { id: uid('pl'), opts, closed: false, pick: '' } }); queueRender();
+  },
+  pollvote(el) {
+    const poll = (S.settings || {}).poll; if (!poll || poll.closed) return;
+    const me = S.me.id || 'local', cur = (S.docs[me] || {}).poll || {};
+    const patch = { poll: { pid: poll.id, v: Object.assign({}, cur.pid === poll.id ? cur.v : {}, { [el.dataset.o]: el.dataset.v }) } };
+    applyLocalDoc(me, patch);
+    if (S.mode === 'live') queueWrite('characters/' + me, patch, 250); else LS.set('pollvote', S.docs[me].poll);
+    queueRender();
+  },
+  pollpick(el) { const p = (S.settings || {}).poll, o = p && p.opts.find(x => x.id === el.dataset.o); if (!o) return; saveSettings({ poll: Object.assign({}, p, { closed: true, pick: o.id }), next: o.t }); queueRender(); },
+  pollcancel() { saveSettings({ poll: null }); queueRender(); },
+  nextclear() { saveSettings({ next: '' }); queueRender(); },
 });
 </script>
 </body>
