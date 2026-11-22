@@ -544,6 +544,98 @@ input[type=text], input[type=number], input[type=search], select, textarea { bor
 .cbsheet .sheet { grid-template-columns: minmax(0, 1fr); }
 .cbsheet .sec-skills, .cbsheet .sec-features, .cbsheet .sec-gear, .cbsheet .sec-notes, .cbsheet .secnav, .cbsheet .xpbox { display: none !important; }
 .cbsheet .sheet .sec.sec-top, .cbsheet .sheet .sec.sec-actions, .cbsheet .sheet .sec.sec-spells { display: flex !important; }
+/* ===== Build 23: at the table. Phones get a thumb-reach tab bar and finger-sized controls;
+   the sheet leads with what you do on your turn. ===== */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn.sm { min-height: 40px; padding-inline: 12px; }
+  .tab { min-height: 44px; }
+  .seg button { min-height: 40px; }
+  .seg button.mini { min-height: 36px; }
+  .roll { min-height: 40px; padding-inline: 10px; }
+  .cond button { min-height: 40px; padding-inline: 13px; font-size: 14px; }
+  .btn.exh { min-width: 36px; min-height: 36px; }
+  .secnav button { min-height: 40px; }
+  .ln { min-height: 44px; }
+  .pip { width: 36px; height: 36px; }
+  .pip::before { width: 15px; height: 15px; }
+  .pip.circ::before { width: 18px; height: 18px; }
+  label.chk { min-height: 40px; }
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+  /* 16px stops phones zooming the page every time you tap a field */
+  input:not([type]), input[type=text], input[type=number], input[type=search], select, textarea { font-size: 16px; min-height: 44px; }
+  .chead .cname { font-size: 34px; }
+  .themebtn, .campbtn { min-height: 40px; }
+  .themebtn { min-width: 40px; }
+  .step { min-height: 44px; }
+  .seg button.mini { min-height: 40px; }
+  summary { padding-block: 10px; }
+  .spl .nm { display: inline-block; padding-block: 8px; }
+  .pillbtn { min-height: 36px; display: inline-flex; align-items: center; }
+}
+/* laptops and big screens */
+.bar-in, .wrap, .reqbar-in { max-width: 1680px; }
+.vitals.vd { display: none; }
+.kbdhint { display: none; }
+@media (min-width: 701px) {
+  :not(.cbsheet) > .sheet .vitals.vd { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :not(.cbsheet) > .sheet .sec-top > .vitals { display: none; }
+  :not(.cbsheet) > .sheet .turnbar > .small { display: none; }
+  :not(.cbsheet) > .sheet .sec-spells:has(> .nospell) { display: none; }
+  .ctool { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--barh, 56px)); z-index: 6; background: var(--bg); padding-block: 8px; margin-block: -8px; }
+}
+@media (min-width: 701px) and (hover: hover) { .kbdhint { display: inline; } }
+@media (min-width: 1101px) {
+  .cbsheet .vitals { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .cbsheet .sec-top > .row:has(> [data-act="shortrest"]) { display: none; }
+}
+.bnav, .chmorewrap { display: none; }
+.popbg { position: fixed; inset: 0; z-index: 24; background: transparent; }
+.chmorewrap { position: relative; }
+.popmenu, .bmenu { position: absolute; z-index: 26; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px -12px rgba(0, 0, 0, .55); }
+.popmenu { top: calc(100% + 6px); }
+.popmenu button, .bmenu button { min-height: 48px; text-align: left; padding: 0 14px; border: 0; background: none; border-radius: 10px; font-size: 16px; cursor: pointer; color: var(--ink); }
+.popmenu button:hover, .bmenu button:hover { background: var(--surface-2); }
+.popmenu button.danger { color: var(--danger); }
+.bmenu button[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
+.atkcan { display: none; }
+.pbar { display: none; }
+@media (max-width: 1100px) {
+  .pbar { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 8; display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-top: 12px; padding: 8px 12px; border-radius: 14px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--sun) 60%, var(--line)); box-shadow: 0 10px 26px -12px rgba(0, 0, 0, .55); }
+  .pbar.turn { background: color-mix(in srgb, var(--sun) 16%, var(--surface)); }
+}
+@media (max-width: 700px) {
+  #app:has(> .bnav) .tabs { display: none; }
+  #app:has(> .bnav) { padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.bnav) .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 78px); }
+  body:has(.bnav) .pbar { bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); }
+  .bnav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; position: fixed; z-index: 31; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid color-mix(in srgb, var(--sun) 32%, var(--line)); box-shadow: 0 -8px 20px -14px rgba(0, 0, 0, .5);
+    padding: 4px max(6px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px)); }
+  .bn { position: relative; width: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; border-radius: 12px; cursor: pointer; color: var(--ink-2); font-family: var(--f-label); font-weight: 600; font-size: 12.5px; letter-spacing: .03em; }
+  .bn > span:not(.sr-only) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
+  .bn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .bdot { position: absolute; top: 6px; left: calc(50% + 9px); width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); box-shadow: 0 0 0 2px var(--surface); }
+  .bdot.turn { background: var(--sun); }
+  .bmorewrap { position: relative; }
+  .bmenu { bottom: calc(100% + 10px); right: 0; }
+  .bnav .popbg { bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+  .chacts { display: none !important; }
+  .chmorewrap { display: inline-block; }
+  .atkcan { display: block; }
+  /* weapon attacks read as cards instead of a table that runs off the screen */
+  .atkt thead { display: none; }
+  .atkt, .atkt tbody { display: block; }
+  .atkt tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .atkt tr:last-child { border-bottom: 0; }
+  .atkt td { display: block; padding: 0; border: 0; }
+  .atkt td:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .atkt td:nth-child(3), .atkt td:nth-child(4) { grid-column: 1 / -1; }
+  .loglay { grid-template-columns: minmax(0, 1fr) !important; }
+  .loglay > .panel { order: -1; }
+  .ph:has(.exh) { flex-wrap: wrap; row-gap: 8px; }
+  .ph .row:has(> .exh) { flex-wrap: nowrap; gap: 2px !important; }
+}
 </style>
 </head>
 <body>
@@ -2495,9 +2587,10 @@ function charEditor(e) {
       <div class="meta row" style="margin-top:4px"><span class="pill ${ch.ruleset === '2024' ? 'acc' : 'brass'}">${ch.ruleset === '2024' ? '2024 rules' : '2014 rules'}</span><span>${esc([speciesName(ch), classLine(ch)].filter(Boolean).join(' · '))}</span>${D.level ? `<span class="pill">Level ${D.level}</span>` : ''}${e.mine ? '' : `<span class="pill">${esc(playerName(e.owner))}</span>`}${issuePill(D)}${D.flags.length ? `<span class="pill" title="${esc(D.flags.join('\n'))}">${D.flags.length} house-rule item${D.flags.length === 1 ? '' : 's'}</span>` : ''}</div></div>
     <div class="row">
       <div class="seg" role="group" aria-label="Sheet or builder">${[['sheet', 'Sheet'], ['build', 'Build']].map(([k, l]) => `<button data-act="tab" data-v="${k}"${pressed(UI.tab === k)}>${l}</button>`).join('')}</div>
-      <button class="btn ghost sm" data-act="copycode">Copy code</button>
+      <span class="chacts row"><button class="btn ghost sm" data-act="copycode">Copy code</button>
       <button class="btn ghost sm" data-act="exportchar">Save JSON</button>
-      ${ro ? '' : `<button class="btn ghost sm danger" data-act="delchar">Delete</button>`}
+      ${ro ? '' : `<button class="btn ghost sm danger" data-act="delchar">Delete</button>`}</span>
+      <span class="chmorewrap"><button class="btn ghost sm" data-act="chmore" aria-expanded="${!!UI.chmore}" aria-label="More for this character">${b23Icon('more', 18)}</button>${UI.chmore ? `<div class="popbg" data-act="popclose"></div><div class="popmenu"><button data-act="copycode">Copy code</button><button data-act="exportchar">Save JSON</button>${ro ? '' : '<button class="danger" data-act="delchar">Delete character</button>'}</div>` : ''}</span>
     </div></div>`;
   const banner = ro ? `<div class="note" style="margin-bottom:12px">You're viewing ${esc(playerName(e.owner))}'s character. Only they${S.me.isOwner ? '' : ' and the DM'} can change it.</div>` : '';
   const warn = D.warn.length ? `<div class="stack" style="margin-bottom:10px">${D.warn.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join('')}</div>` : '';
@@ -2979,7 +3072,7 @@ function sheetView(ch, D, ro, e) {
   const sec = SECS.some(s => s[0] === UI.sec) ? UI.sec : 'actions';
 
   /* --- always on top: turn, vitals, hit points, rests --- */
-  const turn = me ? `<div class="turnbar${myTurn ? ' on' : ''}"><b>${myTurn ? 'Your turn' : 'Round ' + (I.round || 1)}</b>${[['a', 'Action'], ['b', 'Bonus action'], ['r', 'Reaction']].map(([k, l]) => `<button class="btn sm" data-act="used" data-k="${k}"${pressed(!!used[k])}${dis(ro)}>${l}${used[k] ? ' used' : ''}</button>`).join('')}<span class="small muted">Resets when your turn starts.</span></div>` : '';
+  const turn = me ? `<div class="turnbar${myTurn ? ' on' : ''}"><b>${myTurn ? (S.mode === 'live' && e && e.owner && S.me && e.owner !== S.me.id ? esc(String(ch.name || 'Their').split(' ')[0]) + '’s turn' : 'Your turn') : 'Round ' + (I.round || 1)}</b>${[['a', 'Action'], ['b', 'Bonus action'], ['r', 'Reaction']].map(([k, l]) => `<button class="btn sm" data-act="used" data-k="${k}"${pressed(!!used[k])}${dis(ro)}>${l}${used[k] ? ' used' : ''}</button>`).join('')}<span class="small muted">Resets when your turn starts.</span></div>` : '';
   const conc = +p.concDC ? `<div class="todo-box"><b>Concentration${p.conc ? ' on ' + esc(p.conc) : ''}:</b> you took damage. Constitution save, DC ${+p.concDC}. <button class="btn pri sm" data-act="concroll"${dis(ro)}>Roll</button> <button class="btn ghost sm" data-act="concskip"${dis(ro)}>Dismiss</button></div>` : '';
   const vit = `<div class="vitals">
     <div class="vital shield-shape" title="${esc(D.acNote)}"><div class="lbl">Armor</div><div class="v">${D.ac}</div></div>
@@ -3010,7 +3103,7 @@ function sheetView(ch, D, ro, e) {
   const xa = infoVal(D, 'Extra attacks');
   const atk = `<div class="panel"><div class="ph">Attacks${xa ? `<span class="pill" style="text-transform:none;letter-spacing:0">${1 + (+xa || 0)} per Attack action</span>` : ''}<span class="spacer"></span>${advSeg()}</div>
     <div class="row" style="margin-bottom:8px"><span class="lbl">Target</span><select data-act="tgt" aria-label="Target">${opt('', tg.length ? 'No target: just roll' : 'No one to target yet')}${tg.map(t => opt(t.id, t.name, UI.tgt === t.id)).join('')}</select>${UI.tgt ? '<span class="small muted">The DM’s screen settles the hit and applies damage.</span>' : ''}</div>
-    <div class="scroll-x"><table class="tbl"><thead><tr><th>Name</th><th>Attack</th><th>Damage only</th><th>Notes</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="tbl atkt"><thead><tr><th>Name</th><th>Attack</th><th>Damage only</th><th>Notes</th></tr></thead><tbody>
     ${D.attacks.map((a, i) => { const am = ammoFor(ch, a); return `<tr><td><b>${esc(a.name)}</b>${a.prof ? '' : '<div class="small warnline">Not proficient</div>'}</td>
       <td><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="roll pri" data-act="attack" data-i="${i}">${sgn(a.atk)}</button>${a.two ? `<button class="roll" data-act="attack" data-i="${i}" data-g="two" title="Two-handed">2H</button>` : ''}${a.off ? `<button class="roll" data-act="attack" data-i="${i}" data-g="off" title="Off-hand attack (bonus action)">Off</button>` : ''}</span></td>
       <td>${a.flat ? `<span class="num">${esc(a.dmg)}</span>` : `<button class="roll" data-act="dmgroll" data-label="${esc(a.name)} damage" data-x="${esc(a.dmg)}" data-i="${i}">${esc(a.dmg)}</button>`} <span class="small muted">${esc(a.dt)}</span></td>
@@ -3025,7 +3118,7 @@ function sheetView(ch, D, ro, e) {
     <div class="cond">${CONDITIONS.map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>
     ${(p.cond || []).length || +p.exh ? `<div class="crules">${(p.cond || []).filter(c => COND_RULES[c]).map(c => `<p><b>${esc(c)}.</b> ${esc(COND_RULES[c])}</p>`).join('')}${+p.exh ? `<p><b>Exhaustion.</b> ${esc(exhRule(+p.exh, ch.ruleset).replace(/^Exhaustion \d+: /, ''))}</p>` : ''}</div>` : '<p class="small muted">Tap a condition to see what it does. Rolls change to match where the rules say so.</p>'}
     <label class="row small"><span class="lbl">Concentrating on</span><input type="text" id="f-conc" data-play="conc" value="${esc(p.conc || '')}" placeholder="Nothing" style="flex:1"${dis(ro)}></label></div>`;
-  const actions = `<div class="stack sec sec-actions">${fx}${atk}${res}${conds}</div>`;
+  /* Build 23: actions are assembled after the spells, so attack cantrips can sit with the attacks */
 
   /* --- skills --- */
   const abil = `<div class="abils">${ABIL.map(a => `<div class="ab-wrap"><button class="ab" style="width:100%" ${roll(ABN[a] + ' check', D.m[a])}><div class="lbl">${ABN[a]}</div><div class="mod">${sgn(D.m[a])}</div><span class="score">${D.sc[a]}</span></button></div>`).join('')}</div>`;
@@ -3037,7 +3130,7 @@ function sheetView(ch, D, ro, e) {
     ${D.weaponProf.size ? `<div><span class="lbl">Weapons</span><br>${esc(Array.from(D.weaponProf).join(', '))}</div>` : ''}
     ${D.toolProf.size ? `<div><span class="lbl">Tools</span><br>${esc(Array.from(D.toolProf).join(', '))}</div>` : ''}
     <div><span class="lbl">Languages</span><br>${esc([...((D.sp && D.sp.langs) || []), ...(ch.langs || [])].join(', ') || '—')}</div></div>`;
-  const col1 = `<div class="stack sec sec-skills">${abil}${saves}${skills}${profs}</div>`;
+  const col1 = `<div class="stack sec sec-skills">${vit.replace('class="vitals"', 'class="vitals vd"')}${abil}${saves}${skills}${profs}</div>`;
 
   /* --- spells --- */
   let spells = '';
@@ -3063,7 +3156,7 @@ function sheetView(ch, D, ro, e) {
               <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(m.dmg)}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
       }).join('')}</div>`;
   }
-  const secSpells = `<div class="stack sec sec-spells">${spells || '<div class="panel muted">No spells on this character.</div>'}</div>`;
+  const secSpells = `<div class="stack sec sec-spells">${spells || '<div class="panel muted nospell">No spells on this character.</div>'}</div>`;
 
   /* --- features, gear, notes --- */
   const feats = `<div class="stack sec sec-features"><div class="panel"><h3>Features & traits</h3>${featureList([
@@ -3078,6 +3171,7 @@ function sheetView(ch, D, ro, e) {
     <p class="small muted" style="margin-top:6px">Add or remove items in Build → Equipment.</p></div></div>`;
   const notes = `<div class="stack sec sec-notes"><div class="panel stack"><h3>Session notes</h3><textarea id="f-n-session" data-in="notes.session" placeholder="Names, clues, loot, plans…"${dis(ro)}>${esc(ch.notes.session || '')}</textarea></div>
     ${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].some(k => ch.notes[k]) ? `<div class="panel stack small"><h3>Character</h3>${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].filter(k => ch.notes[k]).map(k => `<div><span class="lbl">${k}</span><div class="rt">${md(ch.notes[k])}</div></div>`).join('')}</div>` : ''}</div>`;
+  const actions = `<div class="stack sec sec-actions">${atk}${typeof attackCantrips === 'function' ? attackCantrips(ch, D, known, ro) : ''}${res}${conds}${fx}</div>`;
   return `<div class="sheet${UI.flash && UI.flash.cid === ch.id && UI.flash.until > Date.now() ? ' flash' : ''}" data-sec="${sec}">${col1}<div class="stack colmid">${top}${actions}</div><div class="stack col3">${secSpells}${feats}${gear}${notes}</div></div>`;
 }
 
@@ -3123,7 +3217,7 @@ function viewParty() {
 /* ===== dice log ===== */
 function viewLog() {
   return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Dice log</h2><span class="spacer"></span>${advSeg()}</div>
-    <div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start">
+    <div class="grid2 loglay" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start">
       <div class="log">${S.log.length ? S.log.map(logRow).join('') : `<div class="empty">Rolls from anyone with this page open show up here.${S.room || S.mode !== 'live' ? '' : ' Live sharing of rolls isn’t available in this view, so you’ll only see your own.'}</div>`}</div>
       <div class="panel stack"><h3>Quick roll</h3><div class="row">${['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'].map(d => `<button class="btn" data-act="quick" data-x="1${d}">${d}</button>`).join('')}</div>
         <div class="row"><input type="text" id="f-expr" placeholder="e.g. 2d6+3 or 4d6kh3" style="max-width:200px"><button class="btn pri" data-act="quickx">Roll</button></div>
@@ -4211,7 +4305,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 22</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 23</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4240,7 +4334,7 @@ function render() {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
   }
-  app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER);
+  app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER) + (typeof bottomNav === 'function' ? bottomNav() : ''); if (typeof b23After === 'function') b23After();
   try { mapAfterRender(); } catch (err) { console.error(err); }
   { const t = document.querySelector('.tabs .tab[aria-current="true"]'), row = t && t.parentNode; if (row && row.scrollWidth > row.clientWidth + 2) row.scrollLeft = Math.max(0, t.offsetLeft - row.offsetLeft - (row.clientWidth - t.offsetWidth) / 2); }
   Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).forEach((el, i) => { const v = scrollers[i]; if (v) { const [t, l] = v.split(':'); el.scrollTop = +t; el.scrollLeft = +l; } });
@@ -4359,7 +4453,7 @@ function getD(ch) { return derive(ch); }
 const MODALS = {};   // extra dialogs registered by other files
 const VIEWS = ['chars', 'party', 'combat', 'homebrew', 'log', 'campaign', 'table', 'map'];
 const ACT = {
-  view(el) { UI.view = el.dataset.v; if (!UI.fromUrl) LS.set('view', UI.view); queueRender(); window.scrollTo(0, 0); },
+  view(el) { UI.view = el.dataset.v; UI.bmore = false; UI.chmore = false; if (!UI.fromUrl) LS.set('view', UI.view); queueRender(); window.scrollTo(0, 0); },
   open(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; LS.set('cur', UI.cur); UI.startSel = {}; UI.pk = {}; UI.flt = {}; queueRender(); },
   pick(el) {
     const ch = C(); const k = el.dataset.k, v = el.dataset.v;
@@ -4755,10 +4849,12 @@ function onClick(ev) {
   if (el.disabled) return;
   flushTyping();
   const fn = ACT[el.dataset.act];
+  if ((UI.bmore || UI.chmore) && !/^(bmore|chmore|popclose)$/.test(el.dataset.act)) { UI.bmore = false; UI.chmore = false; queueRender(); }
   if (fn) { if (el.dataset.act !== 'bgclose') ev.preventDefault(); fn(el, ev); }
 }
 function onKey(ev) {
   if (ev.key === 'Escape' && UI.modal) { closeModal(); return; }
+  if (ev.key === 'Escape' && (UI.bmore || UI.chmore)) { closePops(); return; }
   if (ev.key === 'Tab' && UI.modal) {
     const dlg = document.querySelector('#modal .modal');
     if (dlg) {
@@ -5078,9 +5174,9 @@ function viewCombat() {
   const enc = (S.dm.enc || []);
   const pend = S.pendingAtk || [];
   const left = `<div class="stack">
-    <div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2><span class="pill acc">Round ${cb.round || 1}</span><span class="spacer"></span>${window.PL_SITE ? `<a class="btn ghost sm" href="?v=table${location.hash}" target="_blank" rel="noopener">Open table display</a>` : ''}</div>
+    <div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2><span class="pill acc">Round ${cb.round || 1}</span><span class="spacer"></span>${cb.list.length ? '<span class="small muted kbdhint">Keys: N next turn, P back</span>' : ''}${window.PL_SITE ? `<a class="btn ghost sm" href="?v=table${location.hash}" target="_blank" rel="noopener">Open table display</a>` : ''}</div>
     ${S.mode === 'live' && !isResolver() ? `<div class="note row"><span class="grow">Player attacks and saves are being settled in another DM window. If that window is closed, nothing gets applied.</span><button class="btn sm" data-act="ctake">Settle them here</button></div>` : ''}
-    <div class="row"><button class="btn pri" data-act="cnext"${dis(!cb.list.length)}>Next turn</button><button class="btn" data-act="cprev"${dis(!cb.list.length)}>Previous</button><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
+    <div class="row ctool"><button class="btn pri" data-act="cnext"${dis(!cb.list.length)} title="Next turn (key N)" aria-keyshortcuts="N">Next turn</button><button class="btn" data-act="cprev"${dis(!cb.list.length)} title="Previous turn (key P)" aria-keyshortcuts="P">Previous</button><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
@@ -6789,15 +6885,15 @@ function viewCombatPlayer() {
   const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : I.unseen ? '<span class="pill">Something unseen acts</span>' : cur ? `<span class="small muted">${esc(cur.name)} is acting</span>` : ''}</div>`;
   if (!list.length) return head + `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`;
   const left = `<div class="stack"><div class="init">${rows}</div>
-    ${me ? `<p class="small muted">Tap someone to target them, then attack or cast on the right. The DM's screen settles hits, saves and damage.</p>` : ''}
+    ${me ? `<p class="small muted">Tap someone to target them, then attack or cast from your sheet. The DM's screen settles hits, saves and damage.</p>` : ''}
     ${notIn.length ? `<div class="panel stack"><div class="ph">Not in this fight</div>${notIn.map(x => `<div class="row"><b class="grow">${esc(x.ch.name)}</b><button class="btn sm" data-act="pjoin" data-cid="${esc(x.ch.id)}">Ask to join</button></div>`).join('')}</div>` : ''}</div>`;
   let right = '';
   if (me) {
     const D = derive(me.ch), ro = !canEditChar(me.owner);
     right = `<div class="stack">${mineIn.length > 1 ? `<div class="seg" role="group" aria-label="Your characters">${mineIn.map(x => `<button data-act="pcur" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(x === me)}>${esc(x.ch.name)}</button>`).join('')}</div>` : ''}
       <div class="cbsheet">${sheetView(me.ch, D, ro, me)}</div></div>`;
-  } else right = `<div class="panel stack"><p class="muted">None of your characters is in this fight.</p>${notIn.length ? '<p class="small muted">Ask to join on the left, or wait for the DM to add the party.</p>' : ''}</div>`;
-  return head + `<div class="run prun">${left}${right}</div>`;
+  } else right = `<div class="panel stack"><p class="muted">None of your characters is in this fight.</p>${notIn.length ? '<p class="small muted">Tap Ask to join, or wait for the DM to add the party.</p>' : ''}</div>`;
+  return head + `<div class="pcwrap"><div class="run prun">${left}${right}</div>${typeof pturnBar === 'function' ? pturnBar(actingMine, list) : ''}</div>`;
 }
 Object.assign(ACT, {
   ptgt(el) { UI.tgt = UI.tgt === el.dataset.v ? '' : el.dataset.v; queueRender(); },
@@ -6878,6 +6974,71 @@ function announceChanges(before) {
     setTimeout(() => queueRender(), 2700);
   }
 }
+
+/* ===== Build 23: at the table. A thumb-reach tab bar on phones, a "your turn / target" bar in combat,
+   and attack cantrips next to weapon attacks. ===== */
+function fightState() {
+  const I = S.init || {}; let list = I.list || [], cur = I.cur;
+  if (!list.length && isDMish() && typeof cbt === 'function') { try { const cb = cbt(); list = cb.list || []; cur = cb.cur; } catch (e) { } }
+  const c = list.find(x => x.id === cur);
+  const mine = !!(c && c.kind === 'pc' && chars().some(x => x.mine && x.ch.id === c.cid));
+  return { on: list.length > 0, mine };
+}
+const B23_ICONS = {
+  sheet: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8M8 17h8M8 9h2"/>',
+  swords: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6M16 16l4 4M19 21l2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5"/><path d="m5 14 4 4M7 17l-3 3M3 19l2 2"/>',
+  party: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  dice: '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/>',
+};
+function b23Icon(n, s) {
+  if (n === 'more') return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>`;
+  return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${B23_ICONS[n] || ''}</svg>`;
+}
+function b23After() { try { const bar = document.querySelector('.bar'); if (bar) document.documentElement.style.setProperty('--barh', bar.offsetHeight + 'px'); } catch (e) { } }
+function bottomNav() {
+  if (S.needCampaign || UI.view === 'table' || (UI.view === 'map' && typeof MAP !== 'undefined' && MAP.tv)) return '';
+  const f = fightState(), hasMap = typeof viewMap === 'function';
+  const main = [['chars', 'Sheet', 'sheet'], ['combat', 'Combat', 'swords'], hasMap ? ['map', 'Map', 'map'] : ['log', 'Dice', 'dice'], ['party', 'Party', 'party']];
+  const more = [['homebrew', 'Homebrew']].concat(hasMap ? [['log', 'Dice log']] : []).concat(isDMish() ? [['campaign', 'Campaign']] : []);
+  const inMore = more.some(m => m[0] === UI.view);
+  const cur = k => UI.view === k || (k === 'combat' && UI.view === 'init');
+  return `<nav class="bnav" aria-label="Views">${main.map(([k, l, ic]) => `<button class="bn" data-act="view" data-v="${k}" aria-current="${cur(k)}">${b23Icon(ic, 22)}<span>${l}</span>${k === 'combat' && f.on ? `<i class="bdot${f.mine ? ' turn' : ''}" aria-hidden="true"></i><span class="sr-only">${f.mine ? ', your turn' : ', a fight is on'}</span>` : ''}</button>`).join('')}
+    <div class="bmorewrap"><button class="bn" data-act="bmore" aria-expanded="${!!UI.bmore}" aria-current="${inMore}">${b23Icon('more', 22)}<span>${inMore ? esc((more.find(m => m[0] === UI.view) || [])[1] || 'More') : 'More'}</span></button>
+    ${UI.bmore ? `<div class="popbg" data-act="popclose"></div><div class="bmenu" aria-label="More views">${more.map(([k, l]) => `<button data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</div>` : ''}</div></nav>`;
+}
+function pturnBar(actingMine, list) {
+  const t = UI.tgt ? list.find(c => c.id === UI.tgt) : null;
+  if (!actingMine && !t) return '';
+  return `<div class="pbar${actingMine ? ' turn' : ''}">
+    ${actingMine ? `<span><b>Your turn</b> <span class="small muted">${esc(actingMine.ch.name)}</span></span>` : ''}
+    ${t ? `<span class="small">Target: <b>${esc(t.name)}</b></span><button class="btn ghost sm" data-act="ptgt" data-v="${esc(t.id)}">Clear</button>` : '<span class="small muted">Tap someone in the turn order to target them.</span>'}
+    <span class="spacer"></span>
+    ${actingMine ? `<button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : ''}
+  </div>`;
+}
+function attackCantrips(ch, D, known, ro) {
+  const list = known.filter(x => x.s.lvl === 0).map(x => Object.assign({ m: spellMathFor(ch, D, x.s, 0, x.c) }, x)).filter(x => x.m && x.m.dmg && (x.s.atk || x.m.save));
+  if (!list.length) return '';
+  return `<div class="panel atkcan"><div class="ph">Attack cantrips</div>${list.sort((a, b) => a.s.name.localeCompare(b.s.name)).map(({ s, c, m }) => `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r].filter(Boolean).join(' · '))}</div></div>
+    <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}<span class="pill">${esc(m.dmg)}</span><button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`).join('')}</div>`;
+}
+function closePops() { if (UI.bmore || UI.chmore) { UI.bmore = false; UI.chmore = false; queueRender(); } }
+Object.assign(ACT, {
+  bmore() { UI.bmore = !UI.bmore; UI.chmore = false; queueRender(); },
+  chmore() { UI.chmore = !UI.chmore; UI.bmore = false; queueRender(); },
+  popclose() { closePops(); },
+});
+// DM keyboard: N and P move the turn on the combat screen (not while typing)
+document.addEventListener('keydown', e => {
+  if (UI.modal || UI.view !== 'combat' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  if (typeof isDMish !== 'function' || !isDMish()) return;
+  const t = e.target, tag = (t && t.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag) || (t && t.isContentEditable)) return;
+  const k = (e.key || '').toLowerCase(); if (k !== 'n' && k !== 'p') return;
+  const cb = cbt(); if (!(cb.list || []).length) return;
+  e.preventDefault(); if (k === 'n') ACT.cnext(); else ACT.cprev();
+});
 </script>
 </body>
 </html>
