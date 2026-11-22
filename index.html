@@ -2004,6 +2004,7 @@ function d20Roll(o) {
   const dice = M ? M.defs.filter(f => f[t] && (t !== 'atk' || fxApplies(f, o.a) || !f.strMelee)).map(f => f[t]) : [];
   const um = o.type === 'death' ? 'normal' : takeAdv(); let adv = um === 'adv', dis = um === 'dis';
   if (t === 'atk' && o.vex) adv = true;
+  if (o.dis) dis = true;
   if (M) {
     if (t === 'atk') { if (M.advAtk || M.defs.some(f => f.advAtk && fxApplies(f, o.a))) adv = true; if (M.disAtk) dis = true; }
     if (t === 'check' && M.disCheck) dis = true;
@@ -5028,11 +5029,17 @@ function publicCombat(cb) {
   const cur = cb.list.find(c => c.id === cb.cur);
   return {
     round: cb.round || 1, cur: cur && !cur.hidden ? cur.id : null, unseen: !!(cur && cur.hidden),
-    list: cb.list.filter(c => !c.hidden).map(c => c.kind === 'mon'
-      ? { id: c.id, kind: 'mon', name: c.name, init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [], sz: monSize(c), pos: mapPubPos(c) }
-      : { id: c.id, kind: 'pc', name: liveName(c), init: c.init == null ? null : c.init, cid: c.cid, owner: c.owner }),
+    list: cb.list.filter(c => !c.hidden).map(c => c.kind === 'lair' ? { id: c.id, kind: 'lair', name: c.name, init: c.init == null ? null : c.init }
+      : c.kind === 'mon'
+      ? { id: c.id, kind: 'mon', name: c.name, init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [], fx: fxPub(c), surp: c.surp ? 1 : 0, sz: monSize(c), pos: mapPubPos(c) }
+      : { id: c.id, kind: 'pc', name: liveName(c), init: c.init == null ? null : c.init, cid: c.cid, owner: c.owner, fx: fxPub(c), surp: c.surp ? 1 : 0 }),
   };
 }
+/* timed effects: players get names, rounds left and the save to end them, nothing else */
+const fxPub = c => (c.fxs || []).map(f => ({ id: f.id, n: f.n, r: f.r, sv: f.ab ? f.ab.toUpperCase() + ' DC ' + f.dc : '' }));
+const fxText = f => f.n + (f.r != null ? ' · ' + f.r + (f.r === 1 ? ' round' : ' rounds') : '') + (f.sv ? ' · ends on ' + f.sv : '');
+/* effect pills, then conditions that are not just the same effect again */
+const condPills = (conds, fx) => (fx || []).map(f => `<span class="pill bad" title="Effect">${esc(fxText(f))}</span>`).concat(conds.filter(k => !(fx || []).some(f => f.n === k)).map(k => `<span class="pill bad">${esc(k)}</span>`)).join('');
 /* a PC's name is the sheet's own, so a rename mid-fight shows up everywhere */
 function liveName(c) { if (c.kind !== 'pc') return c.name; const x = findChar(c.cid, c.owner); return x ? x.ch.name : c.name; }
 /* remove combatants and keep cb.cur on a creature that is still in the list */
@@ -5048,18 +5055,101 @@ function pruneGone(cb) {
   if (gone.length) { dropCombatants(cb, gone); saveCombat(cb); }
 }
 function saveCombat(cb) { S.dm.combat = cb; saveDM({ combat: cb }); saveInit(publicCombat(cb)); }
-function sortCombat(cb) { cb.list.sort((a, b) => (b.init == null ? -99 : b.init) - (a.init == null ? -99 : a.init)); }
+/* ties go to the higher Dex modifier; the lair always loses a tie */
+function sortCombat(cb) {
+  const dx = new Map(cb.list.map(c => { const x = c.kind === 'pc' && findChar(c.cid, c.owner); return [c.id, c.kind === 'lair' ? -99 : x ? derive(x.ch).m.dex : (+c.ib || 0)]; }));
+  cb.list.sort((a, b) => (b.init == null ? -99 : b.init) - (a.init == null ? -99 : a.init) || dx.get(b.id) - dx.get(a.id));
+}
 function monDef(c) { return c && c.mid ? (registry(c.rs || '2014').monsters.get(c.mid) || null) : null; }
+const rsOf = c => { const x = c.kind === 'pc' && findChar(c.cid, c.owner); return x ? x.ch.ruleset : (c.rs || RUN.rs); };
+const nameOf = c => c.hidden ? 'Something unseen' : liveName(c);
+const monSaveBonus = (c, ab) => { const d = monDef(c); return d ? (d.saves && d.saves[ab] != null ? +d.saves[ab] : mod((d.ab || {})[ab] || 10)) : (+c.sv || 0); };
+const monSave = (c, ab) => { const b = monSaveBonus(c, ab); return rollExpr('1d20' + (b ? (b > 0 ? '+' : '-') + Math.abs(b) : '')); };
+/* counts and lair text from the stat block text; legendary actions default to 3 per round and resistance to 3 per day */
+function monExtra(d) {
+  if (!d) return { la: 0, lr: 0, lair: '' };
+  const all = [...(d.traits || []), ...(d.actions || []), ...(d.legendary || [])], txt = all.map(t => t.n + '. ' + t.d).join('\n');
+  const lrE = all.find(t => /^legendary resistance/i.test(t.n)), lrM = lrE && (lrE.n + ' ' + lrE.d).match(/\((\d+)\/day/i), laM = txt.match(/(\d+) legendary actions/i);
+  const lair = all.find(t => /^lair actions?/i.test(t.n));
+  return { la: (d.legendary || []).length || laM ? (laM ? +laM[1] : 3) : 0, lr: lrE ? (lrM ? +lrM[1] : 3) : 0, lair: lair ? lair.d : '' };
+}
+/* d20 for initiative; with a memo, creatures of one kind share the roll (group initiative). A surprised 2024 creature rolls with disadvantage. */
+function rollInit(c, memo) {
+  const k = c.mid || String(c.name).replace(/ \d+$/, '');
+  if (!memo || memo[k] == null) { const d = rollExpr('1d20', c.surp && rsOf(c) === '2024' ? 'dis' : '').total; if (!memo) return d + (+c.ib || 0); memo[k] = d; }
+  return memo[k] + (+c.ib || 0);
+}
+/* ----- timed effects: { id, n, r: rounds left or null, ab/dc: the save that ends it, cond: the condition it applies } ----- */
+function setCond(c, v, on) {
+  if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) play(x.ch, { cond: (x.ch.play.cond || []).filter(k => k !== v).concat(on ? [v] : []) }); return; }
+  c.cond = (c.cond || []).filter(k => k !== v).concat(on ? [v] : []);
+}
+function addFx(cb, c, f) {   // f may come from a player's message: clean it
+  const n = String(f.n || '').trim().slice(0, 40); if (!n) return;
+  const ab = ABIL.includes(f.ab) ? f.ab : '', r = Math.round(+f.r) > 0 ? clamp(Math.round(+f.r), 1, 99) : null, cond = CONDITIONS.find(k => k.toLowerCase() === n.toLowerCase()) || '';
+  (c.fxs = c.fxs || []).push({ id: uid('x'), n: cond || n, r, ab, dc: ab ? clamp(Math.round(+f.dc) || 10, 1, 40) : 0, cond });
+  if (cond) setCond(c, cond, true);
+  saveCombat(cb);
+}
+function fxDrop(c, f, why) {
+  c.fxs = (c.fxs || []).filter(x => x.id !== f.id);
+  if (f.cond) setCond(c, f.cond, false);
+  sendMsg({ kind: 'res', text: `${nameOf(c)}: ${f.n} ends${why}.`, hit: true });
+}
+function fxSave(c, f) {
+  if (c.kind === 'pc') { sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label: `a ${ABN[f.ab]} save to end ${f.n}`, t: 'save', ab: f.ab, dc: f.dc, keys: [c.owner + '|' + c.cid], fx: { cid: c.cid, id: f.id } }); return; }
+  const r = monSave(c, f.ab);
+  if (r.total >= f.dc) fxDrop(c, f, ` (${f.ab.toUpperCase()} save ${r.total} vs DC ${f.dc})`);
+  else sendMsg({ kind: 'note', text: `${nameOf(c)} fails the ${f.ab.toUpperCase()} save against ${f.n} (${r.total} vs DC ${f.dc}).` });
+}
+/* a creature's turn ended (end = true) or began: saves are rolled at the end, rounds count down at the end or start as the DM chose */
+function fxTurn(cb, c, end) {
+  for (const f of (c.fxs || []).slice()) {
+    if (end && f.ab) fxSave(c, f);
+    if (end === (cb.tick !== 'start') && f.r != null && (c.fxs || []).includes(f) && --f.r <= 0) fxDrop(c, f, ' (duration over)');
+  }
+}
+/* answer to a player's "save to end" request */
+function fxSaved(q, pass) {
+  const cb = cbt(), c = cb.list.find(x => x.kind === 'pc' && x.cid === q.fx.cid), f = c && (c.fxs || []).find(x => x.id === q.fx.id);
+  if (f && pass) { fxDrop(c, f, ' (saved)'); saveCombat(cb); }
+}
+function skipTurn(cb, c) {
+  if (c.kind === 'mon' && cb.skipDead !== false && c.hp != null && c.hp <= 0) return true;
+  if (!c.surp) return false;
+  c.surp = 0;   // 2024 only rolled initiative at a disadvantage; 2014 loses the first turn
+  if ((cb.round || 1) > 1 || rsOf(c) !== '2014') return false;
+  sendMsg({ kind: 'note', text: `${nameOf(c)} is surprised and loses its first turn.` });
+  return true;
+}
+function arrive(cb, c) {
+  if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) savePlay(x.ch, { used: { a: 0, b: 0, r: 0 } }); }
+  else if (c.kind === 'mon') { c.lau = 0; c.rxu = 0; }   // legendary actions and the reaction come back on its own turn
+  if (c.kind === 'lair') RUN.sel = c.id;   // show the lair actions
+  else if (RUN.sel && (cb.list.find(x => x.id === RUN.sel) || {}).kind === 'lair') RUN.sel = null;
+  if (cb.tick === 'start') fxTurn(cb, c, false);
+}
 function stepTurn(dir) {
   const cb = cbt(); if (!cb.list.length) return;
+  const prev = cb.list.find(c => c.id === cb.cur);
+  if (dir > 0 && prev) fxTurn(cb, prev, true);
   let i = cb.list.findIndex(c => c.id === cb.cur);
   if (i < 0) i = dir > 0 ? -1 : 0;
-  i += dir;
-  if (i >= cb.list.length) { i = 0; cb.round = (cb.round || 1) + 1; }
-  if (i < 0) { i = cb.list.length - 1; cb.round = Math.max(1, (cb.round || 1) - 1); }
+  for (let n = 0; n < cb.list.length; n++) {
+    i += dir;
+    if (i >= cb.list.length) { i = 0; cb.round = (cb.round || 1) + 1; }
+    if (i < 0) { i = cb.list.length - 1; cb.round = Math.max(1, (cb.round || 1) - 1); }
+    if (dir < 0 || !skipTurn(cb, cb.list[i])) break;
+  }
   const c = cb.list[i]; cb.cur = c.id;
-  if (dir > 0 && c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) savePlay(x.ch, { used: { a: 0, b: 0, r: 0 } }); }
+  if (dir > 0) arrive(cb, c);
   saveCombat(cb);
+}
+/* a monster that is concentrating takes damage: Con save against DC 10 or half the damage, and it breaks at 0 HP */
+function monConc(c, dmg, down) {
+  const dc = Math.max(10, Math.floor(dmg / 2)), r = down ? null : monSave(c, 'con'), spell = c.conc;
+  const lost = down || r.total < dc; if (lost) c.conc = '';
+  sendMsg({ kind: 'res', text: `${nameOf(c)} ${down ? 'goes down and loses' : lost ? `fails the Con save (${r.total} vs DC ${dc}) and loses` : `holds (Con save ${r.total} vs DC ${dc})`} concentration on ${spell}.`, hit: true });
 }
 function findTarget(id) {
   id = String(id || '');
@@ -5091,6 +5181,7 @@ function hurt(t, amount, dt, crit) {
     if (c.hp == null) c.taken = snap.taken + amount;   // HP not known: keep a tally and never call it down
     else c.hp = clamp(+c.hp - amount, 0, c.max || 9999);
     pushUndo(`${amount} damage to ${c.name}`, () => { const cb = cbt(), cc = cb.list.find(x => x.id === c.id); if (cc) { Object.assign(cc, snap); saveCombat(cb); } });
+    if (c.conc && amount > 0) monConc(c, amount, c.hp != null && c.hp <= 0);
     saveCombat(cbt());
     return { dealt: amount, note, down: c.hp != null && c.hp <= 0 };
   }
@@ -5141,6 +5232,7 @@ function handleMsg(m) {
   if (q && m.key && m.total != null) {
     const pass = q.dc ? m.total >= q.dc : null;
     q.answers[m.key] = { total: m.total, pass, who: m.who };
+    if (isResolver() && !m.old && q.fx) fxSaved(q, pass);
     if (isResolver() && !m.old && q.dmg != null) {
       const t = findTarget('pc|' + m.key);
       const amt = pass ? (q.half ? Math.floor(q.dmg / 2) : 0) : q.dmg;
@@ -5189,9 +5281,7 @@ function resolveSave(m) {
   for (const id of m.tgts || []) {
     const t = findTarget(id); if (!t) continue;
     if (t.kind === 'pc') { pcs.push(t.x.owner + '|' + t.x.ch.id); continue; }
-    const def = t.def, ab = m.ab || 'dex';
-    const bonus = def ? (def.saves && def.saves[ab] != null ? +def.saves[ab] : mod((def.ab || {})[ab] || 10)) : (+t.c.sv || 0);
-    const r = rollExpr('1d20' + (bonus ? (bonus > 0 ? '+' : '-') + Math.abs(bonus) : ''));
+    const ab = m.ab || 'dex', r = monSave(t.c, ab);
     const pass = r.total >= (+m.dc || 0);
     const amt = m.dmg == null ? 0 : pass ? (m.half ? Math.floor(m.dmg / 2) : 0) : m.dmg;
     const h = amt ? hurt(t, amt, m.dt) : { dealt: 0, note: '', down: false };
@@ -5255,7 +5345,17 @@ function restPatch(ch, D, kind) {
 }
 
 /* ===== views ===== */
-const RUN = { sel: null, picks: {}, q: '', rs: LS.get('rs', '2024'), tgt: '' };
+const RUN = { sel: null, picks: {}, q: '', rs: LS.get('rs', '2024'), tgt: '', hpm: 'avg', grp: false };
+/* clickable pips: a filled pip is still available, a hollow one is spent; tapping one spends or restores up to it */
+const combatPips = (c, k, max, label) => `<span class="pips" role="group" aria-label="${label}">${Array.from({ length: max }, (_, i) => { const spent = i < (+c[k] || 0); return `<button class="pip${spent ? ' used' : ''}" data-act="cpip" data-v="${esc(c.id)}" data-k="${k}" data-n="${spent ? i : i + 1}" aria-label="${label} ${i + 1} of ${max}, ${spent ? 'spent' : 'available'}"></button>`; }).join('')}</span>`;
+/* add an effect: name (a condition name also applies that condition), rounds, and an optional save that ends it */
+const fxForm = (btn, id) => `<div class="row" data-fxf="${esc(id)}"><input type="text" list="fxnames" data-k="n" placeholder="Effect or condition" aria-label="Effect" style="width:150px"><input type="number" min="1" data-k="r" placeholder="Rounds" aria-label="Rounds" style="width:76px"><select data-k="ab" aria-label="Save that ends it"><option value="">No save</option>${ABIL.map(a => opt(a, a.toUpperCase() + ' save')).join('')}</select><input type="number" min="1" data-k="dc" placeholder="DC" aria-label="Save DC" style="width:62px">${btn}</div><datalist id="fxnames">${CONDITIONS.map(k => `<option value="${k}">`).join('')}</datalist>`;
+function fxRead(el) {
+  const b = el.closest('[data-fxf]'), g = k => b.querySelector(`[data-k="${k}"]`).value, n = g('n').trim(), ab = g('ab'), dc = +g('dc');
+  if (!n) { toastMsg('Name the effect first.'); return null; }
+  if (ab && !dc) { toastMsg('Type the DC of the save.'); return null; }
+  return { n, r: +g('r') || null, ab, dc };
+}
 function crLabel(v) { return v === 0.125 ? '1/8' : v === 0.25 ? '1/4' : v === 0.5 ? '1/2' : String(v); }
 function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)}>${c}</button>`).join('')}</div>`; }
 function viewCombat() {
@@ -5271,17 +5371,22 @@ function viewCombat() {
   const sel = cb.list.find(c => c.id === RUN.sel) || cb.list.find(c => c.id === cb.cur) || null;
   const rows = cb.list.map(c => {
     const nm = liveName(c);
-    let hp = c.hp, max = c.max, ac = c.ac, conds = c.cond || [], sub = c.kind === 'mon' ? (c.hidden ? 'Hidden from players' : 'Monster') : 'Player character';
+    if (c.kind === 'lair') return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}">
+      <span style="width:20px"></span><input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
+      <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">Lair actions, loses initiative ties</span></button>
+      <span class="row cx"><button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span></div>`;
+    let hp = c.hp, max = c.max, ac = c.ac, conds = c.cond || [], sub = c.kind === 'mon' ? (c.hidden ? 'Hidden from players' : 'Monster') + (c.conc ? ' · concentrating on ' + c.conc : '') : 'Player character';
     if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) { const D = derive(x.ch); hp = hpOf(x.ch, D); max = D.maxHp; ac = D.ac; conds = x.ch.play.cond || []; sub = playerName(x.owner) + (x.ch.play.conc ? ' · concentrating on ' + x.ch.play.conc : ''); const ds = downState(x.ch, D); if (ds) conds = [ds].concat(conds); } else sub = 'Sheet not found'; }
+    if (c.surp) conds = conds.concat('Surprised');
     const pct = max ? clamp(hp / max * 100, 0, 100) : 0;
     return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}${c.hidden ? ' hid' : ''}">
       <input type="checkbox" data-act="cpick" data-v="${esc(c.id)}"${RUN.picks[c.id] ? ' checked' : ''} aria-label="Select ${esc(nm)}">
       <input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
-      <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length ? `<span class="row small">${conds.map(x => `<span class="pill bad">${esc(x)}</span>`).join('')}</span>` : ''}</button>
+      <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length || (c.fxs || []).length ? `<span class="row small">${condPills(conds, fxPub(c))}</span>` : ''}</button>
       <div class="chp"><span class="num"><b>${hp == null ? '—' : hp}</b>${max ? ' / ' + max : ''}${hp == null && c.taken ? ` <span class="small muted" title="HP isn't set, so damage is only tallied">took ${c.taken}</span>` : ''}</span><div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div></div>
       <span class="num cac" title="Armor Class">AC ${ac == null || ac === '' ? '?' : ac}</span>
       <span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
-      <span class="row cx">${c.kind === 'mon' ? `<button class="btn ghost sm" data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span>
+      <span class="row cx">${c.kind === 'mon' ? combatPips(c, 'rxu', 1, 'Reaction') : ''}<button class="btn ghost sm" data-act="crx" data-v="${esc(c.id)}" title="Attack with this creature's reaction">Reaction attack</button><button class="btn ghost sm" data-act="cdelay" data-v="${esc(c.id)}" title="Move to after the creature whose turn it is"${dis(!cb.cur)}>Delay</button><button class="btn ghost sm" data-act="csurp" data-v="${esc(c.id)}"${pressed(c.surp)} title="Surprised: 2014 loses its first turn, 2024 rolls initiative with disadvantage">Surprised</button>${c.kind === 'mon' ? `<button class="btn ghost sm" data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span>
     </div>`;
   }).join('');
   const last = UNDO[UNDO.length - 1];
@@ -5294,13 +5399,14 @@ function viewCombat() {
     <div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2><span class="pill acc">Round ${cb.round || 1}</span><span class="spacer"></span>${cb.list.length ? '<span class="small muted kbdhint">Keys: N next turn, P back</span>' : ''}${window.PL_SITE ? `<a class="btn ghost sm" href="?v=table${location.hash}" target="_blank" rel="noopener">Open table display</a>` : ''}</div>
     ${S.mode === 'live' && !isResolver() ? `<div class="note row"><span class="grow">Player attacks and saves are being settled in another DM window. If that window is closed, nothing gets applied.</span><button class="btn sm" data-act="ctake">Settle them here</button></div>` : ''}
     <div class="row ctool"><button class="btn pri" data-act="cnext"${dis(!cb.list.length)} title="Next turn (key N)" aria-keyshortcuts="N">Next turn</button><button class="btn" data-act="cprev"${dis(!cb.list.length)} title="Previous turn (key P)" aria-keyshortcuts="P">Previous</button><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
+    <div class="row small"><label class="chk"><input type="checkbox" data-act="cskip"${cb.skipDead !== false ? ' checked' : ''}> Auto-skip dead monsters</label><label class="row" style="gap:6px">Effects count down at <select data-act="ctick" aria-label="Effects count down at">${opt('end', 'end of turn', cb.tick !== 'start')}${opt('start', 'start of turn', cb.tick === 'start')}</select></label></div>
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
       <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
       <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:190px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
     <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
-      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label></div>
+      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
       <div class="row"><input type="text" id="f-cn" placeholder="Quick add: name" style="max-width:170px"><input type="number" id="f-cib" placeholder="Init +" style="width:80px"><input type="number" id="f-chp" placeholder="HP" style="width:70px"><input type="number" id="f-cac" placeholder="AC" style="width:70px"><button class="btn sm" data-act="cquick">Add</button></div>
       <div class="row"><select id="f-enc" aria-label="Saved encounters">${enc.length ? enc.map(e => opt(e.id, `${e.name} (${sum(e.list.map(x => x.n))})`)).join('') : opt('', 'No saved encounters')}</select><button class="btn sm" data-act="encload"${dis(!enc.length)}>Load</button><button class="btn ghost sm danger" data-act="encdel"${dis(!enc.length)}>Delete</button><input type="text" id="f-encn" placeholder="Name this fight" style="max-width:170px"><button class="btn sm" data-act="encsave"${dis(!cb.list.some(c => c.kind === 'mon'))}>Save monsters as encounter</button></div></div>
@@ -5319,8 +5425,28 @@ function logRow(r) {
   if (r.text) return `<div class="lg txt${r.priv ? ' priv' : ''}"><span>${esc(r.text)}</span><span class="small muted">${r.priv ? 'private · ' : ''}${new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>`;
   return `<div class="lg${r.priv ? ' priv' : ''}"><div class="tot" style="${r.crit ? 'color:var(--brass)' : r.fail ? 'color:var(--danger)' : ''}">${r.total == null ? '' : r.total}</div><div class="grow"><b>${esc(r.who || 'Someone')}</b> <span class="muted">${esc(r.label)}</span><div class="small muted">${esc(r.detail)}</div></div><div class="small muted">${r.priv ? 'private · ' : ''}${new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></div>`;
 }
+function fxPanel(c) {
+  const fx = fxPub(c);
+  return `<div class="stack"><span class="lbl">Timed effects</span>${fx.length ? `<div class="row small">${fx.map(f => `<span class="row" style="gap:0"><span class="pill bad">${esc(fxText(f))}</span><button class="btn ghost sm" data-act="cfxrm" data-v="${esc(c.id)}" data-i="${esc(f.id)}" aria-label="End ${esc(f.n)}">${svgIcon('x', 14)}</button></span>`).join('')}</div>` : ''}${fxForm(`<button class="btn sm" data-act="cfxadd" data-v="${esc(c.id)}">Add effect</button>`, c.id)}</div>`;
+}
+const monSpellNames = (c, d) => {   // concentration spells named in its Spellcasting traits
+  const txt = [...(d.traits || []), ...(d.actions || []), ...(d.bonus || []), ...(d.reactions || [])].filter(t => /spellcasting/i.test(t.n)).map(t => t.d).join('\n');
+  return txt ? registry(c.rs || '2014').list('spells').filter(s => s.conc && new RegExp('\\b' + s.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(txt)).map(s => s.name) : [];
+};
+const rxCreature = id => (isDMish() ? cbt().list : (S.init || {}).list || []).find(x => x.id === id);
+MODALS.rxatk = () => {
+  const m = UI.modal, c = rxCreature(m.id); if (!c) return '';
+  let tg, atk;
+  if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (!x) return ''; tg = targetsFor(x.ch); atk = getD(x.ch).attacks.map((a, i) => ({ i, n: a.name, b: sgn(a.atk) })); }
+  else { const d = monDef(c); tg = cbt().list.filter(x => x.id !== c.id && x.kind !== 'lair').map(x => ({ id: x.id, name: liveName(x) })); atk = d ? (d.actions || []).filter(a => a.atk != null).map(a => ({ n: a.n, b: sgn(+a.atk) })) : []; }
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Reaction attack"><div class="row"><h2>Reaction attack: ${esc(nameOf(c))}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <label class="field"><span class="lbl">Target</span><select data-act="rxtgt">${opt('', 'No target: just roll')}${tg.map(t => opt(t.id, t.name, m.tgt === t.id)).join('')}</select></label>
+    <div class="stack"><span class="lbl">Attack (spends the reaction)</span>${atk.length ? `<div class="row">${atk.map(a => `<button class="btn sm" data-act="rxgo" data-i="${a.i == null ? '' : a.i}" data-n="${esc(a.n)}">${esc(a.n)} <span class="muted">${a.b}</span></button>`).join('')}</div>` : '<span class="small muted">No attacks to roll. Use Attack in its detail panel.</span>'}</div>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button></div></div>`;
+};
 function combatDetail(c, cb) {
-  const tgts = cb.list.filter(x => x.id !== c.id);
+  if (c.kind === 'lair') { const d = monDef({ mid: c.mid, rs: c.rs }); return `<div class="panel stack"><div class="ph">${esc(c.name)}</div><div class="rt small">${md(monExtra(d).lair)}</div></div>`; }
+  const tgts = cb.list.filter(x => x.id !== c.id && x.kind !== 'lair');
   const tsel = `<select id="f-mt" aria-label="Target">${opt('', 'No target: just roll')}${tgts.map(x => opt(x.id, liveName(x), RUN.tgt === x.id)).join('')}</select>`;
   if (c.kind === 'pc') {
     const x = findChar(c.cid, c.owner);
@@ -5330,9 +5456,9 @@ function combatDetail(c, cb) {
       <div class="small muted">${esc(speciesName(x.ch))} ${esc(classLine(x.ch))} · ${esc(playerName(x.owner))}</div>
       <div class="row small"><span class="pill">AC ${D.ac}</span><span class="pill">Passive Perception ${D.passive.per}</span>${D.casters[0] ? `<span class="pill">Spell DC ${D.casters[0].dc}</span>` : ''}<span class="pill">Speed ${D.speed}</span></div>
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
-      ${condChips(x.ch.play.cond, 'ccond', `data-v="${esc(c.id)}"`)}</div>`;
+      ${condChips(x.ch.play.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}</div>`;
   }
-  const d = monDef(c);
+  const d = monDef(c), ex = monExtra(d), spells = d ? monSpellNames(c, d) : [];
   const act = (a, kind) => `<div class="mact"><div class="row"><b>${esc(a.n)}</b>${a.use ? `<span class="pill">${esc(a.use)}</span>` : ''}<span class="spacer"></span>${a.atk != null ? `<button class="roll" data-act="matk" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${sgn(+a.atk)} to hit</button>` : ''}${a.dc && a.dc.v ? `<button class="roll" data-act="msave" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${a.dc.ab.toUpperCase()} DC ${a.dc.v} on selected</button>` : ''}${a.atk == null && !(a.dc && a.dc.v) && a.dmg ? `<button class="roll" data-act="mdmg" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">Roll damage</button>` : ''}</div><div class="rt small">${md(a.d)}</div></div>`;
   const block = d ? `<div class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)}${d.xp ? ' (' + d.xp + ' XP)' : ''} · ${esc(d.speed || '')}</div>
     <div class="abgrid">${ABIL.map(a => `<button class="vital" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" title="Roll a ${ABN[a]} check"><div class="lbl">${a}</div><div class="num"><b>${d.ab[a]}</b> ${sgn(mod(d.ab[a]))}</div></button>`).join('')}</div>
@@ -5346,7 +5472,10 @@ function combatDetail(c, cb) {
     : `<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>`;
   return `<div class="panel stack"><div class="ph">${esc(c.name)}<span class="spacer"></span>${c.hidden ? '<span class="pill">hidden</span>' : ''}</div>
     <div class="row"><label class="field" style="width:150px"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>
-    ${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}
+    ${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}
+    ${ex.la || ex.lr ? `<div class="row small">${ex.la ? `<span class="lbl">Legendary actions</span>${combatPips(c, 'lau', ex.la, 'Legendary action')}` : ''}${ex.lr ? `<span class="lbl">Legendary resistance</span>${combatPips(c, 'lru', ex.lr, 'Legendary resistance')}` : ''}</div>` : ''}
+    ${c.conc ? `<div class="row small"><span class="pill brass">Concentrating: ${esc(c.conc)}</span><button class="btn ghost sm" data-act="mbreak" data-v="${esc(c.id)}">Break</button><span class="muted">Damage asks for a Con save</span></div>` : ''}
+    ${spells.length ? `<div class="row small"><span class="lbl">Cast (concentration)</span>${spells.map(s => `<button class="btn sm" data-act="mcast" data-v="${esc(c.id)}" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
     ${block}</div>`;
 }
 function viewCombatPublic(big) {
@@ -5355,7 +5484,8 @@ function viewCombatPublic(big) {
   const rows = list.map(c => {
     let st = c.st || '', conds = c.cond || [];
     if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) { const D = derive(x.ch); st = hpOf(x.ch, D) + ' / ' + D.maxHp + ' HP'; conds = x.ch.play.cond || []; } }
-    return `<div class="irow${c.id === I.cur ? ' cur' : ''}${big ? ' big' : ''}"><div class="iv">${c.init == null ? '—' : c.init}</div><div class="grow"><b>${esc(liveName(c))}</b>${mine(c) ? ' <span class="pill acc">you</span>' : ''}<div class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${conds.map(x => `<span class="pill bad">${esc(x)}</span>`).join('')}</div></div>${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
+    if (c.surp) conds = conds.concat('Surprised');
+    return `<div class="irow${c.id === I.cur ? ' cur' : ''}${big ? ' big' : ''}"><div class="iv">${c.init == null ? '—' : c.init}</div><div class="grow"><b>${esc(liveName(c))}</b>${mine(c) ? ' <span class="pill acc">you</span>' : ''}<div class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${condPills(conds, c.fx)}</div></div>${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const cur = list.find(c => c.id === I.cur);
   return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:${big ? 40 : 26}px">${big ? esc((S.campaign && S.campaign.name) || 'Initiative') : 'Combat'}</h2>${list.length ? `<span class="pill acc"${big ? ' style="font-size:18px"' : ''}>Round ${I.round || 1}</span>` : ''}${cur && mine(cur) ? '<span class="pill brass">Your turn</span>' : I.unseen ? '<span class="pill">Something unseen acts</span>' : ''}</div>
@@ -5364,9 +5494,13 @@ function viewCombatPublic(big) {
 }
 
 /* ===== actions ===== */
-function addMonster(cb, def, rs, name, hidden) {
-  const ib = mod((def.ab || {}).dex || 10);
-  cb.list.push({ id: uid('m'), kind: 'mon', mid: def.id, rs, name, init: rnd(20) + ib, ib, hp: +def.hp || 1, max: +def.hp || 1, ac: def.ac == null ? null : +def.ac, hidden: !!hidden, cond: [] });
+/* o.roll: roll the hit dice from the stat block instead of taking the average; o.memo: group initiative */
+function addMonster(cb, def, rs, name, hidden, o) {
+  o = o || {};
+  const ib = mod((def.ab || {}).dex || 10), hp = o.roll && def.hd ? Math.max(1, rollExpr(def.hd).total) : +def.hp || 1;
+  const m = { id: uid('m'), kind: 'mon', mid: def.id, rs, name, init: 0, ib, hp, max: hp, ac: def.ac == null ? null : +def.ac, hidden: !!hidden, cond: [] };
+  m.init = rollInit(m, o.memo); cb.list.push(m);
+  if (monExtra(def).lair && !cb.list.some(c => c.kind === 'lair' && c.mid === def.id)) cb.list.push({ id: uid('l'), kind: 'lair', mid: def.id, rs, name: 'Lair (' + def.name + ')', init: 20 });
 }
 function uniqueNames(cb, base, n) {
   const used = new Set(cb.list.map(c => c.name)); const out = [];
@@ -5424,14 +5558,47 @@ Object.assign(ACT, {
     for (const x of chars()) if (!cb.list.some(c => c.kind === 'pc' && c.cid === x.ch.id)) cb.list.push({ id: uid('i'), kind: 'pc', cid: x.ch.id, owner: x.owner, name: x.ch.name, init: null });
     saveCombat(cb); queueRender();
   },
-  crollmon() { const cb = cbt(); for (const c of cb.list) if (c.kind === 'mon') c.init = rnd(20) + (+c.ib || 0); sortCombat(cb); saveCombat(cb); queueRender(); },
+  crollmon() { const cb = cbt(), memo = RUN.grp ? {} : null; for (const c of cb.list) if (c.kind === 'mon') c.init = rollInit(c, memo); sortCombat(cb); saveCombat(cb); queueRender(); },
+  mgrp(el) { RUN.grp = el.checked; queueRender(); },
+  mhp(el) { RUN.hpm = el.dataset.v; queueRender(); },
+  cskip(el) { const cb = cbt(); cb.skipDead = el.checked; saveCombat(cb); queueRender(); },
+  ctick(el) { const cb = cbt(); cb.tick = el.value; saveCombat(cb); queueRender(); },
+  csurp(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.surp = c.surp ? 0 : 1; saveCombat(cb); queueRender(); },
+  /* Delay: move a creature to just after the one whose turn it is (the current creature itself acts after the next one instead) */
+  cdelay(el) {
+    const cb = cbt(), i = cb.list.findIndex(x => x.id === el.dataset.v), cur = cb.list.findIndex(x => x.id === cb.cur); if (i < 0 || cur < 0) return;
+    const c = cb.list[i];
+    if (i === cur) {
+      const nx = cb.list[i + 1]; if (!nx) { toastMsg('Nobody acts after ' + nameOf(c) + ' this round.'); return; }
+      cb.list.splice(i, 1); cb.list.splice(i + 1, 0, c); c.init = nx.init; cb.cur = nx.id; arrive(cb, nx);
+    } else { cb.list.splice(i, 1); const at = cb.list.findIndex(x => x.id === cb.cur); c.init = cb.list[at].init; cb.list.splice(at + 1, 0, c); }
+    toastMsg(nameOf(c) + ' delays.'); saveCombat(cb); queueRender();
+  },
+  cpip(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c[el.dataset.k] = +el.dataset.n; saveCombat(cb); queueRender(); },
+  cfxadd(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v), f = c && fxRead(el); if (f) { addFx(cb, c, f); queueRender(); } },
+  cfxrm(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v), f = c && (c.fxs || []).find(x => x.id === el.dataset.i); if (f) { fxDrop(c, f, ' (ended by the DM)'); saveCombat(cb); queueRender(); } },
+  mcast(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.conc = el.dataset.s; saveCombat(cb); sendMsg({ kind: 'note', text: `${nameOf(c)} casts ${c.conc} and concentrates on it.` }); queueRender(); },
+  mbreak(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; sendMsg({ kind: 'note', text: `${nameOf(c)} stops concentrating on ${c.conc}.` }); c.conc = ''; saveCombat(cb); queueRender(); },
+  /* Reaction attack: pick a target and one of the creature's attacks; it rolls and spends the reaction */
+  crx(el) { openModal({ kind: 'rxatk', id: el.dataset.v, tgt: '' }); },
+  rxtgt(el) { UI.modal.tgt = el.value; renderModal(); },
+  rxgo(el) {
+    const m = UI.modal, c = rxCreature(m.id); if (!c) return;
+    if (c.kind === 'pc') {
+      const x = findChar(c.cid, c.owner); if (!x) return; const prev = { cur: UI.cur, tgt: UI.tgt };
+      UI.cur = { cid: x.ch.id, owner: x.owner }; UI.tgt = m.tgt; ACT.attack({ dataset: { i: el.dataset.i } }); UI.cur = prev.cur; UI.tgt = prev.tgt;
+      if (canEditChar(x.owner)) savePlay(x.ch, { used: Object.assign({}, x.ch.play.used, { r: 1 }) });
+    } else { ACT.matk({ dataset: { v: c.id, k: 'actions', n: el.dataset.n, t: m.tgt } }); const cb = cbt(), cc = cb.list.find(x => x.id === c.id); if (cc) { cc.rxu = 1; saveCombat(cb); } }
+    closeModal(); queueRender();
+  },
   mq(el) { RUN.q = el.value; queueRender(); },
   ctake() { saveDM({ resolver: TAB }); toastMsg('This window now settles player rolls.'); queueRender(); },
   mrs(el) { RUN.rs = el.dataset.v; queueRender(); },
   madd(el) {
     const def = registry(RUN.rs).monsters.get(el.dataset.v); if (!def) return;
     const cb = cbt(), n = clamp(+($('#f-mn') || {}).value || 1, 1, 20), hidden = !!($('#f-mh') || {}).checked;
-    for (const nm of uniqueNames(cb, def.name, n)) addMonster(cb, def, RUN.rs, nm, hidden);
+    const o = { roll: RUN.hpm === 'roll', memo: RUN.grp ? {} : null };
+    for (const nm of uniqueNames(cb, def.name, n)) addMonster(cb, def, RUN.rs, nm, hidden, o);
     sortCombat(cb); saveCombat(cb); toastMsg(`Added ${n} × ${def.name}${hidden ? ' (hidden)' : ''}.`); queueRender();
   },
   cquick() {
@@ -5501,7 +5668,7 @@ Object.assign(ACT, {
   },
   matk(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return;
-    RUN.tgt = ($('#f-mt') || {}).value || '';
+    RUN.tgt = el.dataset.t != null ? el.dataset.t : ($('#f-mt') || {}).value || '';   // data-t: the target picked in the reaction-attack pop-up
     const r = d20Roll({ bonus: +a.atk || 0, type: 'atk' }); const dm = rollDmgList(a.dmg || [], r.crit); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
     sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: a.n, total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dm.total, dmgDetail: dm.detail, dt: dm.dt, tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: UI.priv });
   },
@@ -5678,7 +5845,8 @@ Object.assign(ACT, {
     const e = E(), ch = e && e.ch; if (!ch) return; const D = getD(ch), M = fxMods(ch, D);
     const kind = el.dataset.kind || 'check';
     const abk = kind === 'save' ? ABIL.find(a => String(el.dataset.label || '').startsWith(ABN[a])) : null;
-    const r = d20Roll({ M, bonus: +el.dataset.b || 0, type: kind === 'save' ? 'save' : kind === 'death' ? 'death' : 'check', ab: abk });
+    const surprised = kind === 'init' && ch.ruleset === '2024' && ((S.init || {}).list || []).some(c => c.kind === 'pc' && c.cid === ch.id && c.surp);   // 2024: surprised means disadvantage on initiative
+    const r = d20Roll({ M, bonus: +el.dataset.b || 0, type: kind === 'save' ? 'save' : kind === 'death' ? 'death' : 'check', ab: abk, dis: surprised });
     sendMsg({ kind: kind === 'init' ? 'init' : 'roll', who: ch.name, label: el.dataset.label + modeTag(r), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, cid: ch.id, owner: e.owner, priv: privOn() });
     if (kind === 'death' && canEditChar(e.owner)) {
       if (r.nat === 20) { play(ch, { hp: 1, ds: [0, 0], cond: (ch.play.cond || []).filter(c => c !== 'Unconscious') }, 'death save'); return; }
@@ -7057,7 +7225,7 @@ MODALS.xpend = () => {
     <p class="small muted">This clears the turn order for everyone. Saved encounters stay.</p>
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn" data-act="xpendgo" data-v="0">End without XP</button><button class="btn pri" data-act="xpendgo" data-v="1"${dis(!each)}>Give ${fmtN(each)} XP each and end</button></div></div>`;
 };
-function endCombatNow() { RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [] }); queueRender(); }
+function endCombatNow() { const o = cbt(); RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [], skipDead: o.skipDead !== false, tick: o.tick === 'start' ? 'start' : 'end' }); queueRender(); }
 Object.assign(ACT, {
   setadv(el) { saveSettings({ adv: el.dataset.v }); queueRender(); },
   xpgive() {
@@ -7106,12 +7274,13 @@ function viewCombatPlayer() {
       const x = findChar(c.cid, c.owner);
       if (x) { const D = derive(x.ch), hp = hpOf(x.ch, D); conds = x.ch.play.cond || []; st = isMine || showHp === 'exact' ? hp + ' / ' + D.maxHp + ' HP' : showHp === 'none' ? '' : healthWord({ hp, max: D.maxHp }); }
     }
-    const tgt = UI.tgt === c.id, canTarget = !isMine && !!me;
+    if (c.surp) conds = conds.concat('Surprised');
+    const tgt = UI.tgt === c.id, canTarget = !isMine && !!me && c.kind !== 'lair';
     return `<div class="irow prow${c.id === I.cur ? ' cur' : ''}${tgt ? ' tgt' : ''}">
       <div class="iv">${c.init == null ? (isMine ? `<button class="btn sm" data-act="cbinit" data-cid="${esc(c.cid)}" title="Roll initiative">Roll</button>` : '—') : c.init}</div>
       ${canTarget ? `<button class="grow ptarget" data-act="ptgt" data-v="${esc(c.id)}" aria-pressed="${tgt}" title="${tgt ? 'Stop targeting' : 'Target ' + esc(liveName(c))}">` : '<div class="grow">'}<b>${esc(liveName(c))}</b>${isMine ? ' <span class="pill acc">you</span>' : ''}${tgt ? ' <span class="pill brass">target</span>' : ''}
-        <span class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${conds.map(x => `<span class="pill bad">${esc(x)}</span>`).join('')}</span>${canTarget ? '</button>' : '</div>'}
-      ${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
+        <span class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${condPills(conds, c.fx)}</span>${canTarget ? '</button>' : '</div>'}
+      ${isMine ? `<button class="btn ghost sm" data-act="crx" data-v="${esc(c.id)}" title="Attack with your reaction">Reaction attack</button>` : ''}${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const notIn = chars().filter(x => x.mine && !mineIn.includes(x));
   const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : I.unseen ? '<span class="pill">Something unseen acts</span>' : cur ? `<span class="small muted">${esc(cur.name)} is acting</span>` : ''}</div>`;
@@ -7123,6 +7292,7 @@ function viewCombatPlayer() {
   if (me) {
     const D = derive(me.ch), ro = !canEditChar(me.owner);
     right = `<div class="stack">${mineIn.length > 1 ? `<div class="seg" role="group" aria-label="Your characters">${mineIn.map(x => `<button data-act="pcur" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(x === me)}>${esc(x.ch.name)}</button>`).join('')}</div>` : ''}
+      <div class="panel stack"><span class="lbl">Your timed effects</span>${(((list.find(c => c.kind === 'pc' && c.cid === me.ch.id) || {}).fx) || []).map(f => `<span class="row small" style="gap:0"><span class="pill bad">${esc(fxText(f))}</span><button class="btn ghost sm" data-act="pfxrm" data-cid="${esc(me.ch.id)}" data-owner="${esc(me.owner)}" data-i="${esc(f.id)}" aria-label="End ${esc(f.n)}">${svgIcon('x', 14)}</button></span>`).join('')}${fxForm(`<button class="btn sm" data-act="pfxadd" data-cid="${esc(me.ch.id)}" data-owner="${esc(me.owner)}">Add effect</button>`, me.ch.id)}</div>
       <div class="cbsheet">${sheetView(me.ch, D, ro, me)}</div></div>`;
   } else right = `<div class="panel stack"><p class="muted">None of your characters is in this fight.</p>${notIn.length ? '<p class="small muted">Tap Ask to join, or wait for the DM to add the party.</p>' : ''}</div>`;
   return head + `<div class="pcwrap"><div class="run prun">${left}${right}</div>${typeof pturnBar === 'function' ? pturnBar(actingMine, list) : ''}</div>`;
@@ -7139,6 +7309,14 @@ Object.assign(ACT, {
     const x = myCombatChars().find(y => y.ch.id === el.dataset.cid); if (!x) return;
     sendMsg({ kind: 'turn', act: 'end', cid: x.ch.id, owner: x.owner, who: x.ch.name, text: `${x.ch.name} ends their turn.` });
   },
+  pfxadd(el) {
+    const x = myCombatChars().find(y => y.ch.id === el.dataset.cid), f = x && fxRead(el); if (!f) return;
+    sendMsg({ kind: 'turn', act: 'fx', cid: x.ch.id, owner: x.owner, who: x.ch.name, fx: f, text: `${x.ch.name} gains ${f.n}${f.r ? ' for ' + f.r + (f.r === 1 ? ' round' : ' rounds') : ''}.` });
+  },
+  pfxrm(el) {
+    const x = myCombatChars().find(y => y.ch.id === el.dataset.cid); if (!x) return;
+    sendMsg({ kind: 'turn', act: 'fxrm', cid: x.ch.id, owner: x.owner, who: x.ch.name, fid: el.dataset.i, text: `${x.ch.name} ends an effect early.` });
+  },
   pjoin(el) {
     const x = chars().find(y => y.mine && y.ch.id === el.dataset.cid); if (!x) return;
     sendMsg({ kind: 'turn', act: 'join', cid: x.ch.id, owner: x.owner, who: x.ch.name, text: `${x.ch.name} asks to join the fight.` });
@@ -7149,6 +7327,11 @@ Object.assign(ACT, {
 function resolveTurnMsg(m) {
   const cb = cbt();
   if (m.act === 'end') { const c = cb.list.find(x => x.id === cb.cur); if (c && c.kind === 'pc' && c.cid === m.cid) { stepTurn(1); } }
+  else if (m.act === 'fx' || m.act === 'fxrm') {
+    const c = cb.list.find(x => x.kind === 'pc' && x.cid === m.cid && x.owner === m.owner); if (!c) return;
+    const f = m.act === 'fxrm' && (c.fxs || []).find(x => x.id === m.fid);
+    if (m.act === 'fx') addFx(cb, c, m.fx || {}); else if (f) { fxDrop(c, f, ' (ended early)'); saveCombat(cb); }
+  }
   else if (m.act === 'join') {
     if (cb.list.some(x => x.kind === 'pc' && x.cid === m.cid)) return;
     const x = findChar(m.cid, m.owner); if (!x) return;
