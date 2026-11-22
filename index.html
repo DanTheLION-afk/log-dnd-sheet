@@ -639,7 +639,6 @@ footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color:
   :not(.cbsheet) > .sheet .sec-top > .vitals { display: none; }
   :not(.cbsheet) > .sheet .turnbar > .small { display: none; }
   :not(.cbsheet) > .sheet .sec-spells:has(> .nospell) { display: none; }
-  .ctool { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--barh, 56px)); z-index: 6; background: var(--bg); padding-block: 8px; margin-block: -8px; }
 }
 @media (min-width: 701px) and (hover: hover) { .kbdhint { display: inline; } }
 @media (min-width: 1101px) {
@@ -711,6 +710,36 @@ footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color:
 .palrow .muted { margin-left: auto; text-align: right; }
 .crow.abs { border-left: 4px solid var(--sun); }
 .crow.abs.cur { box-shadow: inset 0 0 0 2px var(--sun); }
+/* ===== Build 32: DM monsters. A sticky turn bar, a stat block that stays beside the list, the monster browser ===== */
+.cbar { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--barh, 56px)); z-index: 6; background: var(--bg); display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding-block: 8px; margin-block: -8px; border-bottom: 1px solid var(--line); }
+.cturn { flex: 1 1 240px; min-width: 0; line-height: 1.3; }
+.cturn .who { font-family: var(--f-display); font-size: 19px; font-weight: 600; color: var(--brass); }
+.cbar .cshow { margin-left: auto; }
+@media (min-width: 1101px) { .cbar .cshow { display: none; } .rdet { position: sticky; top: calc(var(--barh, 56px) + 12px); max-height: calc(100vh - var(--barh, 56px) - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 2px; } }
+#mdetail { scroll-margin-top: calc(var(--barh, 56px) + 88px); }
+.mdet.mcur { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.mdet .ph { flex-wrap: wrap; row-gap: 6px; }
+.mhp { font-size: 22px; }
+.edtag { color: var(--brass); margin-top: 2px; }
+.mb { width: min(1080px, 100%); }
+.mbf { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.mbgrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.mblist { display: flex; flex-direction: column; gap: 2px; max-height: min(52vh, 460px); overflow: auto; padding: 2px; }
+.mbprev { max-height: min(52vh, 460px); overflow: auto; padding: 2px; display: flex; flex-direction: column; gap: 8px; }
+.mbrow { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, auto); gap: 2px 12px; align-items: baseline; text-align: left; width: 100%; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; min-height: 44px; }
+.mbrow:hover, .mbrow[aria-pressed="true"] { background: var(--accent-soft); }
+.mbrow[aria-pressed="true"] { border-color: var(--accent); }
+.mbrow .mbs { font-family: var(--f-label); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+.mbrow .mbn { min-width: 0; display: flex; flex-direction: column; }
+.mbback { display: none; }
+@media (max-width: 800px) {
+  .mbgrid { grid-template-columns: minmax(0, 1fr); }
+  .mbgrid.sel .mblist, .mbgrid:not(.sel) .mbprev { display: none; }
+  .mbgrid.sel .mbback { display: inline-flex; }
+  .mbrow { grid-template-columns: repeat(4, 1fr); }
+  .mbrow .mbn { grid-column: 1 / -1; }
+  .mblist, .mbprev { max-height: none; }
+}
 </style>
 </head>
 <body>
@@ -5232,7 +5261,7 @@ function onInput(ev) {
   }
   if (LIVE_ACTS.includes(el.dataset.act)) { clearTimeout(searchTimer); searchTimer = setTimeout(() => ACT[el.dataset.act](el), 220); }
 }
-const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'hbbq','pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq', 'ppq'];   // text inputs that act while typing; every other text input with a data-act commits on change
+const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'hbbq','pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq', 'ppq', 'mbq'];   // text inputs that act while typing; every other text input with a data-act commits on change
 function onChange(ev) {
   const el = ev.target;
   flushTyping();
@@ -5375,7 +5404,7 @@ function sortCombat(cb) {
 }
 /* a player's custom companion keeps its attacks as plain rows in the combat doc (no nested arrays); the stat block is built from them when needed */
 const cmpDef = c => ({ id: '', name: c.name, size: c.cmp.size || 'Medium', type: 'companion', cr: 0, ac: c.ac, hp: c.max, speed: c.cmp.speed || '', ab: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, actions: (c.cmp.atks || []).map(a => ({ n: a.n, d: `${sgn(+a.b || 0)} to hit${a.d ? ', ' + a.d + ' ' + (a.t || '') : ''}`, atk: +a.b || 0, dmg: a.d ? [[a.d, a.t || '']] : [] })) });
-function monDef(c) { return c && c.cmp ? cmpDef(c) : c && c.mid ? (registry(c.rs || '2014').monsters.get(c.mid) || null) : null; }
+function monDef(c) { return c && c.cmp ? cmpDef(c) : c && c.mid ? edDef(c, registry(c.rs || '2014').monsters.get(c.mid) || null) : null; }   // edDef: this fight's edits (Build 32) laid over the stat block
 const rsOf = c => { const x = c.kind === 'pc' && findChar(c.cid, c.owner); return x ? x.ch.ruleset : (c.rs || RUN.rs); };
 const nameOf = c => c.hidden ? 'Something unseen' : liveName(c);
 const monSaveBonus = (c, ab) => { const d = monDef(c); return d ? (d.saves && d.saves[ab] != null ? +d.saves[ab] : mod((d.ab || {})[ab] || 10)) : (+c.sv || 0); };
@@ -5458,7 +5487,7 @@ function stepTurn(dir) {
     if (i < 0) { i = cb.list.length - 1; cb.round = Math.max(1, (cb.round || 1) - 1); }
     if (dir < 0 || !skipTurn(cb, cb.list[i])) break;
   }
-  const c = cb.list[i]; cb.cur = c.id;
+  const c = cb.list[i]; cb.cur = c.id; RUN.sel = null;   // the stat block follows the turn
   if (dir > 0) arrive(cb, c);
   saveCombat(cb);
 }
@@ -5721,7 +5750,7 @@ function viewCombat() {
     return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}${c.hidden ? ' hid' : ''}${isAbsent(c) ? ' abs' : ''}">
       <input type="checkbox" data-act="cpick" data-v="${esc(c.id)}"${RUN.picks[c.id] ? ' checked' : ''} aria-label="Select ${esc(nm)}">
       <input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
-      <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length || (c.fxs || []).length ? `<span class="row small">${condPills(conds, fxPub(c))}</span>` : ''}</button>
+      <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length || (c.fxs || []).length || c.kind === 'mon' ? `<span class="row small">${c.kind === 'mon' ? monTags(c) : ''}${condPills(conds, fxPub(c))}</span>` : ''}</button>
       <div class="chp"><span class="num"><b>${hp == null ? '—' : hp}</b>${max ? ' / ' + max : ''}${hp == null && c.taken ? ` <span class="small muted" title="HP isn't set, so damage is only tallied">took ${c.taken}</span>` : ''}</span><div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div></div>
       <span class="num cac" title="Armor Class">AC ${ac == null || ac === '' ? '?' : ac}</span>
       <span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
@@ -5737,23 +5766,24 @@ function viewCombat() {
   const left = `<div class="stack">
     <div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2><span class="pill acc">Round ${cb.round || 1}</span><span class="spacer"></span>${cb.list.length ? '<span class="small muted kbdhint">Keys: N next turn, P back</span>' : ''}${window.PL_SITE ? `<a class="btn ghost sm" href="?v=table${location.hash}" target="_blank" rel="noopener">Open table display</a>` : ''}</div>
     ${S.mode === 'live' && !isResolver() ? `<div class="note row"><span class="grow">Player attacks and saves are being settled in another DM window. If that window is closed, nothing gets applied.</span><button class="btn sm" data-act="ctake">Settle them here</button></div>` : ''}
-    <div class="row ctool"><button class="btn pri" data-act="cnext"${dis(!cb.list.length)} title="Next turn (key N)" aria-keyshortcuts="N">Next turn</button><button class="btn" data-act="cprev"${dis(!cb.list.length)} title="Previous turn (key P)" aria-keyshortcuts="P">Previous</button><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
+    ${cbar(cb)}
+    <div class="row ctool"><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button><button class="btn" data-act="mbrowse">Add monsters</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
     <div class="row small"><label class="chk"><input type="checkbox" data-act="cskip"${cb.skipDead !== false ? ' checked' : ''}> Auto-skip dead monsters</label><label class="row" style="gap:6px">Effects count down at <select data-act="ctick" aria-label="Effects count down at">${opt('end', 'end of turn', cb.tick !== 'start')}${opt('start', 'start of turn', cb.tick === 'start')}</select></label></div>
     ${absentBanner(cb)}
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
-    ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
+    ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then find monsters to fight.<div class="row" style="justify-content:center;margin-top:12px"><button class="btn pri" data-act="mbrowse">Add monsters</button></div></div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
       <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
       <div class="row"><select id="f-rt" aria-label="Roll to ask for">${rollOpts()}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:190px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
     <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
-      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative (DMG optional rule)</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span></div>
+      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative (DMG optional rule)</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span><button class="btn sm" data-act="mbrowse">Browse all monsters</button></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
       <div class="row"><input type="text" id="f-cn" placeholder="Quick add: name" style="max-width:170px"><input type="number" id="f-cib" placeholder="Init +" style="width:80px"><input type="number" id="f-chp" placeholder="HP" style="width:70px"><input type="number" id="f-cac" placeholder="AC" style="width:70px"><button class="btn sm" data-act="cquick">Add</button></div>
       <div class="row"><select id="f-enc" aria-label="Saved encounters">${enc.length ? enc.map(e => opt(e.id, `${e.name} (${sum(e.list.map(x => x.n))})`)).join('') : opt('', 'No saved encounters')}</select><button class="btn sm" data-act="encload"${dis(!enc.length)}>Load</button><button class="btn ghost sm danger" data-act="encdel"${dis(!enc.length)}>Delete</button><input type="text" id="f-encn" placeholder="Name this fight" style="max-width:170px"><button class="btn sm" data-act="encsave"${dis(!cb.list.some(c => c.kind === 'mon'))}>Save monsters as encounter</button></div></div>
   </div>`;
   const reqs = Object.values(S.reqs || {}).sort((a, b) => b.at - a.at).slice(0, 3);
-  const right = `<div class="stack">
-    ${sel ? combatDetail(sel, cb) : ''}
+  const right = `<div class="stack rdet">
+    ${sel ? `<div id="mdetail">${combatDetail(sel, cb)}</div>` : ''}
     ${reqs.length ? `<div class="panel stack"><div class="ph">Roll requests</div>${reqs.map(q => `<div><b class="small">${esc(q.label)}${q.dc ? ' · DC ' + q.dc : ''}</b><div class="row small">${(q.keys || []).map(k => { const a = q.answers[k]; const t = findTarget('pc|' + k); return `<span class="pill ${a ? (a.pass === false ? 'bad' : 'acc') : ''}">${esc(t ? t.name : '?')}: ${a ? a.total + (a.pass == null ? '' : a.pass ? ' ✓' : ' ✗') : 'waiting'}</span>`; }).join('')}</div></div>`).join('')}</div>` : ''}
     <div class="panel stack"><div class="ph">Dice<span class="spacer"></span>${advSeg()}</div>
       <div class="row">${['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'].map(d => `<button class="btn sm" data-act="quick" data-x="1${d}">${d}</button>`).join('')}<label class="chk small"><input type="checkbox" data-act="priv"${UI.priv ? ' checked' : ''}> roll privately</label></div>
@@ -5798,24 +5828,41 @@ function combatDetail(c, cb) {
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
       ${condChips(x.ch.play.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}${absentPanel(c, x, D)}</div>`;
   }
-  const d = monDef(c), ex = monExtra(d), spells = d ? monSpellNames(c, d) : [];
-  const act = (a, kind) => `<div class="mact"><div class="row"><b>${esc(a.n)}</b>${a.use ? `<span class="pill">${esc(a.use)}</span>` : ''}<span class="spacer"></span>${a.atk != null ? `<button class="roll" data-act="matk" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${sgn(+a.atk)} to hit</button>` : ''}${a.dc && a.dc.v ? `<button class="roll" data-act="msave" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${a.dc.ab.toUpperCase()} DC ${a.dc.v} on selected</button>` : ''}${a.atk == null && !(a.dc && a.dc.v) && a.dmg ? `<button class="roll" data-act="mdmg" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">Roll damage</button>` : ''}</div><div class="rt small">${md(a.d)}</div></div>`;
-  const block = d ? `<div class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)}${d.xp ? ' (' + d.xp + ' XP)' : ''} · ${esc(d.speed || '')}</div>
-    <div class="abgrid">${ABIL.map(a => `<button class="vital" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" title="Roll a ${ABN[a]} check"><div class="lbl">${a}</div><div class="num"><b>${d.ab[a]}</b> ${sgn(mod(d.ab[a]))}</div></button>`).join('')}</div>
-    <div class="row small"><span class="lbl">Saves</span>${ABIL.map(a => `<button class="roll" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" data-sv="1">${a.toUpperCase()} ${sgn(d.saves && d.saves[a] != null ? +d.saves[a] : mod(d.ab[a]))}</button>`).join('')}</div>
-    ${d.skills ? `<div class="small"><span class="lbl">Skills</span> ${Object.entries(d.skills).map(([k, v]) => esc((SKILL[k] || { name: k }).name) + ' ' + sgn(+v)).join(', ')}</div>` : ''}
-    ${['vuln', 'res', 'imm', 'cimm'].filter(k => d[k]).map(k => `<div class="small"><span class="lbl">${{ vuln: 'Vulnerable', res: 'Resists', imm: 'Immune', cimm: 'Condition immune' }[k]}</span> ${esc(d[k].join('; '))}</div>`).join('')}
-    <div class="small"><span class="lbl">Senses</span> ${esc(d.senses || '—')} · <span class="lbl">Languages</span> ${esc(d.langs || '—')}</div>
-    ${(d.traits || []).map(t => `<div class="rt small"><b>${esc(t.n)}.</b> ${md(t.d).replace(/^<p>/, '').replace(/<\/p>$/, '')}</div>`).join('')}
-    <div class="row"><span class="lbl">Target</span>${tsel}${advSeg()}</div>
-    ${[['actions', 'Actions'], ['bonus', 'Bonus actions'], ['reactions', 'Reactions'], ['legendary', 'Legendary actions']].filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}`
-    : `<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>`;
-  return `<div class="panel stack"><div class="ph">${esc(c.name)}<span class="spacer"></span>${c.hidden ? '<span class="pill">hidden</span>' : ''}</div>
-    <div class="row"><label class="field" style="width:210px;max-width:100%"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>
-    ${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}
-    ${ex.la || ex.lr ? `<div class="row small">${ex.la ? `<span class="lbl">Legendary actions</span>${combatPips(c, 'lau', ex.la, 'Legendary action')}` : ''}${ex.lr ? `<span class="lbl">Legendary resistance</span>${combatPips(c, 'lru', ex.lr, 'Legendary resistance')}` : ''}</div>` : ''}
+  const d = monDef(c), ex = monExtra(d), spells = d ? monSpellNames(c, d) : [], isCur = c.id === cb.cur;
+  const nTick = Object.keys(RUN.picks).filter(id => id !== c.id).length, lair = cb.list.find(x => x.kind === 'lair' && x.mid && x.mid === c.mid);
+  const KINDS = [['actions', 'Actions'], ['bonus', 'Bonus actions'], ['reactions', 'Reactions'], ['legendary', 'Legendary actions']];
+  /* every action is a row with its own buttons; legendary actions and reactions also spend their pip (Use) */
+  const act = (a, kind) => {
+    const cost = kind === 'legendary' ? +((String(a.n).match(/costs? (\d+) actions?/i) || [])[1] || 1) : 0;
+    const use = kind === 'legendary' ? `<button class="roll" data-act="muse" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}"${dis(ex.la - (+c.lau || 0) < cost)} title="Spends ${cost} legendary action${cost === 1 ? '' : 's'}">Use${cost > 1 ? ' (' + cost + ')' : ''}</button>`
+      : kind === 'reactions' ? `<button class="roll" data-act="muse" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}"${dis(c.rxu)} title="Marks this creature's reaction as used">Use reaction</button>` : '';
+    return `<div class="mact"><div class="row"><b>${esc(a.n)}</b>${a.use ? `<span class="pill">${esc(a.use)}</span>` : ''}<span class="spacer"></span>${use}${a.atk != null ? `<button class="roll" data-act="matk" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${sgn(+a.atk)} to hit</button>` : ''}${a.dc && a.dc.v ? `<button class="roll" data-act="msave" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${a.dc.ab.toUpperCase()} DC ${a.dc.v} on ${nTick ? nTick + ' ticked' : 'ticked'}</button>` : ''}${a.atk == null && !(a.dc && a.dc.v) && a.dmg ? `<button class="roll" data-act="mdmg" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">Roll damage</button>` : ''}</div><div class="rt small">${md(a.d)}</div>${a.ed ? `<div class="small edtag">Edited for this fight: ${[a.atk != null ? sgn(+a.atk) + ' to hit' : '', (a.dmg || []).map(x => x.join(' ')).join(' + ')].filter(Boolean).join(', ')}</div>` : ''}</div>`;
+  };
+  const left = k => Math.max(0, ex[k] - (+c[k === 'la' ? 'lau' : 'lru'] || 0));
+  const pct = c.max ? clamp((c.hp == null ? 0 : c.hp) / c.max * 100, 0, 100) : 0, pills = condPills(c.cond || [], fxPub(c));
+  /* the read-only picture of this creature right now: hit points, conditions, legendary and reaction state, lair, concentration, edits */
+  const status = `<div class="stack" style="gap:6px"><div class="row"><b class="num mhp">${c.hp == null ? '—' : c.hp}${c.max ? ' / ' + c.max : ''} HP</b><div class="hpbar grow" style="min-width:60px"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div><span class="pill">AC ${c.ac == null || c.ac === '' ? '?' : c.ac}</span>${d && d.speed ? `<span class="pill">${esc(d.speed)}</span>` : ''}</div>
+    ${pills ? `<div class="row small">${pills}</div>` : ''}
+    <div class="row small">${ex.la ? `<span class="row" style="gap:6px;flex-wrap:nowrap"><span class="lbl">Legendary actions</span>${combatPips(c, 'lau', ex.la, 'Legendary action')}<span class="muted">${left('la')} of ${ex.la} left</span></span>` : ''}${ex.lr ? `<span class="row" style="gap:6px;flex-wrap:nowrap"><span class="lbl">Legendary resistance</span>${combatPips(c, 'lru', ex.lr, 'Legendary resistance')}<span class="muted">${left('lr')} of ${ex.lr} left</span></span>` : ''}<span class="pill ${c.rxu ? '' : 'acc'}">Reaction ${c.rxu ? 'used' : 'ready'}</span>${lair ? `<span class="pill brass">Lair actions at initiative ${lair.init == null ? '?' : lair.init}</span>` : ''}</div>
     ${c.conc ? `<div class="row small"><span class="pill brass">Concentrating: ${esc(c.conc)}</span><button class="btn ghost sm" data-act="mbreak" data-v="${esc(c.id)}">Break</button><span class="muted">Damage asks for a Con save</span></div>` : ''}
     ${spells.length ? `<div class="row small"><span class="lbl">Cast (concentration)</span>${spells.map(s => `<button class="btn sm" data-act="mcast" data-v="${esc(c.id)}" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
+    ${c.ed ? `<div class="note small"><b>Edited for this fight:</b> ${esc(edNote(c))}${c.ed.note ? `<div style="margin-top:4px">${esc(c.ed.note)}</div>` : ''}</div>` : ''}</div>`;
+  const quick = `<div class="row"><label class="field" style="width:210px;max-width:100%"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>`;
+  const conds = `<details class="feat" data-k="mconds" open><summary><b>Conditions and effects</b></summary><div class="body stack">${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}</div></details>`;
+  const block = d ? `<div class="row"><span class="lbl">Target</span>${tsel}${advSeg()}</div>
+    ${KINDS.some(([k]) => (d[k] || []).some(a => a.dc && a.dc.v)) ? `<div class="small muted">Save buttons roll for the creatures you tick in the turn order${nTick ? ' (' + nTick + ' ticked)' : ''}.</div>` : ''}
+    ${KINDS.filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}
+    ${conds}
+    <div class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)}${d.xp ? ' (' + d.xp + ' XP)' : ''}</div>
+    <div class="abgrid">${ABIL.map(a => `<button class="vital" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" title="Roll a ${ABN[a]} check"><div class="lbl">${a}</div><div class="num"><b>${d.ab[a]}</b> ${sgn(mod(d.ab[a]))}</div></button>`).join('')}</div>
+    <div class="row small"><span class="lbl">Saves</span>${ABIL.map(a => `<button class="roll" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" data-sv="1">${a.toUpperCase()} ${sgn(d.saves && d.saves[a] != null ? +d.saves[a] : mod(d.ab[a]))}</button>`).join('')}</div>
+    ${d.skills ? `<div class="row small"><span class="lbl">Skills</span>${Object.entries(d.skills).map(([k, v]) => { const s = SKILL[k] || { name: k, ab: '' }; return `<button class="roll" data-act="mroll" data-v="${esc(c.id)}" data-ab="${s.ab}" data-b="${+v}" data-l="${esc(s.name)}">${esc(s.name)} ${sgn(+v)}</button>`; }).join('')}</div>` : ''}
+    ${['vuln', 'res', 'imm', 'cimm'].filter(k => d[k]).map(k => `<div class="small"><span class="lbl">${{ vuln: 'Vulnerable', res: 'Resists', imm: 'Immune', cimm: 'Condition immune' }[k]}</span> ${esc(d[k].join('; '))}</div>`).join('')}
+    <div class="small"><span class="lbl">Senses</span> ${esc(d.senses || '—')} · <span class="lbl">Languages</span> ${esc(d.langs || '—')}</div>
+    ${(d.traits || []).length ? `<details class="feat" data-k="mtraits"><summary><b>Traits (${d.traits.length})</b> <span class="small muted">${esc(d.traits.map(t => t.n).join(', '))}</span></summary><div class="body stack">${d.traits.map(t => `<div class="rt small"><b>${esc(t.n)}.</b> ${md(t.d).replace(/^<p>/, '').replace(/<\/p>$/, '')}</div>`).join('')}</div></details>` : ''}`
+    : `<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>${conds}`;
+  return `<div class="panel stack mdet${isCur ? ' mcur' : ''}"><div class="ph">${esc(c.name)}${isCur ? '<span class="pill brass">Acting now</span>' : ''}${c.hidden ? '<span class="pill">hidden</span>' : ''}${c.ed ? '<span class="pill" title="' + esc(edNote(c)) + '">edited</span><button class="btn ghost sm" data-act="mfreset" data-v="' + esc(c.id) + '">Reset to stat block</button>' : ''}<span class="spacer"></span>${!isCur && cb.cur ? '<button class="btn ghost sm" data-act="cback">Back to current turn</button>' : ''}<button class="btn sm" data-act="mfight" data-v="${esc(c.id)}">Edit for this fight</button></div>
+    ${status}${quick}
     ${block}</div>`;
 }
 function viewCombatPublic(big) {
@@ -5862,6 +5909,12 @@ function encAdd(list) {
   }
   sortCombat(cb); saveCombat(cb);
 }
+/* n copies of one stat block into the fight (the search buttons and the monster browser) */
+function addGroup(def, rs, n, hidden) {
+  const cb = cbt(), o = { roll: RUN.hpm === 'roll', memo: RUN.grp ? {} : null };
+  for (const nm of uniqueNames(cb, def.name, n)) addMonster(cb, def, rs, nm, hidden, o);
+  sortCombat(cb); saveCombat(cb); toastMsg(`Added ${n} × ${def.name}${hidden ? ' (hidden)' : ''}.`); queueRender();
+}
 const seenName = c => c.hidden ? 'Something unseen' : c.name;
 function monAction(c, kind, name) { const d = monDef(c); return d ? (d[kind] || []).find(a => a.n === name) : null; }
 function rollDmgList(list, crit) {
@@ -5875,12 +5928,13 @@ Object.assign(ACT, {
   cnext() { stepTurn(1); queueRender(); },
   cprev() { stepTurn(-1); queueRender(); },
   csort() { const cb = cbt(); sortCombat(cb); saveCombat(cb); queueRender(); },
-  csel(el) { RUN.sel = el.dataset.v; queueRender(); },
+  csel(el) { RUN.sel = el.dataset.v; queueRender(); if (innerWidth <= 1100) showDetail(); },   // one column: the stat block is far below the list
   cpick(el) { if (el.checked) RUN.picks[el.dataset.v] = 1; else delete RUN.picks[el.dataset.v]; queueRender(); },
   cinit(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.init = el.value === '' ? null : +el.value; saveCombat(cb); queueRender(); },
   cset(el) {
     const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; const k = el.dataset.k;
-    c[k] = k === 'name' ? (el.value.trim() || c.name) : (el.value === '' ? null : +el.value);
+    const v = k === 'name' ? (el.value.trim() || c.name) : (el.value === '' ? null : +el.value);
+    if (c.kind === 'mon' && (k === 'name' || k === 'ac' || k === 'max')) edSet(c, k, v); else c[k] = v;   // Build 32: remember the original so the edit can be reset
     if (k === 'max' && c.hp != null && c.max != null) c.hp = Math.min(c.hp, c.max);
     saveCombat(cb); queueRender();
   },
@@ -5948,10 +6002,7 @@ Object.assign(ACT, {
   mrs(el) { RUN.rs = el.dataset.v; queueRender(); },
   madd(el) {
     const def = registry(RUN.rs).monsters.get(el.dataset.v); if (!def) return;
-    const cb = cbt(), n = clamp(+($('#f-mn') || {}).value || 1, 1, 20), hidden = !!($('#f-mh') || {}).checked;
-    const o = { roll: RUN.hpm === 'roll', memo: RUN.grp ? {} : null };
-    for (const nm of uniqueNames(cb, def.name, n)) addMonster(cb, def, RUN.rs, nm, hidden, o);
-    sortCombat(cb); saveCombat(cb); toastMsg(`Added ${n} × ${def.name}${hidden ? ' (hidden)' : ''}.`); queueRender();
+    addGroup(def, RUN.rs, clamp(+($('#f-mn') || {}).value || 1, 1, 20), !!($('#f-mh') || {}).checked);
   },
   cquick() {
     const cb = cbt(); const nb = $('#f-cn'); const name = (nb.value || '').trim() || 'Creature'; const ib = +$('#f-cib').value || 0;
@@ -6004,9 +6055,9 @@ Object.assign(ACT, {
   reqskip(el) { (S.reqDone = S.reqDone || {})[el.dataset.rid + el.dataset.key] = 1; queueRender(); },
   mroll(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), d = monDef(c); if (!d) return; const ab = el.dataset.ab, sv = !!el.dataset.sv;
-    const b = sv && d.saves && d.saves[ab] != null ? +d.saves[ab] : mod(d.ab[ab]);
+    const b = el.dataset.b != null ? +el.dataset.b : sv && d.saves && d.saves[ab] != null ? +d.saves[ab] : mod(d.ab[ab]);   // data-b: a skill's own bonus
     const r = d20Roll({ bonus: b, type: sv ? 'save' : 'check' });
-    sendMsg({ kind: 'roll', who: seenName(c), label: ABN[ab] + (sv ? ' save' : ' check'), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, priv: UI.priv });
+    sendMsg({ kind: 'roll', who: seenName(c), label: el.dataset.l ? el.dataset.l + ' check' : ABN[ab] + (sv ? ' save' : ' check'), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, priv: UI.priv });
   },
   matk(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return;
@@ -6419,7 +6470,9 @@ function ebParty() {
 /* the builder's monsters in the saved-encounter shape (Combat's encsave/encload use the same one) */
 const ebList = () => pp().eb.map(g => { const d = registry(g.rs).monsters.get(g.mid); return d && { mid: g.mid, rs: g.rs, name: d.name, n: g.n, hp: +d.hp || null, ac: d.ac == null ? null : +d.ac, ib: mod((d.ab || {}).dex || 10), hidden: false }; }).filter(Boolean);
 const ebXps = () => ebList().flatMap(g => Array(g.n).fill(monXp({ mid: g.mid, rs: g.rs })));
-const rsSeg = P => `<span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button class="mini" data-act="pprs" data-v="${r}"${pressed(P.rs === r)}>${r}</button>`).join('')}</span>`;
+/* n more of a monster in the builder (the search buttons and the monster browser) */
+function ebPush(mid, rs, n) { const P = pp(), g = P.eb.find(x => x.mid === mid && x.rs === rs); if (g) g.n = Math.min(30, g.n + n); else P.eb.push({ mid, rs, n: Math.min(30, n) }); }
+const rsSeg = P =>`<span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button class="mini" data-act="pprs" data-v="${r}"${pressed(P.rs === r)}>${r}</button>`).join('')}</span>`;
 /* a text/textarea/select field that edits one key of one list entry (npcs, quests, sessions, tables) */
 const pfield = (l, o, k, label, area) => `<label class="field"><span class="lbl">${label}</span>${area ? `<textarea id="f-pf-${k}" data-act="pf" data-l="${l}" data-v="${esc(o.id)}" data-k="${k}">${esc(o[k] || '')}</textarea>` : `<input type="text" id="f-pf-${k}" data-act="pf" data-l="${l}" data-v="${esc(o.id)}" data-k="${k}" value="${esc(o[k] || '')}">`}</label>`;
 const pdel = (l, id) => `<button class="btn ghost sm danger" data-act="ppdel" data-l="${l}" data-v="${esc(id)}">Delete</button>`;
@@ -6443,7 +6496,7 @@ function prepEnc() {
     : P.rs === '2024' ? `Monster XP ${fmtN(dif.raw)}. Budget for ${party.lv.length} character${party.lv.length === 1 ? '' : 's'}: ${dif.names.map((n, i) => n + ' ' + fmtN(dif.th[i])).join(' · ')}.`
     : `Monster XP ${fmtN(dif.raw)} × ${dif.mult} = ${fmtN(dif.adj)} adjusted. Thresholds for ${party.lv.length} character${party.lv.length === 1 ? '' : 's'}: ${dif.names.map((n, i) => n + ' ' + fmtN(dif.th[i])).join(' · ')}.`;
   const builder = `<div class="panel stack"><div class="ph">Encounter builder<span class="spacer"></span>${rsSeg(P)}</div>
-    <div class="row"><input type="search" id="f-ppq-q" data-act="ppq" data-k="q" placeholder="Search ${R.monsters.size} monsters" value="${esc(P.q)}" style="max-width:240px" aria-label="Search monsters"><label class="row" style="gap:6px">Party levels<input type="text" id="f-eblv" data-act="eblv" value="${esc(P.lv)}" placeholder="blank = campaign" style="width:150px" aria-label="Party levels, e.g. 5, 5, 4, 3"></label></div>
+    <div class="row"><input type="search" id="f-ppq-q" data-act="ppq" data-k="q" placeholder="Search ${R.monsters.size} monsters" value="${esc(P.q)}" style="max-width:240px" aria-label="Search monsters"><button class="btn sm" data-act="mbrowse">Browse all monsters</button><label class="row" style="gap:6px">Party levels<input type="text" id="f-eblv" data-act="eblv" value="${esc(P.lv)}" placeholder="blank = campaign" style="width:150px" aria-label="Party levels, e.g. 5, 5, 4, 3"></label></div>
     ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="ebadd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Homebrew monsters appear here too.</div>' : '')}
     ${rows || '<div class="empty">No monsters yet. Search above and tap one to add it.</div>'}
     <div class="row"><b>Difficulty</b>${dif ? `<span class="pill ${/Deadly|Over/.test(dif.label) ? 'bad' : 'acc'}" id="eb-diff">${esc(dif.label)}</span>` : ''}<span class="small muted grow" id="eb-note">${esc(verdict)} Party from ${esc(party.src)}.</span></div>
@@ -6593,7 +6646,7 @@ Object.assign(ACT, {
   sessnew() { const all = prep().sessions, s = { id: uid('s'), date: todayStr(), title: 'Session ' + (all.length + 1), summary: '', notes: '' }; savePrep({ sessions: [s].concat(all) }); pp().sess = s.id; queueRender(); },
   sessshare(el) { savePrep({ share: prep().share === el.dataset.v ? '' : el.dataset.v }); queueRender(); },
   /* encounter builder */
-  ebadd(el) { const P = pp(), g = P.eb.find(x => x.mid === el.dataset.v && x.rs === P.rs); if (g) g.n = Math.min(30, g.n + 1); else P.eb.push({ mid: el.dataset.v, rs: P.rs, n: 1 }); queueRender(); },
+  ebadd(el) { ebPush(el.dataset.v, pp().rs, 1); queueRender(); },
   ebn(el) { pp().eb[+el.dataset.i].n = clamp(Math.round(+el.value) || 1, 1, 30); queueRender(); },
   ebrm(el) { pp().eb.splice(+el.dataset.i, 1); queueRender(); },
   eblv(el) { pp().lv = el.value; queueRender(); },
@@ -9032,6 +9085,192 @@ Object.assign(ACT, {
     const x = all.find(i => i.n === n) || all.find(i => i.n.toLowerCase().includes(low) || low.includes(i.n.toLowerCase()));
     if (!x) { toastMsg('No rules text for ' + n + '. Try the search.'); return; }
     openModal({ kind: 'text', title: x.n, html: x.d() });
+  },
+});
+'use strict';
+/* ===== Build 32: DM monsters (find them, run them, tweak one) =====
+   browser:  ACT.mbrowse opens MODALS.mbrowse. Its state is UI.modal { rs, q, c0, c1, type, size, src, sort, sel, n, hid }; the list and the stat block redraw in place
+             (mbList), so typing in the search box keeps its focus. "Add to fight" is addGroup, "Add to encounter" is ebPush.
+   run:      cbar (sticky: round, whose turn, who is next, Previous / Next turn), monTags (row pills), combatDetail (status, actions, then the rest of the stat block).
+   tweak:    a combatant's own changes are c.ed = { was: {name, ac, max: the originals}, speed, atk: {<kind><index>: {b, d}}, note }. edDef lays them over the stat block
+             inside monDef, so matk, msave and the rest roll the edited numbers. publicCombat never copies c.ed. ACT.mfight opens MODALS.mfight. */
+const CR_STEPS = [0, .125, .25, .5].concat(Array.from({ length: 30 }, (_, i) => i + 1));
+const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+const monType = d => (String(d.type || '').toLowerCase().match(/[a-z]+/) || [''])[0];   // "swarm of Tiny beasts" counts as swarm
+const monSizeOf = d => (String(d.size || '').match(/[A-Za-z]+/) || [''])[0];   // "Medium or small" counts as Medium
+const monSrc = d => !d.pack ? 'SRD' : /^cc-/.test(d.pack) ? 'Campaign edit' : 'Homebrew';
+const monBase = c => c && !c.cmp && c.mid ? registry(c.rs || '2014').monsters.get(c.mid) || null : null;
+const edKinds = ['actions', 'bonus', 'reactions', 'legendary'];
+/* the stat block with this fight's edits on top (speed, and the to-hit and damage of attacks); an edited action carries ed: 1 */
+function edDef(c, d) {
+  const e = c.ed; if (!d || !e || !(e.speed || e.atk)) return d;
+  const out = Object.assign({}, d); if (e.speed) out.speed = e.speed;
+  for (const k of edKinds) if (d[k]) out[k] = d[k].map((a, i) => {
+    const o = e.atk && e.atk[k + i]; if (!o) return a;
+    return Object.assign({}, a, o.b != null ? { atk: o.b } : {}, o.d ? { dmg: o.d.split(',').map((x, j) => [x, ((a.dmg || [])[j] || (a.dmg || [])[0] || ['', ''])[1]]) } : {}, { ed: 1 });
+  });
+  return out;
+}
+/* name, AC and max HP: keep the original the first time it changes, so "Reset to stat block" can put it back */
+function edSet(c, k, v) {
+  if (c[k] === v) return;
+  const e = c.ed || (c.ed = {}), w = e.was || (e.was = {});
+  if (!(k in w)) w[k] = c[k] === undefined ? null : c[k];
+  c[k] = v; if (w[k] === v) delete w[k];
+  edClean(c);
+}
+function edClean(c) {
+  const e = c.ed; if (!e) return;
+  if (e.was && !Object.keys(e.was).length) delete e.was;
+  if (e.atk && !Object.keys(e.atk).length) delete e.atk;
+  if (!e.speed) delete e.speed; if (!e.note) delete e.note;
+  if (!Object.keys(e).length) delete c.ed;
+}
+function edNote(c) {
+  const e = c.ed || {}, w = e.was || {}, n = Object.keys(e.atk || {}).length, q = v => v == null ? '?' : v, out = [];
+  if ('name' in w) out.push('was named ' + w.name);
+  if ('ac' in w) out.push(`AC ${q(w.ac)} to ${q(c.ac)}`);
+  if ('max' in w) out.push(`max HP ${q(w.max)} to ${q(c.max)}`);
+  if (e.speed) out.push('speed ' + e.speed);
+  if (n) out.push(n + (n === 1 ? ' attack changed' : ' attacks changed'));
+  if (e.note) out.push('has a note');
+  return out.join(', ');
+}
+/* a row's pills: legendary actions left, and the "edited" mark */
+function monTags(c) {
+  const ex = monExtra(monDef(c));
+  return (ex.la ? `<span class="pill brass" title="Legendary actions left this round">Legendary ${Math.max(0, ex.la - (+c.lau || 0))}/${ex.la}</span>` : '') + (c.ed ? `<span class="pill" title="${esc(edNote(c))}">edited</span>` : '');
+}
+/* who acts after the current creature (skipping dead monsters the way Next turn does) and whether that starts a new round */
+function nextUp(cb) {
+  const n = cb.list.length, i = cb.list.findIndex(c => c.id === cb.cur);
+  for (let k = 1; k <= (i < 0 ? n : n - 1); k++) { const j = i + k, c = cb.list[j % n]; if (!(c.kind === 'mon' && cb.skipDead !== false && c.hp != null && c.hp <= 0)) return { c, wrap: j >= n }; }
+  return null;
+}
+function cbar(cb) {
+  const cur = cb.list.find(c => c.id === cb.cur), nx = nextUp(cb), who = c => esc(c.kind === 'lair' ? 'Lair actions' : liveName(c));
+  const msg = !cb.list.length ? '<span class="muted">Add the party and some monsters to start.</span>'
+    : cur ? `<b class="who">${who(cur)}</b> <span class="muted">is acting${nx ? ` · Next: <b>${who(nx.c)}</b>${nx.wrap ? ', new round' : ''}` : ''}</span>`
+    : `<span class="muted">Nobody has acted yet.${nx ? ` Next turn starts with <b>${who(nx.c)}</b>.` : ''}</span>`;
+  return `<div class="cbar"><div class="cturn">${msg}</div><button class="btn sm cshow" data-act="cshow">Stat block</button><button class="btn" data-act="cprev"${dis(!cb.list.length)} title="Previous turn (key P)" aria-keyshortcuts="P">Previous</button><button class="btn pri" data-act="cnext"${dis(!cb.list.length)} title="Next turn (key N)" aria-keyshortcuts="N">Next turn</button></div>`;
+}
+/* one column (phone, tablet): scroll to the stat block once the screen has redrawn */
+function showDetail() { requestAnimationFrame(() => requestAnimationFrame(() => { const d = $('#mdetail'); if (d) d.scrollIntoView({ block: 'start' }); })); }
+
+/* ----- the monster browser ----- */
+function mbHits(m) {
+  const toks = m.q.trim().toLowerCase().split(/\s+/).filter(Boolean), lo = m.c0 === '' ? -1 : +m.c0, hi = m.c1 === '' ? 99 : +m.c1, dir = m.sort[0] === '-' ? -1 : 1, byCr = /cr$/.test(m.sort);
+  return registry(m.rs).list('monsters').filter(d => {
+    const cr = +d.cr || 0, text = (d.name + ' ' + d.type).toLowerCase();
+    return toks.every(t => text.includes(t)) && cr >= lo && cr <= hi && (!m.type || monType(d) === m.type) && (!m.size || monSizeOf(d) === m.size) && (!m.src || monSrc(d) === m.src);
+  }).sort((a, b) => dir * (byCr ? (+a.cr || 0) - (+b.cr || 0) || byName(a, b) : byName(a, b)));
+}
+function mbRows(m) {
+  const hits = mbHits(m);
+  return { n: hits.length, more: hits.length > 100, html: hits.slice(0, 100).map(d => `<button class="mbrow" data-act="mbsel" data-v="${esc(d.id)}"${pressed(d.id === m.sel)}><span class="mbn"><b>${esc(d.name)}</b><span class="small muted">${esc([monSizeOf(d), monType(d)].filter(Boolean).join(' '))} · ${monSrc(d)}</span></span><span class="mbs">CR ${crLabel(+d.cr || 0)}</span><span class="mbs">${fmtN(monXp({ mid: d.id, rs: m.rs }))} XP</span><span class="mbs">AC ${esc(d.ac == null ? '?' : d.ac)}</span><span class="mbs">HP ${esc(d.hp == null ? '?' : d.hp)}</span></button>`).join('') || `<div class="empty">No monsters match.<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" data-act="mbclear">Clear search and filters</button></div></div>` };
+}
+const mbCount = (rows, m) => `${rows.n} of ${registry(m.rs).list('monsters').length} monsters${rows.more ? '. Showing the first 100, so narrow the search.' : '.'}`;
+/* what is already in the fight and the builder, so a second tap is never a surprise */
+function mbSay(d, m) {
+  const f = cbt().list.filter(c => c.mid === d.id).length, e = (pp().eb.find(g => g.mid === d.id && g.rs === m.rs) || {}).n || 0, el = $('#mb-msg');
+  if (el) el.textContent = f || e ? 'Right now: ' + [f ? f + ' in the fight' : '', e ? e + ' in the encounter builder' : ''].filter(Boolean).join(', ') + '.' : '';
+}
+function mbPrev(m) {
+  const d = m.sel && registry(m.rs).monsters.get(m.sel);
+  if (!d) return `<div class="empty">Tap a monster to read its stat block and add it.</div>`;
+  return `<div class="row"><button class="btn ghost sm mbback" data-act="mbback">Back to the list</button><h3 style="font-family:var(--f-display);font-size:20px">${esc(d.name)}</h3><span class="pill">${monSrc(d)}</span></div>
+    <div class="row"><label class="row" style="gap:6px">How many<input type="number" id="f-mbn" min="1" max="20" value="${m.n}" style="width:70px"></label><label class="chk small"><input type="checkbox" id="f-mbh"${m.hid ? ' checked' : ''}> add hidden</label><button class="btn pri" data-act="mbadd">Add to fight</button><button class="btn" data-act="mbenc">Add to encounter</button></div>
+    <div class="small muted" id="mb-msg" role="status"></div>
+    <div class="rt">${monHtml(d)}</div>`;
+}
+function mbList(prev) {
+  const m = UI.modal, g = $('#mb-grid'); if (!g) return;
+  const rows = mbRows(m); $('#mb-list').innerHTML = rows.html; $('#mb-count').textContent = mbCount(rows, m); g.classList.toggle('sel', !!m.sel);
+  if (prev) { $('#mb-prev').innerHTML = mbPrev(m); const d = m.sel && registry(m.rs).monsters.get(m.sel); if (d) mbSay(d, m); }
+}
+MODALS.mbrowse = () => {
+  const m = UI.modal, all = registry(m.rs).list('monsters'), rows = mbRows(m), types = Array.from(new Set(all.map(monType).filter(Boolean))).sort();
+  const cr = CR_STEPS.map(v => [String(v), 'CR ' + crLabel(v)]);
+  const sel = (k, label, o) => `<select data-act="mbf" data-k="${k}" aria-label="${label}">${o.map(([v, t]) => opt(v, t, m[k] === v)).join('')}</select>`;
+  return `<div class="modal mb" role="dialog" aria-modal="true" aria-label="Monster browser"><div class="row"><h2>Find monsters</h2><span class="seg" role="group" aria-label="Rules">${['2024', '2014'].map(r => `<button class="mini" data-act="mbrs" data-v="${r}"${pressed(m.rs === r)}>${r}</button>`).join('')}</span><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <input type="search" id="f-mbq" data-act="mbq" placeholder="Search by name or type" value="${esc(m.q)}" aria-label="Search monsters">
+    <div class="mbf">${sel('c0', 'Lowest CR', [['', 'Lowest CR'], ...cr])}${sel('c1', 'Highest CR', [['', 'Highest CR'], ...cr])}${sel('type', 'Type', [['', 'Any type'], ...types.map(t => [t, t[0].toUpperCase() + t.slice(1)])])}${sel('size', 'Size', [['', 'Any size'], ...SIZES.filter(s => all.some(d => monSizeOf(d) === s)).map(s => [s, s])])}${sel('src', 'Source', [['', 'Any source'], ['SRD', 'SRD'], ['Homebrew', 'Homebrew'], ['Campaign edit', 'Campaign edit']])}${sel('sort', 'Sort by', [['name', 'Name, A to Z'], ['-name', 'Name, Z to A'], ['cr', 'CR, low to high'], ['-cr', 'CR, high to low']])}</div>
+    <div class="small muted" id="mb-count" role="status">${mbCount(rows, m)}</div>
+    <div class="mbgrid${m.sel ? ' sel' : ''}" id="mb-grid"><div class="mblist" id="mb-list">${rows.html}</div><div class="mbprev" id="mb-prev" tabindex="-1" aria-label="Stat block">${mbPrev(m)}</div></div>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Done</button></div></div>`;
+};
+const mbRead = m => { const n = $('#f-mbn'), h = $('#f-mbh'); m.n = clamp(Math.round(+n.value) || 1, 1, 20); n.value = m.n; m.hid = h.checked; };
+
+/* ----- edit one creature for this fight ----- */
+const mfRows = d => edKinds.flatMap(k => (d[k] || []).map((a, i) => ({ key: k + i, a })).filter(x => x.a.atk != null || (x.a.dmg || []).length));
+MODALS.mfight = () => {
+  const m = UI.modal, c = cbt().list.find(x => x.id === m.id); if (!c) return '';
+  const b = monBase(c), d = monDef(c), f = (id, label, v, type, ph) => `<label class="field"><span class="small muted">${label}</span><input type="${type || 'text'}" id="f-mf-${id}" value="${esc(v == null ? '' : v)}"${ph ? ` placeholder="${esc(ph)}"` : ''}></label>`;
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Edit for this fight"><div class="row"><h2>Edit ${esc(c.name)} for this fight</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <p class="small muted">These changes belong to this creature in this fight only. The stat block, homebrew and campaign edits stay as they are.</p>
+    <div class="grid2">${f('name', 'Name', c.name)}${f('ac', 'AC', c.ac, 'number')}${f('hp', 'HP now', c.hp, 'number')}${f('max', 'Max HP', c.max, 'number')}${b ? f('speed', 'Speed', c.ed && c.ed.speed, 'text', b.speed || '') : ''}</div>
+    ${b ? `<div class="stack"><span class="lbl">Attacks</span>${mfRows(d).map(({ key, a }) => `<div class="row"><b class="grow">${esc(a.n)}${a.ed ? ' <span class="pill">edited</span>' : ''}</b>${a.atk != null ? `<label class="row small" style="gap:4px">To hit<input type="number" id="f-mf-b-${key}" value="${+a.atk}" style="width:70px"></label>` : ''}${(a.dmg || []).length ? `<label class="row small" style="gap:4px">Damage<input type="text" id="f-mf-d-${key}" value="${esc(a.dmg.map(x => x[0]).join(', '))}" style="width:170px" aria-label="Damage dice for ${esc(a.n)}, separate parts with commas"></label>` : ''}</div>`).join('') || '<span class="small muted">This stat block has no attacks to roll.</span>'}<span class="small muted">Damage is dice only, like 2d6+3. Separate extra damage with a comma. The damage types stay.</span></div>` : ''}
+    <label class="field"><span class="small muted">Note (only you see it)</span><textarea id="f-mf-note" maxlength="300" placeholder="Carries the cult key. Flees at 10 HP.">${esc((c.ed && c.ed.note) || '')}</textarea></label>
+    <div class="row">${c.ed ? `<button class="btn ghost" data-act="mfreset" data-v="${esc(c.id)}">Reset to stat block</button>` : ''}<span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="mfsave">Save edits</button></div></div>`;
+};
+
+Object.assign(ACT, {
+  mbrowse() { if (!isDMish()) return; openModal({ kind: 'mbrowse', rs: UI.view === 'prep' ? pp().rs : RUN.rs, q: '', c0: '', c1: '', type: '', size: '', src: '', sort: 'name', sel: '', n: 1, hid: false }); },
+  mbq(el) { UI.modal.q = el.value; mbList(); },
+  mbf(el) { UI.modal[el.dataset.k] = el.value; mbList(); },
+  mbclear() { Object.assign(UI.modal, { q: '', c0: '', c1: '', type: '', size: '', src: '', sort: 'name' }); renderModal(); },
+  mbrs(el) { const m = UI.modal; m.rs = el.dataset.v; m.sel = ''; if (UI.view === 'prep') pp().rs = m.rs; else RUN.rs = m.rs; renderModal(); queueRender(); },
+  mbsel(el) {
+    const m = UI.modal; m.sel = el.dataset.v; m.last = m.sel; mbList(true);
+    if (getComputedStyle($('#mb-list')).display === 'none') $('#mb-prev').focus({ preventScroll: true });   // narrow screen: the list gave way to the stat block
+    else { const r = $('#mb-list [aria-pressed="true"]'); if (r) r.focus({ preventScroll: true }); }
+  },
+  mbback() { const m = UI.modal; m.sel = ''; mbList(true); const r = m.last && $(`#mb-list [data-v="${CSS.escape(m.last)}"]`); if (r) r.focus({ preventScroll: true }); },
+  mbadd() { const m = UI.modal, d = registry(m.rs).monsters.get(m.sel); if (!d) return; mbRead(m); addGroup(d, m.rs, m.n, m.hid); mbSay(d, m); },
+  mbenc() { const m = UI.modal, d = registry(m.rs).monsters.get(m.sel); if (!d) return; mbRead(m); ebPush(d.id, m.rs, m.n); toastMsg(`Added ${m.n} × ${d.name} to the encounter.`); queueRender(); mbSay(d, m); },
+  cshow() { showDetail(); },
+  cback() { RUN.sel = null; queueRender(); },
+  /* a legendary action spends its pip (more for "Costs 2 Actions"); a reaction marks the reaction used */
+  muse(el) {
+    const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v), a = c && monAction(c, el.dataset.k, el.dataset.n); if (!a) return;
+    const leg = el.dataset.k === 'legendary';
+    if (leg) {
+      const cost = +((String(a.n).match(/costs? (\d+) actions?/i) || [])[1] || 1), la = monExtra(monDef(c)).la;
+      if ((+c.lau || 0) + cost > la) { toastMsg('No legendary actions left this round.'); return; }
+      c.lau = (+c.lau || 0) + cost;
+    } else c.rxu = 1;
+    saveCombat(cb); sendMsg({ kind: 'note', text: `${seenName(c)} uses ${a.n} (${leg ? 'legendary action' : 'reaction'}).`, priv: UI.priv }); queueRender();
+  },
+  mfight(el) { openModal({ kind: 'mfight', id: el.dataset.v }); },
+  mfsave() {
+    const m = UI.modal, cb = cbt(), c = cb.list.find(x => x.id === m.id); if (!c) { closeModal(); return; }
+    const g = id => $('#f-mf-' + id), b = monBase(c), num = id => g(id).value === '' ? null : +g(id).value, atk = {};
+    if (b) for (const { key, a } of mfRows(b)) {
+      const o = {}, bi = g('b-' + key), di = g('d-' + key);
+      if (bi && bi.value !== '' && +bi.value !== +a.atk) o.b = +bi.value;
+      if (di) {
+        const parts = di.value.split(',').map(x => x.replace(/\s+/g, '')).filter(Boolean);
+        if (parts.some(x => !DICE_RE.test(x))) { toastMsg(`${a.n}: write damage as dice, like 2d6+3. Separate parts with commas.`); return; }
+        if (parts.length && parts.join(',') !== a.dmg.map(x => x[0]).join(',')) o.d = parts.join(',');
+      }
+      if (o.b != null || o.d) atk[key] = o;
+    }
+    edSet(c, 'name', g('name').value.trim() || c.name); edSet(c, 'ac', num('ac')); edSet(c, 'max', num('max')); c.hp = num('hp');
+    if (c.hp != null && c.max != null) c.hp = Math.min(c.hp, c.max);
+    const e = c.ed || (c.ed = {}), sp = b && g('speed').value.trim();
+    if (b) { if (sp && sp !== b.speed) e.speed = sp; else delete e.speed; e.atk = atk; }
+    e.note = $('#f-mf-note').value.trim().slice(0, 300);
+    edClean(c); saveCombat(cb); closeModal(); toastMsg(`Saved edits for ${c.name}.`); queueRender();
+  },
+  mfreset(el) {
+    const cb = cbt(), c = cb.list.find(x => x.id === (el.dataset.v || (UI.modal || {}).id)); if (!c || !c.ed) return;
+    const was = clone({ ed: c.ed, name: c.name, ac: c.ac, max: c.max, hp: c.hp }), w = c.ed.was || {};
+    for (const k of ['name', 'ac', 'max']) if (k in w) c[k] = w[k];
+    if (c.hp != null && c.max != null) c.hp = Math.min(c.hp, c.max);
+    delete c.ed; saveCombat(cb);
+    pushUndo('reset ' + was.name, () => { const c2 = cbt(), x = c2.list.find(y => y.id === c.id); if (x) { Object.assign(x, was); saveCombat(c2); } });
+    if (UI.modal && UI.modal.kind === 'mfight') closeModal();
+    toastMsg(`${c.name} is back to its stat block.`); queueRender();
   },
 });
 </script>
