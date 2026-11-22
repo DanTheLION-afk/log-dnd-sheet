@@ -940,6 +940,7 @@ function classGrants(ch, D, features) {
 }
 function classGrantPanel(ch, D, ro, R, g) {
   const head = t => `<div class="ph">${t}<span class="spacer"></span><span class="pill acc">Save DC ${g.dc}</span><span class="pill acc">Attack ${sgn(g.atk)}</span></div>`;
+  if (g.hb) return `<div class="panel stack">${head('Spells from ' + esc(g.name))}<ul class="rt" style="margin:0;padding-left:1.2em">${g.all.map(x => `<li><b>${esc(x.name)}</b> <span class="small muted">${x.free ? x.free + ' free cast' + (x.free === 1 ? '' : 's') + ' per ' + (x.reset === 'short' ? 'Short' : 'Long') + ' Rest' : 'always prepared'}</span></li>`).join('')}</ul></div>`;
   if (g.key === 'inv') return `<div class="panel stack">${head('Spells from Eldritch Invocations')}<ul class="rt" style="margin:0;padding-left:1.2em">${g.all.map(x => `<li><b>${esc(x.name)}</b> <span class="small muted">${esc(x.via)} · ${x.atwill ? 'at will, no spell slot' : 'one free cast per Long Rest'}</span></li>`).join('')}</ul><p class="small muted">Change invocations under Features.</p></div>`;
   if (g.key === 'arcanum') {
     const pool = R.spellsByClass.get('warlock') || [], cur = ch.choices.arcanum || {};
@@ -1081,7 +1082,7 @@ function registry(rs) {
     if (p.ruleset && p.ruleset !== 'any' && p.ruleset !== rs) continue;
     for (const t of TYPES) for (const e of (p.entries && p.entries[t]) || []) {
       if (t === 'subspecies') subsp.push([e, p]);
-      else if (t === 'feats') { const f = featFix(e, R, p.id); if (f) { put(t, f, p.name, p.id); R._fnames.set(slug(f.name), R.feats.get(f.id)); } }
+      else if (t === 'feats') { const f = R.feats.has(e.id) ? e : featFix(e, R, p.id); if (f) { put(t, f, p.name, p.id); if (R._fnames) R._fnames.set(slug(f.name), R.feats.get(f.id)); } }   // a feat with a built-in's id is a campaign change: it replaces the original as written
       else put(t, e, p.name, p.id);
     }
   }
@@ -1111,14 +1112,20 @@ function registry(rs) {
 function bumpPacks(packs) { PACKS = packs; packsVersion++; regCache.clear(); syncConds(); }
 /* homebrew conditions join the built-in lists (sheet, combat, effects) and their rules text; a built-in name always wins a clash */
 const BASE_CONDS = CONDITIONS.slice();
+let CONDBASE = null;   // the built-in rules text and effects, kept so a campaign change can be undone
+const condBase = () => CONDBASE || (CONDBASE = { rules: Object.assign({}, COND_RULES), fx: clone(COND_FX) });
 function syncConds() {
+  const base = condBase();
   CONDITIONS.length = BASE_CONDS.length;
-  for (const k of Object.keys(COND_FX)) if (!BASE_CONDS.includes(k)) delete COND_FX[k];
-  for (const k of Object.keys(COND_RULES)) if (!BASE_CONDS.includes(k)) delete COND_RULES[k];
+  for (const k of Object.keys(COND_FX)) delete COND_FX[k];
+  for (const k of Object.keys(COND_RULES)) delete COND_RULES[k];
+  Object.assign(COND_FX, clone(base.fx)); Object.assign(COND_RULES, base.rules);
   for (const p of PACKS) for (const e of (p.entries || {}).conditions || []) {
-    if (!e.name || CONDITIONS.includes(e.name)) continue;
-    CONDITIONS.push(e.name); COND_RULES[e.name] = e.d || '';
-    if (Object.values(e.fx || {}).some(Boolean)) COND_FX[e.name] = e.fx;
+    const own = BASE_CONDS.includes(e.name);   // a built-in name is replaced only by the DM's "Campaign changes" pack
+    if (!e.name || (own ? !/^cc-/.test(p.id) : CONDITIONS.includes(e.name))) continue;
+    if (!own) CONDITIONS.push(e.name);
+    COND_RULES[e.name] = e.d || '';
+    if (Object.values(e.fx || {}).some(Boolean)) COND_FX[e.name] = e.fx; else delete COND_FX[e.name];
   }
 }
 
@@ -1332,7 +1339,8 @@ function derive(ch) {
   D.features = features;
   D.asiSlots = asiSlots;
   D.feats = feats;
-  const hasFeature = (re) => features.some(x => re.test(x.n));
+  const G = applyGrants(ch, D, feats, features);
+  const hasFeature =(re) => features.some(x => re.test(x.n));
   const choiceNames = features.map(x => ch.choices[x.key]).flat().filter(Boolean);
   const hasChoice = (re) => choiceNames.some(n => re.test(n));
   const hasFeat = id => feats.some(x => x.f.id === id || slug(x.f.name) === id);
@@ -1353,6 +1361,7 @@ function derive(ch) {
     if (p && p.type === 'asi') addAb(s.cls + ' ' + s.l, p.a);
   }
   for (const x of feats) { if (x.f.asi || x.f.asiFeat) addAb(x.f.name, x.a); if (x.f.type === 'epic-boon') for (const a of ABIL) if ((x.a || {})[a]) capMap[a] = 30; }
+  for (const g of G.ab) { sc[g.a] += g.n; parts[g.a].push([g.from, g.n]); if (g.max > (capMap[g.a] || 20)) capMap[g.a] = g.max; }
   for (const a of ABIL) { const cap = ch.free ? 30 : (capMap[a] || 20); if (sc[a] > cap) sc[a] = cap; }
   addAb('Other', ch.abil.misc);
   for (const a of ABIL) sc[a] = clamp(sc[a], 1, 30);
@@ -1396,6 +1405,7 @@ function derive(ch) {
     if (bg && bg.toolPick) (tp.bg || []).filter(Boolean).forEach(v => tools.add(v));
     if (first && first.def.toolPick) (tp.cls || []).filter(Boolean).forEach(v => tools.add(v));
   }
+  for (const g of G.prof) { const [t, v] = g.p.split(/:(.*)/); if (t === 'skill') moreSkills.add(v); else if (t === 'save') D.saveProf.add(v); else if (t === 'armor') armor.add(v); else if (t === 'weapon') weapons.add(v); else tools.add(v); }
   if (is24) {
     if (hasChoice(/^protector$/i)) { armor.add('Heavy Armor'); weapons.add('Martial Weapons'); }
     if (hasChoice(/^warden$/i)) { armor.add('Medium Armor'); weapons.add('Martial Weapons'); }
@@ -1415,6 +1425,7 @@ function derive(ch) {
   for (const x of features) if (x.f && x.f.skillOpts) for (const nm of [].concat(ch.choices[x.key] || [])) { const s = SKILLS.find(k => k[1] === nm); if (s) skillSet.add(s[0]); }
   D.skillProf = skillSet;
   D.expertise = new Set((ch.expertise || []).filter(s => skillSet.has(s)));
+  for (const g of G.exp) { skillSet.add(g.v); D.expertise.add(g.v); }   // expertise from a grant brings the proficiency with it
   const joat = hasFeature(/^jack of all trades/i);
   D.skill = {};
   for (const [id, , ab] of SKILLS) {
@@ -1458,6 +1469,7 @@ function derive(ch) {
   hp += perLv * D.level;
   for (const x of cls) if (x.sub && /draconic/.test(x.sub.id) && x.def.id === 'sorcerer') hp += x.c.lvl;
   hp += +ch.bonus.hp || 0;
+  hp += gsum(G.hp) + gsum(G.hpl) * D.level;
   D.maxHp = Math.max(D.level ? 1 : 0, hp);
   D.hdPool = hdPool;
 
@@ -1493,13 +1505,14 @@ function derive(ch) {
   for (const x of items) if (x.d.cat !== 'armor' && x.d.cat !== 'shield' && itemMod(ch, x.i, 'ac', x.d)) { ac += itemMod(ch, x.i, 'ac', x.d); acNote.push(x.d.name); }
   for (const x of items) if (x.d.att && !x.i.att && (+x.i.ac || +x.i.atk || +x.i.dmg || +x.i.save)) D.warn.push(`${x.d.name} needs attunement: its bonuses don't apply until you attune to it.`);
   ac += +ch.bonus.ac || 0;
+  for (const g of G.ac) { ac += g.n; acNote.push(g.from); }
   if (typeof fxMods === 'function') { const fm = fxMods(ch, D); if (fm.ac) { ac += fm.ac; acNote.push(fm.defs.filter(f => f.ac).map(f => f.n).join(' + ')); } }
   D.ac = ac; D.acNote = acNote.join(' + ');
   D.armorIt = armorIt; D.shieldIt = shieldIt;
 
   /* initiative & speed */
   const initPb = feats.some(x => x.f.init === 'pb' || (is24 && x.f.id === 'alert'));
-  D.init = dexM + (+ch.bonus.init || 0) + (initPb ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (!is24 && hasFeat('alert') ? 5 : 0);   // Jack of All Trades: initiative is a Dex check
+  D.init = dexM + (+ch.bonus.init || 0) + (initPb ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (!is24 && hasFeat('alert') ? 5 : 0) + gsum(G.init);   // Jack of All Trades: initiative is a Dex check
   let speed = +((sub && sub.speed) || (sp && sp.speed) || 30);
   const heavy = armorIt && (armorIt.d.a || {}).cat === 'heavy';
   for (const x of cls) {
@@ -1510,9 +1523,10 @@ function derive(ch) {
   }
   if (armorIt && (armorIt.d.a || {}).str && D.sc.str < armorIt.d.a.str && encMode !== 'variant' && !(!is24 && sp && /dwarf/.test(sp.id))) speed -= 10;   // SRD 5.1: the variant encumbrance rule replaces the armor Strength speed penalty; only 2014 dwarves ignore it
   speed += +ch.bonus.speed || 0;
+  speed += gsum(G.speed);
   if (((ch.play || {}).cond || []).some(c => (COND_FX[c] || {}).speed0)) speed = 0;   // a homebrew condition that pins you down
   D.speed = speed;
-  D.dv = Math.max(+(sp && sp.dv) || 0, +(sub && sub.dv) || 0, ...features.map(z => +(z.f && z.f.dv) || 0));
+  D.dv = Math.max(+(sp && sp.dv) || 0, +(sub && sub.dv) || 0, ...features.map(z => +(z.f && z.f.dv) || 0), ...G.sense.map(g => g.n));
 
   /* spellcasting */
   D.casters = [];
@@ -1570,6 +1584,7 @@ function derive(ch) {
 
   D.grants = grantsOf(ch, D, feats, sp, sub, bg);
   if (is24) classGrants(ch, D, features);
+  for (const g of G.spellSrc) { g.ab = g.ab || bestMental(D); g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
 
   /* attacks */
   D.attacks = [];
@@ -1657,7 +1672,8 @@ function derive(ch) {
   if (trait(/relentless endurance/i)) addRes('relent', 'Relentless Endurance', 1, 'long');
   if (trait(/breath weapon/i)) addRes('breath', 'Breath Weapon', is24 ? D.pb : 1, is24 ? 'long' : 'short');
   if (is24 && trait(/adrenaline rush/i)) addRes('adren', 'Adrenaline Rush', D.pb, 'short');
-  for (const g of D.grants) for (const x of g.spells) if (x.free) addRes(g.id + ':' + x.id, x.name + ', free cast', x.free, 'long', g.name);
+  for (const g of D.grants) for (const x of g.spells) if (x.free) addRes(g.id + ':' + x.id, x.name + ', free cast', x.free, x.reset || 'long', g.name);
+  for (const g of G.res) addRes(g.key, g.name, g.max, g.reset, g.from);
   for (const s of ch.fields || []) for (const f of s.items || []) if (f.t === 'count') { const max = evalMax(f.max || '1', D.level, D); if (max > 0) D.res.push({ key: 'c:' + f.id, n: f.n || 'Counter', max, reset: f.reset || 'none', note: '', cf: 1 }); }
 
   /* class info chips (non-tracked counters) */
@@ -1702,6 +1718,7 @@ function derive(ch) {
     const affF = features.find(z => /^elemental affinity$/i.test(z.n) && z.f && z.f.opts);
     D.affinity = affF ? ([].concat(ch.choices[affF.key] || [])[0] || '') : '';
     if (D.affinity) resist.add(D.affinity);
+    for (const g of G.resist) resist.add(cap(g.v));
     D.resist = Array.from(resist).sort();
   }
   {
@@ -1724,6 +1741,7 @@ function derive(ch) {
       }
       for (const c of ['Grappled', 'Restrained', 'Paralyzed', 'Petrified', 'Unconscious'].concat(is24 ? [] : 'Stunned')) if (cond.includes(c)) { sp = 0; why.push(`${c}: speed 0`); }
       D.prone = cond.includes('Prone'); if (D.prone) why.push('Prone: standing up costs half your speed');
+      for (const g of G.speed) why.push(`${g.from}: ${g.n > 0 ? '+' : '−'}${Math.abs(g.n)} ft`);
       D.speed = Math.max(0, sp); D.speedWhy = why;
     }
     setv('init', () => D.init, v => { D.init = v; });
@@ -3590,6 +3608,7 @@ function hbEntryFromForm(type, x) {
     for (const k of ['la', 'lair', 'skills']) if (!x[k]) delete x[k];
   }
   if (type === 'conditions') x.fx = Object.fromEntries(Object.entries(x.fx || {}).filter(([, v]) => v));
+  if (!(x.grants || []).length) delete x.grants;
   if (type === 'classes' && x.unarmored) x.unarmored = { add: [x.unarmored], shield: x.unarmored === 'con' };
   else if (type === 'classes') delete x.unarmored;
   return x;
@@ -3618,6 +3637,7 @@ function fieldHTML(type, f, val, rs, prefix) {
   if (kind === 'species') return `<label class="field">${L}<select id="${id}">${opt('', '—')}${R.list('species').map(c => opt(c.id, c.name, val === c.id)).join('')}</select></label>`;
   if (kind === 'feat') return `<label class="field">${L}<select id="${id}">${opt('', 'None')}${R.list('feats').map(c => opt(c.id, c.name, val === c.id)).join('')}</select></label>`;
   if (kind === 'spell') return `<label class="field">${L}<select id="${id}">${opt('', '—')}${R.list('spells').map(c => opt(c.id, (c.lvl ? 'L' + c.lvl : 'C') + ' ' + c.name, val === c.id)).join('')}</select></label>`;
+  if (kind === 'grants') return grantsHTML(type, f, val, rs, id);
   if (kind === 'rows') {
     const rows = Array.isArray(val) ? val : [];
     return `<div class="field" style="grid-column:1/-1">${L}<div class="rows">${rows.map((r, i) => `<div class="rowed">${extra.map(sf => fieldHTML(type, sf, r[sf[0]], rs, id + '-' + i)).join('')}<div class="wide row"><span class="spacer"></span><button class="btn ghost sm danger" data-act="hbrowrm" data-p="${esc(path)}" data-i="${i}">Remove</button></div></div>`).join('')}</div><button class="btn sm" data-act="hbrowadd" data-p="${esc(path)}" style="align-self:flex-start">Add ${esc(label.toLowerCase().replace(/s$/, ''))}</button></div>`;
@@ -3641,6 +3661,7 @@ function readField(f, rs, prefix, root) {
   if (kind === 'abchecks') return ABIL.filter(a => { const x = el(id + '-' + a); return x && x.checked; });
   if (kind === 'skills') return SKILLS.map(s => s[0]).filter(s => { const x = el(id + '-' + s); return x && x.checked; });
   if (kind === 'classes') return registry(rs === 'any' ? '2024' : rs).list('classes').map(c => c.id).filter(c => { const x = el(id + '-' + c); return x && x.checked; });
+  if (kind === 'grants') return grantsRead(rs, id, root);
   if (kind === 'rows') {
     const out = []; let i = 0;
     while (root.querySelector('#' + CSS.escape(id + '-' + i + '-' + extra[0][0].replace(/\./g, '_')))) {
@@ -3695,7 +3716,7 @@ function viewHomebrew() {
       <div class="panel"><div class="row" style="margin-bottom:8px"><input type="search" id="f-hbq" data-act="hbq" placeholder="Search ${TYPE_LABEL[t].toLowerCase()} entries" value="${esc(UI.hb.q)}" style="max-width:260px"><span class="spacer"></span>${can ? `<button class="btn pri" data-act="hbnew">New ${TYPE_LABEL[t].toLowerCase()}</button>` : ''}</div>
       ${list.length ? list.slice(0, 300).map(e => `<div class="hb-row"><div><b>${esc(e.name)}</b> <span class="small muted">${esc(hbSummary(t, e))}</span></div><div class="row"><button class="btn sm" data-act="hbedit" data-v="${esc(e.id)}">${can ? 'Edit' : 'View'}</button>${can ? `<button class="btn ghost sm danger" data-act="hbdel" data-v="${esc(e.id)}">Delete</button>` : ''}</div></div>`).join('') + (list.length > 300 ? `<p class="small muted">Showing 300 of ${list.length}. Search to narrow it down.</p>` : '') : `<p class="muted">No ${TYPE_LABEL[t].toLowerCase()} entries${q ? ' match' : ' yet'}.</p>`}</div>`;
   }
-  return `<div class="shell">${left}<section style="min-width:0">${sourcesPanel()}${main}</section></div>`;
+  return `<div class="shell">${left}<section style="min-width:0">${sourcesPanel()}${ccPanel()}${main}</section></div>`;
 }
 function allSources() {
   const m = new Map();
@@ -3911,7 +3932,7 @@ function templatePack() {
       species: [{ id: 'sproutling', name: 'Sproutling', size: 'Small', speed: 30, dv: 0, ab: {}, langs: ['Common', 'Sylvan'], skills: ['nature'], traits: [{ n: 'Photosynthesis', d: 'You need only half as much food while in sunlight.' }] }],
       subspecies: [{ id: 'thornback', of: 'sproutling', name: 'Thornback', ab: {}, traits: [{ n: 'Thorns', d: 'A creature that grapples you takes 1d4 piercing damage.' }] }],
       backgrounds: [{ id: 'lamplighter', name: 'Lamplighter', skills: ['perception', 'stealth'], tools: ["Tinker's Tools"], abOpts: ['dex', 'int', 'wis'], feat: 'alert', feature: { n: 'Night Rounds', d: 'You know every street lamp and alley in your home city.' } }],
-      feats: [{ id: 'quick-hands', name: 'Quick Hands', type: 'general', prereq: 'Level 4+', lvl: 4, asi: { from: ['dex'], n: 1 }, d: 'You can use the Utilize action as a Bonus Action.' }],
+      feats: [{ id: 'quick-hands', name: 'Quick Hands', type: 'general', prereq: 'Level 4+', lvl: 4, asi: { from: ['dex'], n: 1 }, d: 'You can use the Utilize action as a Bonus Action.', grants: [{ l: 1, k: 'speed', n: 5 }, { l: 5, k: 'res', name: 'Quick Burst', n: 'pb', reset: 'short' }] }],
       spells: [{ id: 'ember-mote', name: 'Ember Mote', lvl: 0, sch: 'Evocation', t: 'Action', r: '60 feet', comp: 'VS', dur: 'Instantaneous', cls: ['sorcerer', 'wizard'], atk: 'ranged', dmg: '1d8', dt: 'Fire', d: 'A spark flies at a creature you can see.' }],
       items: [{ id: 'lantern-blade', name: 'Lantern Blade', cat: 'weapon', w: { cat: 'martial', rng: 'melee', dmg: '1d8', dt: 'Slashing', props: ['Versatile'], two: '1d10' }, d: 'Sheds dim light in a 10-foot radius.' }],
       classes: [{ id: 'warden', name: 'Warden', hd: 10, saves: ['str', 'wis'], armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'], skills: { n: 2, from: ['athletics', 'insight', 'nature', 'perception', 'survival'] }, spell: null, subLevel: 3, subLabel: 'Warden Oath', asiLevels: [4, 8, 12, 16, 19], features: [{ l: 1, n: 'Steadfast', d: 'You gain temporary hit points equal to your Warden level when you roll Initiative.' }, { l: 2, n: 'Root Stance', usage: 'proficiency/Long Rest', d: 'As a Bonus Action, you cannot be moved against your will until your next turn.' }], resources: [], mc: { req: [['str', 13], ['wis', 13]], any: false, armor: ['Light Armor', 'Shields'], weapons: [] } }],
@@ -5169,7 +5190,7 @@ function onInput(ev) {
   }
   if (LIVE_ACTS.includes(el.dataset.act)) { clearTimeout(searchTimer); searchTimer = setTimeout(() => ACT[el.dataset.act](el), 220); }
 }
-const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq', 'ppq'];   // text inputs that act while typing; every other text input with a data-act commits on change
+const LIVE_ACTS = ['spellq', 'itemq', 'hbq', 'hbbq','pkq', 'flt', 'xspq', 'srcq', 'mq', 'cq', 'wq', 'ppq'];   // text inputs that act while typing; every other text input with a data-act commits on change
 function onChange(ev) {
   const el = ev.target;
   flushTyping();
@@ -8696,11 +8717,125 @@ MODALS.impchar = () => {
     <label class="field"><span class="lbl">Or paste a character code</span><textarea id="f-impcode" style="min-height:90px;font-family:ui-monospace,monospace;font-size:12px"></textarea></label>
     <label class="field"><span class="lbl">Rules for a PDF</span><select id="f-impcrs">${['2024', '2014'].map(r => `<option value="${r}"${newRsEff() === r ? ' selected' : ''}${rsAllowed(r) ? '' : ' disabled'}>${r === '2024' ? '2024 (5.5e)' : '2014 (5e)'}</option>`).join('')}</select></label>
     <div class="errline" id="f-imperr" role="alert"></div>
-    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" id="f-impgo" data-act="impgo">Import</button></div></div>`;
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" id="f-impgo" data-act="impcgo">Import</button></div></div>`;
 };
+/* ===== Build 29: grants by level on homebrew content, and campaign changes to built-in content =====
+   An entry's `grants: [{l, k, ...}]` is applied in derive() by applyGrants(). l = character level (class level for classes and subclasses).
+   Kinds: ab {a, n, max} ac/hp/hpl/speed/init/sense {n}  prof {v: 'skill:id' | 'save:ab' | 'armor:..' | 'weapon:..', tool}  exp {v: skill id}
+          spell {v: spell id, ab, n: free casts or 'pb', reset}  res {name, n: number or 'pb', reset}  text {name, d}  resist {v: damage type}
+   A built-in entry edited for the campaign lives in the pack "Campaign changes" (id cc-<ruleset>) under the SAME id, so registry() returns it instead. */
+const GRANT_TYPES = ['feats', 'species', 'subspecies', 'backgrounds', 'classes', 'subclasses', 'items'];
+const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance']];
+const NUM_G = ['n', 'Amount', 'num'];
+const GRANT_FIELDS = {
+  ab: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], NUM_G, ['max', 'Cap (blank = 20)', 'num']],
+  ac: [NUM_G], hp: [NUM_G], hpl: [['n', 'Amount per level', 'num']], speed: [['n', 'Feet', 'num']], init: [NUM_G], sense: [['n', 'Feet', 'num']],
+  prof: [['v', 'Proficiency', 'select', [['', '—'], ...SKILLS.map(([s, n]) => ['skill:' + s, 'Skill: ' + n]), ...ABIL.map(a => ['save:' + a, 'Save: ' + ABN[a]]), ...['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields'].map(a => ['armor:' + a, a]), ...['Simple Weapons', 'Martial Weapons'].map(a => ['weapon:' + a, a])]], ['tool', '…or a tool (name)', 'text']],
+  exp: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])]],
+  spell: [['v', 'Spell', 'spell'], ['ab', 'Casting ability', 'select', [['', 'Best of Int, Wis, Cha'], ...ABIL.map(a => [a, ABN[a]])]], ['n', 'Free casts (number or pb)', 'text'], ['reset', 'Free casts return on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]],
+  res: [['name', 'Name', 'text'], ['n', 'Uses (number or pb)', 'text'], ['reset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest'], ['none', 'Never']]]],
+  text: [['name', 'Name', 'text'], ['d', 'Description', 'textarea']],
+  resist: [['v', 'Damage type', 'select', ['acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'].map(d => [d, cap(d)])]],
+};
+for (const t of GRANT_TYPES) FORMS[t].push(['grants', 'Grants by level', 'grants']);
+const gsum = a => sum(a.map(g => g.n));
+function applyGrants(ch, D, feats, features) {
+  const src = [];   // [entry, level it counts at]
+  for (const x of D.cls) src.push([x.def, x.c.lvl], [x.sub, x.c.lvl]);
+  src.push([D.sp, D.level], [D.sub, D.level], [D.bg, D.level]);
+  for (const x of feats) src.push([x.f, D.level]);
+  for (const it of ch.inv || []) if (it.eq) { const d = itemDef(ch, it); if (d && !(d.att && !it.att)) src.push([d, D.level]); }   // an item counts while equipped, and attuned if it needs attunement
+  const G = { ab: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], prof: [], exp: [], res: [], resist: [], spellSrc: [] }, seen = new Set(), by = {};
+  const uses = v => /^pb$/i.test(v) ? D.pb : Math.max(0, +v || 0);
+  for (const [e, lvl] of src) {
+    if (!e || !Array.isArray(e.grants) || seen.has(e)) continue;
+    seen.add(e);
+    for (const g of e.grants) {
+      const l = +g.l || 1, k = g.k, from = e.name, n = +g.n || 0;
+      if (l > lvl) continue;
+      if (k === 'ab') { if (ABIL.includes(g.a) && n) G.ab.push({ a: g.a, n, max: +g.max || 20, from }); }
+      else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense'].includes(k)) { if (n) G[k].push({ n, from }); }
+      else if (k === 'prof') { const p = g.tool ? 'tool:' + g.tool : g.v; if (p) G.prof.push({ p, from }); }
+      else if (k === 'exp') { if (SKILL[g.v]) G.exp.push({ v: g.v, from }); }
+      else if (k === 'resist') { if (g.v) G.resist.push({ v: g.v, from }); }
+      else if (k === 'res') { if (g.name) G.res.push({ key: 'gr:' + slug(from) + ':' + slug(g.name), name: g.name, max: uses(g.n), reset: g.reset === 'short' || g.reset === 'none' ? g.reset : 'long', from }); }
+      else if (k === 'text') features.push({ key: 'gr:' + slug(from) + ':' + slug(g.name || '') + ':' + l, l, n: g.name || 'Feature', d: g.d || '', from, f: {}, cls: '' });
+      else if (k === 'spell') {
+        const s = look(ch, 'spells', g.v); if (!s) continue;
+        const b = by[from] || (by[from] = { key: 'gr:' + slug(from), name: from, ab: g.ab || '', classGrant: 1, hb: 1, all: [] });
+        if (!b.all.some(x => x.id === s.id)) b.all.push({ id: s.id, name: s.name, lvl: s.lvl, l, free: s.lvl > 0 ? uses(g.n) : 0, at: s.lvl, ok: true, reset: g.reset === 'short' ? 'short' : 'long' });
+      }
+    }
+  }
+  G.spellSrc = Object.values(by).map(b => Object.assign(b, { spells: b.all }));
+  return G;
+}
+/* the "Grants" editor in the homebrew form: one row per grant, its fields follow the chosen kind */
+function grantsHTML(type, f, val, rs, id) {
+  const lv = type === 'classes' || type === 'subclasses' ? 'Class level' : 'Level';
+  const rows = (Array.isArray(val) ? val : []).map((r, i) => {
+    const p = id + '-' + i, k = GRANT_FIELDS[r.k] ? r.k : 'ab';
+    return `<div class="rowed">${fieldHTML(type, ['l', lv, 'num'], r.l == null ? 1 : r.l, rs, p)}<label class="field"><span class="lbl">Gives</span><select id="${p}-k" data-act="hbgk">${GRANT_KINDS.map(([v, l]) => opt(v, l, k === v)).join('')}</select></label>${GRANT_FIELDS[k].map(sf => fieldHTML(type, sf, r[sf[0]], rs, p)).join('')}<div class="wide row"><span class="spacer"></span><button class="btn ghost sm danger" data-act="hbrowrm" data-p="grants" data-i="${i}">Remove</button></div></div>`;
+  }).join('');
+  return `<div class="field" style="grid-column:1/-1"><span class="lbl">${esc(f[1])}</span><p class="small muted">Things this gives a character from the level you set. ${type === 'items' ? 'An item gives them while equipped, and attuned if it needs attunement.' : type === 'classes' || type === 'subclasses' ? 'The level is the character’s level in this class.' : 'The level is the character’s total level.'}</p><div class="rows">${rows}</div><button class="btn sm" data-act="hbrowadd" data-p="grants" style="align-self:flex-start">Add grant</button></div>`;
+}
+function grantsRead(rs, id, root) {
+  const out = [], el = s => root.querySelector('#' + CSS.escape(s));
+  for (let i = 0; el(id + '-' + i + '-k'); i++) {
+    const p = id + '-' + i, k = el(p + '-k').value, r = { l: readField(['l', '', 'num'], rs, p, root) || 1, k };
+    for (const sf of GRANT_FIELDS[k] || []) { const v = readField(sf, rs, p, root); if (v !== '' && v != null) r[sf[0]] = v; }
+    out.push(r);
+  }
+  return out;
+}
+/* campaign changes */
+const ccCan = () => S.mode !== 'live' || S.me.isOwner;
+const ccId = rs => 'cc-' + rs;
+function ccBuiltin(t, rs) {
+  if (t === 'conditions') { const b = condBase(); return BASE_CONDS.map(n => ({ id: slug(n), name: n, d: b.rules[n] || '', fx: clone(b.fx[n] || {}) })); }
+  const out = ((SRD[rs] || {})[t] || []).map(e => Object.assign({ src: rs === '2014' ? 'SRD 5.1' : 'SRD 5.2' }, e));   // the source stays, so rules that check for free-rules content still do
+  for (const p of BUILTIN_PACKS) if (p.ruleset === 'any' || p.ruleset === rs) for (const e of (p.entries || {})[t] || []) out.push(Object.assign({ src: p.name }, e));
+  return out;
+}
+async function ccPack(rs) {
+  const id = ccId(rs);
+  if (!PACKS.find(p => p.id === id)) {
+    const shared = S.mode === 'live' && S.me.isOwner, pack = { id, name: 'Campaign changes', ruleset: rs };
+    await savePack(pack, {}, shared);
+    if (shared) { S.sharedParts.push({ _key: id + '~0', pack, entries: {} }); refreshPacks(); }
+  }
+  return PACKS.find(p => p.id === id);
+}
+function ccPanel() {
+  if (!ccCan()) return '';
+  const h = UI.hb, t = h.bt || 'feats', rs = h.brs || newRsEff(), q = (h.bq || '').toLowerCase();
+  const ents = (PACKS.find(p => p.id === ccId(rs)) || {}).entries || {};
+  const over = new Set((ents[t] || []).map(e => e.id)), n = sum(TYPES.map(k => (ents[k] || []).length));
+  const list = ccBuiltin(t, rs).filter(e => !q || String(e.name).toLowerCase().includes(q)).slice().sort(byName);
+  return `<details class="panel" data-k="builtin" style="margin-bottom:12px"><summary class="ph" style="cursor:pointer;margin:0">Built-in rules: edit for this campaign<span class="pill ${n ? 'brass' : ''}" style="text-transform:none;letter-spacing:0">${n} changed</span></summary>
+    <div class="stack" style="margin-top:10px"><p class="small muted">Change a built-in class, feat, spell and so on for this campaign only. Your version replaces the original for everyone, and characters keep using it. “Restore original” brings the book version back.</p>
+    <div class="row"><div class="seg">${['2024', '2014'].map(r => `<button data-act="hbbrs" data-v="${r}"${pressed(rs === r)}>${r}</button>`).join('')}</div><select data-act="hbbt" aria-label="What to change">${TYPES.filter(k => k !== 'subspecies').map(k => opt(k, TYPE_LABEL[k], k === t)).join('')}</select><input type="search" id="f-hbbq" data-act="hbbq" placeholder="Search" value="${esc(h.bq || '')}" style="max-width:220px"></div>
+    ${list.slice(0, 100).map(e => `<div class="hb-row"><div><b>${esc(e.name)}</b> <span class="small muted">${esc(hbSummary(t, e))}</span>${over.has(e.id) ? ' <span class="pill brass">Changed for this campaign</span>' : ''}</div><div class="row"><button class="btn sm" data-act="hbccedit" data-v="${esc(e.id)}">Edit for this campaign</button>${over.has(e.id) ? `<button class="btn ghost sm" data-act="hbccrestore" data-v="${esc(e.id)}">Restore original</button>` : ''}</div></div>`).join('') || '<p class="muted">Nothing found.</p>'}${list.length > 100 ? '<p class="small muted">Showing 100. Search to narrow it down.</p>' : ''}</div></details>`;
+}
+Object.assign(ACT, {
+  hbgk() { const m = UI.modal, p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); renderModal(); },
+  hbbt(el) { UI.hb.bt = el.value; queueRender(); },
+  hbbrs(el) { UI.hb.brs = el.dataset.v; queueRender(); },
+  hbbq(el) { UI.hb.bq = el.value; queueRender(); },
+  async hbccedit(el) {
+    const t = UI.hb.bt || 'feats', rs = UI.hb.brs || newRsEff(), p = await ccPack(rs);
+    const raw = ((p && p.entries || {})[t] || []).find(e => e.id === el.dataset.v) || ccBuiltin(t, rs).find(e => e.id === el.dataset.v);
+    if (!raw) return;
+    openModal({ kind: 'hb', type: t, pack: p.id, entry: hbEntryForForm(t, raw), isNew: false, id: raw.id });
+  },
+  hbccrestore(el) {
+    const t = UI.hb.bt || 'feats', p = PACKS.find(x => x.id === ccId(UI.hb.brs || newRsEff()));
+    if (p) confirmBox('Restore the original?', 'The campaign change is removed and everyone gets the built-in version again.', 'Restore original', async () => { await hbCommit(p, entries => { entries[t] = (entries[t] || []).filter(x => x.id !== el.dataset.v); }); queueRender(); });
+  },
+});
 Object.assign(ACT, {
   impchar() { openModal({ kind: 'impchar' }); },
-  async impgo() {
+  async impcgo() {
     const f = $('#f-impfile').files[0], code = $('#f-impcode').value, rs = $('#f-impcrs').value, err = $('#f-imperr'), go = $('#f-impgo');
     if (!f && !code.trim()) { err.textContent = 'Pick a PDF or JSON file, or paste a character code.'; return; }
     err.textContent = ''; go.disabled = true; go.textContent = 'Importing…';
