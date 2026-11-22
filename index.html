@@ -527,6 +527,23 @@ input[type=text], input[type=number], input[type=search], select, textarea { bor
 .maphint .btn { background: #f2c14e; color: #17120a; }
 .tok:focus-visible { box-shadow: 0 0 0 calc(.14em + max(2px, .1em) + 2px) #0f1426; }
 .mapover .fogsel { fill: rgba(201, 210, 234, .18); stroke: #c9d2ea; }
+/* Build 22: experience and the players' combat screen */
+@keyframes plflash { from { box-shadow: 0 0 0 3px var(--brass); } to { box-shadow: 0 0 0 0 transparent; } }
+.sheet.flash .vitals, .sheet.flash .hp { animation: plflash 2.4s ease-out; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) { .sheet.flash .vitals, .sheet.flash .hp { animation: none; outline: 2px solid var(--brass); } }
+.xpbox { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.xpbox.ready { border-color: var(--brass); }
+.xpbar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.xpbar i { display: block; height: 100%; background: var(--brass); }
+.prow .ptarget { appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; flex: 1; min-height: 44px; justify-content: center; }
+.prow .ptarget:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.prow.tgt { border-color: var(--brass); box-shadow: inset 4px 0 0 var(--brass); }
+.prow .grow { min-width: 0; }
+.run.prun { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); }
+@media (max-width: 1100px) { .run.prun { grid-template-columns: minmax(0, 1fr); } }
+.cbsheet .sheet { grid-template-columns: minmax(0, 1fr); }
+.cbsheet .sec-skills, .cbsheet .sec-features, .cbsheet .sec-gear, .cbsheet .sec-notes, .cbsheet .secnav, .cbsheet .xpbox { display: none !important; }
+.cbsheet .sheet .sec.sec-top, .cbsheet .sheet .sec.sec-actions, .cbsheet .sheet .sec.sec-spells { display: flex !important; }
 </style>
 </head>
 <body>
@@ -1999,6 +2016,7 @@ function allChars() {
         try { ch = typeof raw === 'string' ? JSON.parse(raw) : clone(raw); } catch (e) { continue; }
         ch.id = cid;
         fixChar(ch);
+        { const dx = doc.dmx && doc.dmx[cid]; if (typeof dx === 'string') { try { ch.dmSet = JSON.parse(dx) || {}; } catch (e) { } } }
         ch.play = Object.assign(ch.play || {}, (doc.play && doc.play[cid]) || {});
         ch._owner = owner;
         out.push({ ch, owner, mine: owner === S.me.id });
@@ -2096,6 +2114,8 @@ async function flushWrite(path) {
   if (!q || !q.pending) return;
   if (q.busy) { q.timer = setTimeout(() => flushWrite(path), 300); return; }
   const patch = q.pending; q.pending = null; q.busy = true; q.inflight = patch;
+  if (/^characters\//.test(path) && S.me.id && patch && typeof patch === 'object') patch.lastBy = S.me.id;
+  if (/^characters\//.test(path) && !SIZE_WARNED[path]) { try { const kb = Math.round(JSON.stringify(S.docs[path.split('/')[1]] || {}).length / 1024); if (kb > 850) { SIZE_WARNED[path] = 1; toastMsg(`${cap(whoseDoc(path))} is ${kb} KB, close to the campaign server’s 1 MB limit per player. Import homebrew for the whole campaign, or delete characters you don’t use.`); } } catch (e) { } }
   try {
     const ref = S.db.doc(path);
     if (S.known[path] === undefined) { const g = await ref.get(); S.known[path] = g.exists; }
@@ -2103,8 +2123,14 @@ async function flushWrite(path) {
     else await ref.update(patch);
   } catch (e) {
     if (e && e.code === 'invalid_argument') {
-      S.readOnly = true;
-      toastMsg('Your sheet couldn’t be saved to the campaign. You can only view here. Use "Copy code" to send your character to the DM.');
+      const who = whoseDoc(path), own = path === 'characters/' + S.me.id, fc = e.fbCode || '';
+      const big = /exceeds the maximum|too large|maximum size|1048576|index entries/i.test(e.message || '');
+      if (big) toastMsg(`${cap(who)} is too big for the campaign server (1 MB per player). Ask the DM to import your homebrew for the whole campaign instead of “this device only”, or delete characters you don’t use.`);
+      else if (fc === 'permission-denied' || (!fc && !/nested|invalid data|unsupported/i.test(e.message || ''))) {
+        if (S.me.isOwner) toastMsg(window.PL_SITE ? `The campaign server refused your change to ${who}: it doesn’t recognise this browser as the DM. Open the campaign menu and enter your DM key again.` : `${cap(who)} couldn’t be saved: ${(e && e.message) || 'the campaign refused it'}.`);
+        else if (own) { S.readOnly = true; toastMsg('Your sheet couldn’t be saved to the campaign. You can only view here. Use "Copy code" to send your character to the DM.'); }
+        else toastMsg(`Only the DM and its player can change ${who}.`);
+      } else toastMsg(`${cap(who)} couldn’t be saved: ${(e && e.message) || 'the server refused it'}.`);
     } else if (e && e.code === 'quota_exceeded') {
       toastMsg('Campaign storage is full: ' + (e.message || 'delete unused characters or homebrew.'));
     } else if (e && e.code === 'unavailable') {
@@ -2126,7 +2152,7 @@ function charForStorage(ch) {
   delete c.play; delete c._owner;
   const localPackIds = new Set(PACKS.filter(p => !p.shared).map(p => p.id));
   const hb = embedUsed(ch, S.mode === 'live' ? localPackIds : null);
-  if (hb) c.hb = Object.assign({}, ch.hb || {}, hb); else if (ch.hb) c.hb = ch.hb;
+  if (hb) c.hb = Object.assign({}, ch.hb || {}, S.mode === 'live' ? slimEmbedded(hb, ch) : hb); else if (ch.hb) c.hb = ch.hb;
   c.updatedAt = Date.now();
   return c;
 }
@@ -2279,8 +2305,10 @@ async function startLive({ db, user, room, dl }, onChange) {
       const q = WQ[path]; const id = path.split('/')[1];
       if (path.startsWith('characters/') && (q.pending || q.inflight)) next[id] = deepMerge(next[id] || { owner: id, chars: {}, play: {} }, deepMerge(clone(q.inflight || {}), clone(q.pending || {})));
     }
+    const watch = S.me.id && !S.me.isOwner && S.docs[S.me.id] && next[S.me.id] && next[S.me.id].lastBy && next[S.me.id].lastBy !== S.me.id ? statSnaps() : null;
     S.docs = next;
     S.ver++;
+    if (watch) { try { announceChanges(watch); } catch (e) { } }
     S.status = snap.metadata.fromCache ? 'Syncing\u2026' : 'Live campaign';
     keepDocs();
     resolveNames(onChange);
@@ -2970,7 +2998,7 @@ function sheetView(ch, D, ro, e) {
   const cap = S.mode === 'live' && !S.me.isOwner ? (+(S.settings || {}).maxLevel || 20) : 20;
   const rest = ro ? '' : `<div class="row"><button class="btn" data-act="shortrest">Short rest</button><button class="btn" data-act="longrest">Long rest</button>${Object.keys(D.hdPool).map(d => `<button class="btn sm" data-act="spendhd" data-d="${d}"${dis(((+(p.hd || {})[d]) || 0) >= D.hdPool[d])}>Spend d${d}</button>`).join('')}${last ? `<button class="btn sm" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 22))}</button>` : ''}${S.mode === 'live' && S.me && S.me.isOwner && !ro ? `<button class="btn sm" data-act="gobuild" data-v="basics" title="Change any of this character's numbers">DM: change numbers</button>` : ''}<span class="spacer"></span><button class="btn sm" data-act="levelup"${dis(D.level >= cap)} title="${D.level >= cap ? 'At the level cap' : 'Gain a level'}">Level up</button></div>`;
   const nav = `<nav class="secnav" aria-label="Sheet sections">${SECS.map(([k, l]) => `<button data-act="sec" data-v="${k}"${pressed(sec === k)}>${l}</button>`).join('')}</nav>`;
-  const top = `<div class="stack sec sec-top">${turn}${conc}${vit}${hpBox}${rest}${nav}</div>`;
+  const top = `<div class="stack sec sec-top">${turn}${conc}${xpStrip(ch, D, ro)}${vit}${hpBox}${rest}${nav}</div>`;
 
   /* --- actions: effects, attacks, resources, conditions --- */
   const avail = fxAvailable(ch, D), on = new Set(p.fx || []);
@@ -3050,7 +3078,7 @@ function sheetView(ch, D, ro, e) {
     <p class="small muted" style="margin-top:6px">Add or remove items in Build → Equipment.</p></div></div>`;
   const notes = `<div class="stack sec sec-notes"><div class="panel stack"><h3>Session notes</h3><textarea id="f-n-session" data-in="notes.session" placeholder="Names, clues, loot, plans…"${dis(ro)}>${esc(ch.notes.session || '')}</textarea></div>
     ${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].some(k => ch.notes[k]) ? `<div class="panel stack small"><h3>Character</h3>${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].filter(k => ch.notes[k]).map(k => `<div><span class="lbl">${k}</span><div class="rt">${md(ch.notes[k])}</div></div>`).join('')}</div>` : ''}</div>`;
-  return `<div class="sheet" data-sec="${sec}">${col1}<div class="stack colmid">${top}${actions}</div><div class="stack col3">${secSpells}${feats}${gear}${notes}</div></div>`;
+  return `<div class="sheet${UI.flash && UI.flash.cid === ch.id && UI.flash.until > Date.now() ? ' flash' : ''}" data-sec="${sec}">${col1}<div class="stack colmid">${top}${actions}</div><div class="stack col3">${secSpells}${feats}${gear}${notes}</div></div>`;
 }
 
 /* ===== party view ===== */
@@ -3085,10 +3113,11 @@ function viewParty() {
       <div class="row small">${(p.cond || []).map(c => `<span class="pill bad">${esc(c)}</span>`).join('')}${+p.exh ? `<span class="pill bad">Exhaustion ${p.exh}</span>` : ''}${p.conc ? `<span class="pill acc">Concentrating: ${esc(p.conc)}</span>` : ''}${hp <= 0 ? `<span class="pill bad">Down · ${(p.ds || [0, 0])[0]}✓ ${(p.ds || [0, 0])[1]}✗</span>` : ''}${(p.fx || []).length ? `<span class="pill">${(p.fx || []).length} effect${(p.fx || []).length === 1 ? '' : 's'} on</span>` : ''}</div>
       ${slotsLeft.length || D.pact ? `<div class="small muted">Slots ${slotsLeft.join(' · ')}${D.pact ? ` · Pact ${D.pact.n - (+p.pact || 0)}/${D.pact.n}` : ''}</div>` : ''}
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
+      ${advMode() === 'xp' ? `<div class="small"><b class="num">${fmtN(xpOf(ch, D))} XP</b>${D.level < 20 ? (xpOf(ch, D) >= XP_LEVEL[D.level] ? ' <span class="pill brass">ready to level up</span>' : ` <span class="muted">· ${fmtN(XP_LEVEL[D.level] - xpOf(ch, D))} to level ${D.level + 1}</span>`) : ''}</div>` : (+(p.lvlUpTo || 0) > D.level ? '<div class="small"><span class="pill brass">level up waiting</span></div>' : '')}
       ${D.issues.length || D.flags.length ? `<details class="feat" data-k="rev-${esc(owner)}-${esc(ch.id)}"><summary><b class="small">Review</b>${D.issues.length ? `<span class="pill ${D.issues.some(i => i.hard) ? 'bad' : 'brass'}">${D.issues.some(i => i.hard) ? 'breaks a rule · ' : ''}${D.issues.length} unfinished</span>` : ''}${D.flags.length ? `<span class="pill">${D.flags.length} house-ruled</span>` : ''}</summary><ul class="small" style="margin:6px 0 0;padding-left:1.2em">${D.issues.map(i => `<li>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}</li>`).join('')}${D.flags.map(f => `<li class="muted">${esc(f)}</li>`).join('')}</ul></details>` : '<div class="small"><span class="pill acc">Build complete</span></div>'}
     </article>`;
   }).join('');
-  return head + intro + handouts + `<div class="cards">${cards}</div>`;
+  return head + intro + handouts + partyXpPanel() + `<div class="cards">${cards}</div>`;
 }
 
 /* ===== dice log ===== */
@@ -4182,7 +4211,7 @@ function auroraText(node) {
 'use strict';
 /* ===== render ===== */
 let renderQueued = false;
-const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 21</span></footer>`;
+const FOOTER = `<footer class="wrap small muted" style="padding-block:0 28px">Rules text comes from the System Reference Document 5.1 and 5.2 by Wizards of the Coast LLC, available at <a href="https://dnd.wizards.com/resources/systems-reference-document" target="_blank" rel="noopener">dnd.wizards.com</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>, via the open 5e-database project. Party Ledger is not affiliated with Wizards of the Coast or Aurora Builder. Homebrew and imported files belong to whoever made them. <span class="pill" title="Tell Claude this number when something looks off">Build 22</span></footer>`;
 function sigOf(el) { const d = el.dataset; return [el.tagName, d.act, d.v, d.k, d.i, d.key, d.cid, d.n, d.l, d.d, d.c].join('|'); }
 const detKey = d => d.dataset.k || ((d.querySelector('summary') || {}).textContent || '');
 function render() {
@@ -4886,15 +4915,15 @@ function logLine(m) {
   else if (m.kind === 'roll' && m.dmg != null && m.nat != null) e.detail = `${m.detail} · damage ${m.dmg} ${m.dt || ''} [${m.dmgDetail || ''}]`;
   else if (m.kind === 'save') { e.label = `${m.label}: ${String(m.ab || '').toUpperCase()} save${m.tgtNames ? ' → ' + m.tgtNames : ''}`; e.total = m.dmg; e.detail = m.dmg != null ? `${m.dmg} ${m.dt || ''} damage${m.half ? ', half on a success' : ''}` : ''; }
   else if (m.kind === 'apply') { e.label = `${m.label}${m.tgtNames ? ' → ' + m.tgtNames : ''}`; e.total = m.amount; e.detail = m.heal ? 'healing' : (m.dt || '') + ' damage'; }
-  else if (m.kind === 'res' || m.kind === 'req' || m.kind === 'note') { e.text = m.kind === 'req' ? `The DM asks for ${m.label}` : m.text; e.hit = m.hit; }
+  else if (m.kind === 'res' || m.kind === 'req' || m.kind === 'note' || m.kind === 'turn') { e.text = m.kind === 'req' ? `The DM asks for ${m.label}` : m.text; e.hit = m.hit; }
   return e;
 }
 function handleMsg(m) {
   if (!m || typeof m !== 'object') return;
   if (m.kind === 'ping') { if (!m.old) mapPing(m); return; }
   S.log.unshift(logLine(m)); S.log = S.log.slice(0, 150);
-  if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note') showRoll(S.log[0]);
-  if (m.kind === 'res' && !m.old) { toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); if (pend.vex && m.hit && +m.dealt > 0) { const x = findChar(pend.cid, pend.owner); if (x) savePlay(x.ch, { vex: pend.vex }); } } }
+  if (m.isMe && m.kind !== 'res' && m.kind !== 'req' && m.kind !== 'note' && m.kind !== 'turn') showRoll(S.log[0]);
+  if (m.kind === 'res' && !m.old) { S.lastResAt = Date.now(); toastMsg(m.text); const pend = PENDING[m.ref]; if (pend) { delete PENDING[m.ref]; if (m.hit) clearOnce(pend); if (pend.vex && m.hit && +m.dealt > 0) { const x = findChar(pend.cid, pend.owner); if (x) savePlay(x.ch, { vex: pend.vex }); } } }
   if (m.kind === 'req') { S.reqs[m.rid] = Object.assign({}, m, { answers: {} }); if (!m.old && !m.isMe && myRequests().some(r => r.q.rid === m.rid)) { toastMsg('The DM asks for ' + m.label + '. Roll from the bar at the top.'); try { navigator.vibrate && navigator.vibrate(40); } catch (e) { } } }
   const q = m.ref && S.reqs[m.ref];
   if (q && m.key && m.total != null) {
@@ -4912,6 +4941,7 @@ function handleMsg(m) {
     else if (m.kind === 'save') resolveSave(m);
     else if (m.kind === 'apply') resolveApply(m);
     else if (m.kind === 'init' && m.cid) setInitFor(m.cid, m.total);
+    else if (m.kind === 'turn') resolveTurnMsg(m);
   }
   if (typeof queueRender === 'function') queueRender();
 }
@@ -5017,7 +5047,8 @@ const RUN = { sel: null, picks: {}, q: '', rs: LS.get('rs', '2024'), tgt: '' };
 function crLabel(v) { return v === 0.125 ? '1/8' : v === 0.25 ? '1/4' : v === 0.5 ? '1/2' : String(v); }
 function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)}>${c}</button>`).join('')}</div>`; }
 function viewCombat() {
-  if (UI.view === 'table' || !isDMish()) return viewCombatPublic(UI.view === 'table');
+  if (UI.view === 'table') return viewCombatPublic(true);
+  if (!isDMish()) return viewCombatPlayer();
   const cb = cbt();
   if (!cb.list.length && !RUN.migrated && S.init && (S.init.list || []).some(x => x.hp != null || x.turn != null || !x.kind)) {
     RUN.migrated = true;   // fights saved by older builds kept monster numbers in the public list
@@ -5169,7 +5200,11 @@ Object.assign(ACT, {
   chide(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.hidden = !c.hidden; saveCombat(cb); queueRender(); },
   crm(el) { const cb = cbt(); const i = cb.list.findIndex(x => x.id === el.dataset.v); if (i < 0) return;
     { const gone = JSON.parse(JSON.stringify(cb.list[i])), at = i; pushUndo('removed ' + gone.name, () => { const c2 = cbt(); if (!c2.list.some(x => x.id === gone.id)) { c2.list.splice(Math.min(at, c2.list.length), 0, gone); saveCombat(c2); } }); toastMsg('Removed ' + gone.name + '. Undo is in the toolbar.'); } if (cb.cur === el.dataset.v) cb.cur = (cb.list[i + 1] || cb.list[0] || {}).id || null; cb.list.splice(i, 1); delete RUN.picks[el.dataset.v]; saveCombat(cb); queueRender(); },
-  cend() { confirmBox('End combat?', 'This clears the turn order for everyone. Saved encounters stay.', 'End combat', () => { RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [] }); queueRender(); }); },
+  cend() {
+    const cb = cbt();
+    if (advMode() === 'xp' && cb.list.some(c => c.kind === 'mon') && cb.list.some(c => c.kind === 'pc')) { openModal({ kind: 'xpend' }); return; }
+    confirmBox('End combat?', 'This clears the turn order for everyone. Saved encounters stay.', 'End combat', endCombatNow);
+  },
   cparty() {
     const cb = cbt();
     for (const x of chars()) if (!cb.list.some(c => c.kind === 'pc' && c.cid === x.ch.id)) cb.list.push({ id: uid('i'), kind: 'pc', cid: x.ch.id, owner: x.owner, name: x.ch.name, init: null });
@@ -5496,6 +5531,7 @@ function viewCampaign() {
       <div class="field"><span class="lbl">Character changes</span><div class="seg">${[['0', 'Open'], ['1', 'Locked']].map(([k, l]) => `<button data-act="setlock" data-v="${k}"${pressed(!!st.lock === (k === '1'))}>${l}</button>`).join('')}</div><span class="small muted">Locked: players can play from their sheet but not rebuild or level up.</span></div>
       <div class="field"><span class="lbl">Ability score methods players may use</span><div class="row">${ALL_METHODS.map(([k, l]) => `<label class="chk small"><input type="checkbox" data-act="setmethod" data-v="${k}"${methods.includes(k) ? ' checked' : ''}> ${l}</label>`).join('')}</div></div>
       <label class="field"><span class="lbl">What players see of monster health</span><select data-act="sethp">${[['desc', 'A word: Healthy, Hurt, Bloodied, Critical'], ['none', 'Nothing'], ['exact', 'Exact numbers']].map(([k, l]) => opt(k, l, (st.showHp || 'desc') === k)).join('')}</select><span class="small muted">Monster AC is never shown to players.</span></label>
+      <div class="field"><span class="lbl">Levelling</span><div class="seg">${[['xp', 'Experience points'], ['milestone', 'Milestones']].map(([k, l]) => `<button data-act="setadv" data-v="${k}"${pressed(advMode() === k)}>${l}</button>`).join('')}</div><span class="small muted">XP: sheets show progress and ending a fight hands out the monsters’ XP. Milestones: you level the party up from Party.</span></div>
     </div></div>`;
   const sheets = `<div class="panel stack"><h3>Sheets</h3>
     ${list.length ? `<div class="scroll-x"><table class="tbl"><thead><tr><th>Character</th><th>Player</th>${owners.length > 1 ? '<th>Hand to another player</th>' : ''}</tr></thead><tbody>${list.map(x => `<tr><td><b>${esc(x.ch.name)}</b><div class="small muted">${esc(classLine(x.ch))}</div></td><td>${esc(live ? who(x.owner) : 'This device')}</td>${owners.length > 1 ? `<td><span class="row"><select id="f-mv-${esc(x.owner)}-${esc(x.ch.id)}" aria-label="New player">${owners.filter(o => o !== x.owner).map(o => opt(o, who(o) + (o === S.me.id ? ' (you)' : ''))).join('')}</select><button class="btn sm" data-act="moveto" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}">Move</button></span></td>` : ''}</tr>`).join('')}</tbody></table></div>` : '<p class="muted">No characters yet.</p>'}
@@ -5577,8 +5613,8 @@ function fbDb(root) {
     return {
       id: p.split('/').pop(), path: p,
       get: () => r.get().then(s => wrap(p, s), e => { throw fbErr(e); }),
-      set: d => r.set(fbEncode(p, d)).catch(e => { throw fbErr(e); }),
-      update: d => r.set(fbEncode(p, d), { merge: true }).catch(e => { throw fbErr(e); }),
+      set: d => { try { return r.set(fbEncode(p, d)).catch(e => { throw fbErr(e); }); } catch (e) { return Promise.reject(fbErr(e)); } },
+      update: d => { try { return r.set(fbEncode(p, d), { merge: true }).catch(e => { throw fbErr(e); }); } catch (e) { return Promise.reject(fbErr(e)); } },
       delete: () => r.delete().catch(e => { throw fbErr(e); }),
       onSnapshot: (next, err) => r.onSnapshot(s => next(wrap(p, s)), e => err && err(fbErr(e))),
     };
@@ -6566,12 +6602,12 @@ ACT.discpick = function (el) { const ch = C(); if (!ch) return; const raw = [].c
 ACT.dmset = function (el) {
   const ch = C(); if (!ch || !isDMish()) return; const k = el.dataset.k, v = String(el.value).trim();
   const ds = Object.assign({}, ch.dmSet || {}); if (v === '' || isNaN(+v)) delete ds[k]; else ds[k] = +v;
-  ch.dmSet = ds; commit(ch);
+  saveDmSet(ch, ds);
 };
 ACT.dmclear = function () {
   const ch = C(); if (!ch || !isDMish()) return; const prev = JSON.stringify(ch.dmSet || {}), id = ch.id;
-  ch.dmSet = {}; commit(ch);
-  pushUndo('Clear the DM numbers', () => { const c2 = C(); if (c2 && c2.id === id) { c2.dmSet = JSON.parse(prev); commit(c2); } });
+  saveDmSet(ch, {});
+  pushUndo('Clear the DM numbers', () => { const c2 = C(); if (c2 && c2.id === id) saveDmSet(c2, JSON.parse(prev)); });
   toastMsg('Calculated values are back.');
 };
 ACT.gchoice = function (el) { const ch = C(); if (!ch) return; const k = el.dataset.k; if (el.value) ch.choices[k] = el.value; else delete ch.choices[k]; commit(ch); };
@@ -6633,6 +6669,215 @@ ACT.invsell = function (el) {
   if ((+it.q || 1) > 1) it.q = (+it.q || 1) - 1; else ch.inv.splice(i, 1);
   commit(ch); toastMsg(`Sold ${d.name} for ${fmtCp(back) || '0 cp'} (half its price).`);
 };
+/* ===== Build 22: experience points ===== */
+const XP_LEVEL = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000];
+const CR_XP = { 0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800, 6: 2300, 7: 2900, 8: 3900, 9: 5000, 10: 5900, 11: 7200, 12: 8400, 13: 10000, 14: 11500, 15: 13000, 16: 15000, 17: 18000, 18: 20000, 19: 22000, 20: 25000, 21: 33000, 22: 41000, 23: 50000, 24: 62000, 25: 75000, 26: 90000, 27: 105000, 28: 120000, 29: 135000, 30: 155000 };
+const advMode = () => (S.settings || {}).adv === 'milestone' ? 'milestone' : 'xp';
+const xpOf = (ch, D) => Math.max(+((ch.play || {}).xp) || 0, XP_LEVEL[clamp(D.level || 1, 1, 20) - 1] || 0);
+const fmtN = n => Math.round(+n || 0).toLocaleString('en-US');
+function monXp(c) {
+  if (c.xp != null && c.xp !== '') return +c.xp || 0;
+  const d = monDef(c);
+  if (d && +d.xp) return +d.xp;
+  if (d && d.cr != null) return CR_XP[+d.cr] || 0;
+  return 0;
+}
+function xpStrip(ch, D, ro) {
+  const want = +((ch.play || {}).lvlUpTo) || 0;
+  if (advMode() === 'milestone') return want > D.level ? `<div class="todo-box row"><b class="grow">The DM says ${esc(ch.name)} reaches level ${want}.</b>${ro ? '' : '<button class="btn pri sm" data-act="levelup">Level up</button>'}</div>` : '';
+  const xp = xpOf(ch, D), cur = XP_LEVEL[D.level - 1] || 0, next = D.level >= 20 ? null : XP_LEVEL[D.level];
+  const pct = next ? clamp((xp - cur) / (next - cur) * 100, 0, 100) : 100, ready = next != null && xp >= next;
+  const log = ((ch.play || {}).xpLog || []).slice(0, 3);
+  return `<div class="xpbox${ready ? ' ready' : ''}"><div class="row small"><span class="lbl">Experience</span><b class="num">${fmtN(xp)} XP</b><span class="spacer"></span>${next == null ? '<span class="muted">Top level</span>' : ready ? `<span class="pill brass">Ready for level ${D.level + 1}</span>${ro ? '' : '<button class="btn pri sm" data-act="levelup">Level up</button>'}` : `<span class="muted">${fmtN(next - xp)} to level ${D.level + 1}</span>`}</div>
+    <div class="xpbar" role="progressbar" aria-label="Experience toward the next level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div>
+    ${log.length ? `<div class="small muted">${log.map(l => `+${fmtN(l.n)}${l.why ? ' ' + esc(l.why) : ''}`).join(' · ')}</div>` : ''}</div>`;
+}
+/* give XP; the DM's device writes it into each player's sheet */
+function awardXp(xs, each, why) {
+  each = Math.max(0, Math.round(+each || 0)); if (!each || !xs.length) return;
+  for (const x of xs) {
+    const D = derive(x.ch), base = xpOf(x.ch, D);
+    const log = [{ at: Date.now(), n: each, why: String(why || '').slice(0, 60) }].concat((x.ch.play || {}).xpLog || []).slice(0, 10);
+    savePlay(x.ch, { xp: base + each, xpLog: log });
+  }
+  sendMsg({ kind: 'note', text: `${xs.length === 1 ? xs[0].ch.name + ' gains' : xs.map(x => x.ch.name).join(', ') + ' each gain'} ${fmtN(each)} XP${why ? ' for ' + why : ''}.` });
+}
+function milestone(xs) {
+  for (const x of xs) { const D = derive(x.ch); savePlay(x.ch, { lvlUpTo: Math.min(20, D.level + 1) }); }
+  sendMsg({ kind: 'note', text: `The DM says the party levels up: ${xs.map(x => x.ch.name).join(', ')}.` });
+}
+function partyXpPanel() {
+  if (!isDMish()) return '';
+  const list = chars(), mode = advMode();
+  const box = list.map(({ ch, owner }) => `<label class="chk small"><input type="checkbox" class="xpwho" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}" checked> ${esc(ch.name)}</label>`).join('');
+  return `<div class="panel stack" style="margin-bottom:12px"><div class="ph">${mode === 'xp' ? 'Give experience' : 'Milestone levelling'}<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${[['xp', 'XP'], ['milestone', 'Milestones']].map(([k, l]) => `<button class="mini" data-act="setadv" data-v="${k}"${pressed(mode === k)}>${l}</button>`).join('')}</span></div>
+    <div class="row">${box}</div>
+    ${mode === 'xp' ? `<div class="row"><input type="number" id="f-xpn" min="0" placeholder="XP" style="width:110px" aria-label="Experience points"><label class="chk small"><input type="checkbox" id="f-xpsplit" checked> split between them</label><input type="text" id="f-xpwhy" placeholder="What for (optional)" style="flex:1;min-width:160px" aria-label="Reason"><button class="btn pri sm" data-act="xpgive">Give XP</button></div>
+      <span class="small muted">Ending a fight on the Combat screen also offers the monsters' XP.</span>`
+    : `<div class="row"><button class="btn pri sm" data-act="xpmile">Level up the ticked characters</button><span class="small muted">Each one gets a Level up button on their sheet.</span></div>`}</div>`;
+}
+MODALS.xpend = () => {
+  const cb = cbt(), m = UI.modal;
+  const mons = cb.list.filter(c => c.kind === 'mon'), pcs = cb.list.filter(c => c.kind === 'pc').map(c => findChar(c.cid, c.owner)).filter(Boolean);
+  if (!m.init) { m.init = 1; m.mon = {}; m.pc = {}; m.xp = {}; for (const c of mons) { m.mon[c.id] = +c.hp <= 0 || mons.every(x => +x.hp > 0); m.xp[c.id] = monXp(c); } for (const x of pcs) m.pc[x.owner + '|' + x.ch.id] = true; }
+  const total = sum(mons.filter(c => m.mon[c.id]).map(c => +m.xp[c.id] || 0)), who = pcs.filter(x => m.pc[x.owner + '|' + x.ch.id]);
+  const each = who.length ? Math.floor(total / who.length) : 0;
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="End combat"><div class="row"><h2>End combat</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    ${mons.length ? `<div class="stack"><span class="lbl">Monsters that count</span>${mons.map(c => { const d = monDef(c); return `<div class="row small"><label class="chk grow"><input type="checkbox" data-act="xpmon" data-v="${esc(c.id)}"${m.mon[c.id] ? ' checked' : ''}> ${esc(c.name)}${d && d.cr != null ? ` <span class="muted">CR ${crLabel(d.cr)}</span>` : ''}${+c.hp <= 0 ? ' <span class="pill bad">down</span>' : ''}</label><input type="number" min="0" data-act="xpval" data-v="${esc(c.id)}" value="${esc(m.xp[c.id])}" style="width:90px" aria-label="XP for ${esc(c.name)}"><span class="muted">XP</span></div>`; }).join('')}</div>` : '<p class="small muted">No monsters in this fight.</p>'}
+    ${pcs.length ? `<div class="stack"><span class="lbl">Who shares it</span><div class="row">${pcs.map(x => `<label class="chk small"><input type="checkbox" data-act="xppc" data-v="${esc(x.owner + '|' + x.ch.id)}"${m.pc[x.owner + '|' + x.ch.id] ? ' checked' : ''}> ${esc(x.ch.name)}</label>`).join('')}</div></div>` : ''}
+    <p><b>${fmtN(total)} XP</b>${who.length ? `, so <b>${fmtN(each)} each</b> for ${who.length === 1 ? '1 character' : who.length + ' characters'}` : ''}.</p>
+    <p class="small muted">This clears the turn order for everyone. Saved encounters stay.</p>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn" data-act="xpendgo" data-v="0">End without XP</button><button class="btn pri" data-act="xpendgo" data-v="1"${dis(!each)}>Give ${fmtN(each)} XP each and end</button></div></div>`;
+};
+function endCombatNow() { RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [] }); queueRender(); }
+Object.assign(ACT, {
+  setadv(el) { saveSettings({ adv: el.dataset.v }); queueRender(); },
+  xpgive() {
+    const n = Math.round(+($('#f-xpn') || {}).value || 0); if (!(n > 0)) { toastMsg('Type how much XP first.'); return; }
+    const xs = Array.from(document.querySelectorAll('.xpwho:checked')).map(b => findChar(b.dataset.cid, b.dataset.owner)).filter(Boolean);
+    if (!xs.length) { toastMsg('Tick at least one character.'); return; }
+    const split = ($('#f-xpsplit') || {}).checked; awardXp(xs, split ? Math.floor(n / xs.length) : n, (($('#f-xpwhy') || {}).value || '').trim()); queueRender();
+  },
+  xpmile() {
+    const xs = Array.from(document.querySelectorAll('.xpwho:checked')).map(b => findChar(b.dataset.cid, b.dataset.owner)).filter(Boolean);
+    if (!xs.length) { toastMsg('Tick at least one character.'); return; } milestone(xs); queueRender();
+  },
+  xpmon(el) { UI.modal.mon[el.dataset.v] = el.checked; renderModal(); },
+  xppc(el) { UI.modal.pc[el.dataset.v] = el.checked; renderModal(); },
+  xpval(el) { UI.modal.xp[el.dataset.v] = Math.max(0, Math.round(+el.value || 0)); renderModal(); },
+  xpendgo(el) {
+    const m = UI.modal, cb = cbt();
+    if (el.dataset.v === '1') {
+      const mons = cb.list.filter(c => c.kind === 'mon' && m.mon[c.id]);
+      const total = sum(mons.map(c => +m.xp[c.id] || 0));
+      const xs = cb.list.filter(c => c.kind === 'pc' && m.pc[c.owner + '|' + c.cid]).map(c => findChar(c.cid, c.owner)).filter(Boolean);
+      if (xs.length && total) awardXp(xs, Math.floor(total / xs.length), 'the fight' + (mons.length ? ' with ' + Array.from(new Set(mons.map(c => c.name.replace(/\s+\d+$/, '')))).slice(0, 3).join(', ') : ''));
+    }
+    closeModal(); endCombatNow();
+  },
+});
+
+/* ===== Build 22: the combat screen for players ===== */
+function myCombatChars() {
+  const I = S.init || {}, list = I.list || [];
+  return list.filter(c => c.kind === 'pc').map(c => chars().find(x => x.mine && x.ch.id === c.cid && (S.mode !== 'live' || x.owner === c.owner))).filter(Boolean);
+}
+function viewCombatPlayer() {
+  const I = S.init || { list: [] }, list = I.list || [];
+  const mineIn = myCombatChars();
+  const cur = list.find(c => c.id === I.cur);
+  const actingMine = cur && cur.kind === 'pc' ? mineIn.find(x => x.ch.id === cur.cid) : null;
+  let me = (UI.cur && mineIn.find(x => x.ch.id === UI.cur.cid)) || actingMine || mineIn[0] || null;
+  if (me && (!UI.cur || UI.cur.cid !== me.ch.id)) UI.cur = { cid: me.ch.id, owner: me.owner };
+  if (UI.tgt && !list.some(c => c.id === UI.tgt)) UI.tgt = '';
+  const showHp = (S.settings || {}).showHp || 'desc';
+  const rows = list.map(c => {
+    const isMine = c.kind === 'pc' && mineIn.some(x => x.ch.id === c.cid);
+    let st = c.st || '', conds = c.cond || [];
+    if (c.kind === 'pc') {
+      const x = findChar(c.cid, c.owner);
+      if (x) { const D = derive(x.ch), hp = hpOf(x.ch, D); conds = x.ch.play.cond || []; st = isMine || showHp === 'exact' ? hp + ' / ' + D.maxHp + ' HP' : showHp === 'none' ? '' : healthWord({ hp, max: D.maxHp }); }
+    }
+    const tgt = UI.tgt === c.id, canTarget = !isMine && !!me;
+    return `<div class="irow prow${c.id === I.cur ? ' cur' : ''}${tgt ? ' tgt' : ''}">
+      <div class="iv">${c.init == null ? (isMine ? `<button class="btn sm" data-act="cbinit" data-cid="${esc(c.cid)}" title="Roll initiative">Roll</button>` : '—') : c.init}</div>
+      ${canTarget ? `<button class="grow ptarget" data-act="ptgt" data-v="${esc(c.id)}" aria-pressed="${tgt}" title="${tgt ? 'Stop targeting' : 'Target ' + esc(c.name)}">` : '<div class="grow">'}<b>${esc(c.name)}</b>${isMine ? ' <span class="pill acc">you</span>' : ''}${tgt ? ' <span class="pill brass">target</span>' : ''}
+        <span class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${conds.map(x => `<span class="pill bad">${esc(x)}</span>`).join('')}</span>${canTarget ? '</button>' : '</div>'}
+      ${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
+  }).join('');
+  const notIn = chars().filter(x => x.mine && !mineIn.includes(x));
+  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : I.unseen ? '<span class="pill">Something unseen acts</span>' : cur ? `<span class="small muted">${esc(cur.name)} is acting</span>` : ''}</div>`;
+  if (!list.length) return head + `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`;
+  const left = `<div class="stack"><div class="init">${rows}</div>
+    ${me ? `<p class="small muted">Tap someone to target them, then attack or cast on the right. The DM's screen settles hits, saves and damage.</p>` : ''}
+    ${notIn.length ? `<div class="panel stack"><div class="ph">Not in this fight</div>${notIn.map(x => `<div class="row"><b class="grow">${esc(x.ch.name)}</b><button class="btn sm" data-act="pjoin" data-cid="${esc(x.ch.id)}">Ask to join</button></div>`).join('')}</div>` : ''}</div>`;
+  let right = '';
+  if (me) {
+    const D = derive(me.ch), ro = !canEditChar(me.owner);
+    right = `<div class="stack">${mineIn.length > 1 ? `<div class="seg" role="group" aria-label="Your characters">${mineIn.map(x => `<button data-act="pcur" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(x === me)}>${esc(x.ch.name)}</button>`).join('')}</div>` : ''}
+      <div class="cbsheet">${sheetView(me.ch, D, ro, me)}</div></div>`;
+  } else right = `<div class="panel stack"><p class="muted">None of your characters is in this fight.</p>${notIn.length ? '<p class="small muted">Ask to join on the left, or wait for the DM to add the party.</p>' : ''}</div>`;
+  return head + `<div class="run prun">${left}${right}</div>`;
+}
+Object.assign(ACT, {
+  ptgt(el) { UI.tgt = UI.tgt === el.dataset.v ? '' : el.dataset.v; queueRender(); },
+  pcur(el) { UI.cur = { cid: el.dataset.cid, owner: el.dataset.owner }; queueRender(); },
+  cbinit(el) {
+    const x = myCombatChars().find(y => y.ch.id === el.dataset.cid); if (!x) return;
+    UI.cur = { cid: x.ch.id, owner: x.owner }; const D = getD(x.ch);
+    ACT.roll({ dataset: { label: 'Initiative', b: String(D.init), kind: 'init' } });
+  },
+  pendturn(el) {
+    const x = myCombatChars().find(y => y.ch.id === el.dataset.cid); if (!x) return;
+    sendMsg({ kind: 'turn', act: 'end', cid: x.ch.id, owner: x.owner, who: x.ch.name, text: `${x.ch.name} ends their turn.` });
+  },
+  pjoin(el) {
+    const x = chars().find(y => y.mine && y.ch.id === el.dataset.cid); if (!x) return;
+    sendMsg({ kind: 'turn', act: 'join', cid: x.ch.id, owner: x.owner, who: x.ch.name, text: `${x.ch.name} asks to join the fight.` });
+    toastMsg('Asked. The DM’s screen adds you to the turn order.');
+  },
+});
+/* the DM's screen acts on players' turn messages */
+function resolveTurnMsg(m) {
+  const cb = cbt();
+  if (m.act === 'end') { const c = cb.list.find(x => x.id === cb.cur); if (c && c.kind === 'pc' && c.cid === m.cid) { stepTurn(1); } }
+  else if (m.act === 'join') {
+    if (cb.list.some(x => x.kind === 'pc' && x.cid === m.cid)) return;
+    const x = findChar(m.cid, m.owner); if (!x) return;
+    cb.list.push({ id: uid('i'), kind: 'pc', cid: x.ch.id, owner: x.owner, name: x.ch.name, init: null }); saveCombat(cb);
+  }
+}
+
+/* ===== Build 22: saving ===== */
+function whoseDoc(path) {
+  const [col, id] = String(path).split('/');
+  if (col === 'characters') return id === S.me.id ? 'your sheet' : `${playerName(id)}’s sheet`;
+  if (col === 'campaign') return id === 'initiative' ? 'the turn order' : 'the campaign settings';
+  if (col === 'dm') return 'the DM’s combat notes';
+  return path;
+}
+/* sheets that embed someone's own imported content only need the options they picked */
+function slimEmbedded(out, ch) {
+  const chosen = new Set(Object.values(ch.choices || {}).flatMap(v => typeof v === 'string' ? [v] : Array.isArray(v) ? v.filter(s => typeof s === 'string') : []));
+  const slim = e => Array.isArray(e.features) ? Object.assign({}, e, { features: e.features.map(f => Array.isArray(f.opts) && f.opts.length > 6 ? Object.assign({}, f, { opts: f.opts.filter(o => chosen.has(o.n)), optsCut: f.opts.length }) : f) }) : e;
+  for (const t of ['classes', 'subclasses', 'feats']) if (out[t]) out[t] = out[t].map(slim);
+  return out;
+}
+const SIZE_WARNED = {};
+
+/* ===== Build 22: the DM's changes reach players live, and players see what changed ===== */
+/* DM-set numbers live in their own field of the player's document, so a player's save can't overwrite them */
+function saveDmSet(ch, ds) {
+  ch.dmSet = ds;
+  if (S.mode === 'live') {
+    const owner = ch._owner || S.me.id, patch = { dmx: { [ch.id]: JSON.stringify(ds || {}) } };
+    applyLocalDoc(owner, patch); queueWrite('characters/' + owner, patch, 200); queueRender();
+  } else commit(ch);
+}
+function statSnaps() {
+  const out = {};
+  for (const x of chars().filter(y => y.mine)) {
+    try {
+      const D = derive(x.ch);
+      out[x.ch.id] = { name: x.ch.name, v: { AC: D.ac, 'Max HP': D.maxHp, HP: hpOf(x.ch, D), Speed: D.speed, Initiative: D.init, Proficiency: D.pb, Level: D.level, XP: advMode() === 'xp' ? xpOf(x.ch, D) : null, ...Object.fromEntries(ABIL.map(a => [ABN[a], D.sc[a]])) }, cond: (x.ch.play.cond || []).slice() };
+    } catch (e) { }
+  }
+  return out;
+}
+function announceChanges(before) {
+  const after = statSnaps(), quietHp = Date.now() - (S.lastResAt || 0) < 4000;
+  for (const [cid, b] of Object.entries(before)) {
+    const a = after[cid]; if (!a) continue;
+    const bits = [];
+    for (const [k, v] of Object.entries(a.v)) { const o = b.v[k]; if (o == null || v == null || o === v) continue; if (k === 'HP' && quietHp) continue; bits.push(k === 'XP' ? `+${fmtN(v - o)} XP` : `${k} ${o} → ${v}`); }
+    const added = a.cond.filter(c => !b.cond.includes(c)), gone = b.cond.filter(c => !a.cond.includes(c));
+    if (added.length) bits.push('now ' + added.join(', ')); if (gone.length) bits.push('no longer ' + gone.join(', '));
+    if (!bits.length) continue;
+    toastMsg(`The DM changed ${a.name}: ${bits.slice(0, 5).join(', ')}${bits.length > 5 ? ` and ${bits.length - 5} more` : ''}.`);
+    UI.flash = { cid, until: Date.now() + 2600 };
+    setTimeout(() => queueRender(), 2700);
+  }
+}
 </script>
 </body>
 </html>
