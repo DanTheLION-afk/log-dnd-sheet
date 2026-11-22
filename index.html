@@ -693,6 +693,13 @@ footer.wrap { padding-block: 6px 24px; font-size: 12px; line-height: 1.4; color:
   .sheet .panel, .sheet .vital, .sheet .ab { box-shadow: none !important; border-color: #999 !important; break-inside: avoid; }
   .pill, .roll, .pip { border-color: #666 !important; color: #000 !important; background: #fff !important; }
 }
+.palette { width: min(640px, 100%); }
+.palres { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 420px); overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.palrow { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; min-height: 40px; padding: 6px 10px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 15px; cursor: pointer; }
+.palrow:hover, .palrow.on { background: var(--accent-soft); }
+.palrow .muted { margin-left: auto; text-align: right; }
+.crow.abs { border-left: 4px solid var(--sun); }
+.crow.abs.cur { box-shadow: inset 0 0 0 2px var(--sun); }
 </style>
 </head>
 <body>
@@ -1142,7 +1149,7 @@ function newChar(rs) {
     play: { hp: null, temp: 0, ds: [0, 0], slots: {}, pact: 0, hd: {}, res: {}, cond: [], exh: 0, insp: false, conc: '' },
     bonus: { ac: 0, hp: 0, init: 0, speed: 0, save: 0 },
     notes: { alignment: '', personality: '', ideals: '', bonds: '', flaws: '', appearance: '', backstory: '', other: '' },
-    fields: [], companions: [],
+    fields: [], companions: [], rem: [],
   };
 }
 function fixChar(ch) {
@@ -2453,7 +2460,7 @@ function saveDM(patch) {
 }
 /* Prep (NPCs, quests, sessions, loot tables): the DM's copy lives in dm/prep. What players may see is derived from it
    into campaign/story (known NPCs, visible quests, the shared session summary) every time the DM saves. */
-const PREP_BLANK = () => ({ npcs: [], quests: [], sessions: [], tables: [], share: '' });
+const PREP_BLANK = () => ({ npcs: [], quests: [], sessions: [], tables: [], share: '', ev: [] });
 function storyOf(p) {
   const npc = id => p.npcs.find(n => n.id === id), sess = p.sessions.find(s => s.id === p.share);
   return {
@@ -2729,9 +2736,9 @@ function viewBar() {
   const st = statusText(); const cls = S.mode === 'live' ? (st === 'Live campaign' ? 'live' : 'warn') : S.mode === 'local' ? '' : 'warn';
   const role = S.mode === 'live' ? (S.me.isOwner ? 'DM' : S.readOnly ? 'Viewing only' : 'Player') : '';
   return `<header class="bar"><div class="bar-in">
-    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${themeBtn()}${chatBtn()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
+    <div class="brand"><h1>Party Ledger</h1><span class="sync ${cls}" title="Where characters are saved">${esc(st)}</span>${role ? `<span class="pill ${S.me.isOwner ? 'brass' : S.readOnly ? 'bad' : 'acc'}">${role}</span>` : ''}<span id="saving" class="small muted" hidden>Saving…</span>${liveChips()}${themeBtn()}${chatBtn()}${palBtn()}${window.PL_SITE && !S.fbSetup ? `<button class="btn sm campbtn" data-act="campmenu">${S.mode === 'live' && S.campaign ? esc(S.campaign.name || 'Campaign') + ' · ' + esc(S.campaign.code) : 'Join a campaign'}</button>` : ''}</div>
     <nav class="tabs" aria-label="Views">${tabs.map(([k, l]) => `<button class="tab" data-act="view" data-v="${k}" aria-current="${UI.view === k}">${l}</button>`).join('')}</nav>
-  </div>${requestBanner()}</header>`;
+  </div>${requestBanner()}${remBanner()}</header>`;
 }
 
 /* ===== characters view ===== */
@@ -3441,6 +3448,7 @@ function sheetView(ch, D, ro, e) {
     ${(ch.inv || []).length ? `<div class="lines">${gearRows(ch, ro)}</div>` : '<p class="muted small">Nothing carried.</p>'}
     <p class="small muted" style="margin-top:6px">Add or remove items in Build → Equipment.</p></div></div>`;
   const notes = `<div class="stack sec sec-notes"><div class="panel stack"><h3>Session notes</h3><textarea id="f-n-session" data-in="notes.session" placeholder="Names, clues, loot, plans…"${dis(ro)}>${esc(ch.notes.session || '')}</textarea></div>
+    ${remPanel(ch, ro)}
     ${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].some(k => ch.notes[k]) ? `<div class="panel stack small"><h3>Character</h3>${['personality', 'ideals', 'bonds', 'flaws', 'appearance', 'backstory', 'other'].filter(k => ch.notes[k]).map(k => `<div><span class="lbl">${k}</span><div class="rt">${md(ch.notes[k])}</div></div>`).join('')}</div>` : ''}${fieldsView(ch, D, ro)}</div>`;
   const actions =`<div class="stack sec sec-actions">${atk}${typeof attackCantrips === 'function' ? attackCantrips(ch, D, known, ro) : ''}${res}${conds}${fx}</div>`;
   return `<div class="sheet${UI.flash && UI.flash.cid === ch.id && UI.flash.until > Date.now() ? ' flash' : ''}" data-sec="${sec}">${col1}<div class="stack colmid">${top}${actions}</div><div class="stack col3">${secSpells}${feats}${gear}${compView(ch, tg, ro)}${notes}</div></div>`;
@@ -3463,9 +3471,9 @@ function viewParty() {
       const D = derive(ch), c = D.casters[0];
       return `<tr><td><button class="btn ghost sm" style="padding:0;font-weight:600" data-act="openfull" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}">${esc(ch.name)}</button><div class="small muted">${esc(playerName(owner))} · ${esc(classLine(ch))}</div></td>
         <td class="num">${hpOf(ch, D)}/${D.maxHp}</td><td class="num">${D.ac}</td><td class="num">${D.passive.per}</td><td class="num">${D.passive.ins}</td><td class="num">${D.passive.inv}</td><td class="num">${c ? c.dc : '—'}</td><td class="num">${D.speed}</td><td class="num">${D.dv || '—'}</td>
-        <td class="small">${ABIL.map(a => a.toUpperCase() + sgn(D.save[a])).join(' ')}</td><td class="small">${esc([...((D.sp && D.sp.langs) || []), ...(ch.langs || [])].join(', '))}</td></tr>`;
+        <td class="small">${ABIL.map(a => a.toUpperCase() + sgn(D.save[a])).join(' ')}</td><td class="small">${esc([...((D.sp && D.sp.langs) || []), ...(ch.langs || [])].join(', '))}</td>${isDM ? boardCells(ch, D) : ''}</tr>`;
     }).join('');
-    return head + intro + handouts + `<div class="panel scroll-x"><table class="tbl"><thead><tr><th>Character</th><th>HP</th><th>AC</th><th title="Passive Perception">P.Perc</th><th title="Passive Insight">P.Ins</th><th title="Passive Investigation">P.Inv</th><th>Spell DC</th><th>Speed</th><th title="Darkvision">Dark</th><th>Saves</th><th>Languages</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return head + intro + handouts + dmPartyPanel() + `<div class="panel scroll-x"><table class="tbl"><thead><tr><th>Character</th><th>HP</th><th>AC</th><th title="Passive Perception">P.Perc</th><th title="Passive Insight">P.Ins</th><th title="Passive Investigation">P.Inv</th><th>Spell DC</th><th>Speed</th><th title="Darkvision">Dark</th><th>Saves</th><th>Languages</th>${isDM ? '<th>Conditions</th><th>Conc.</th><th title="Inspiration">Insp.</th><th>Slots left</th><th>Hit dice</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   const cards = list.map(({ ch, owner }) => {
     const D = derive(ch), p = ch.play, hp = hpOf(ch, D), can = canEditChar(owner);
@@ -3476,13 +3484,14 @@ function viewParty() {
       <div><div class="row"><span class="num" style="font-size:24px;font-weight:700">${hp}</span><span class="muted">/ ${D.maxHp} HP</span>${p.temp ? `<span class="pill acc">+${p.temp}</span>` : ''}<span class="spacer"></span>${can ? `<input type="number" id="f-q-${esc(owner)}-${esc(ch.id)}" min="0" placeholder="±" style="width:64px" data-hpq="${esc(ch.id)}"><button class="btn sm" data-act="pdmg" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}">Dmg</button><button class="btn sm" data-act="pheal" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}">Heal</button>` : ''}</div>${hpBar(ch, D)}</div>
       <div class="stats4"><div class="stat"><div class="v">${D.ac}</div><div class="lbl">AC</div></div><div class="stat"><div class="v">${sgn(D.init)}</div><div class="lbl">Init</div></div><div class="stat"><div class="v">${D.passive.per}</div><div class="lbl">Passive</div></div><div class="stat"><div class="v">${caster ? caster.dc : '—'}</div><div class="lbl">Spell DC</div></div></div>
       <div class="row small">${(p.cond || []).map(c => `<span class="pill bad">${esc(c)}</span>`).join('')}${+p.exh ? `<span class="pill bad">Exhaustion ${p.exh}</span>` : ''}${p.conc ? `<span class="pill acc">Concentrating: ${esc(p.conc)}</span>` : ''}${hp <= 0 ? `<span class="pill bad">${downState(ch, D)} · ${(p.ds || [0, 0])[0]}✓ ${(p.ds || [0, 0])[1]}✗</span>` : ''}${(p.fx || []).length ? `<span class="pill">${(p.fx || []).length} effect${(p.fx || []).length === 1 ? '' : 's'} on</span>` : ''}</div>
+      ${absentBtn(ch, owner)}
       ${slotsLeft.length || D.pact ? `<div class="small muted">Slots ${slotsLeft.join(' · ')}${D.pact ? ` · Pact ${D.pact.n - (+p.pact || 0)}/${D.pact.n}` : ''}</div>` : ''}
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
       ${advMode() === 'xp' ? `<div class="small"><b class="num">${fmtN(xpOf(ch, D))} XP</b>${D.level < 20 ? (xpOf(ch, D) >= XP_LEVEL[D.level] ? ' <span class="pill brass">ready to level up</span>' : ` <span class="muted">· ${fmtN(XP_LEVEL[D.level] - xpOf(ch, D))} to level ${D.level + 1}</span>`) : ''}</div>` : (+(p.lvlUpTo || 0) > D.level ? '<div class="small"><span class="pill brass">level up waiting</span></div>' : '')}
       ${D.issues.length || D.flags.length ? `<details class="feat" data-k="rev-${esc(owner)}-${esc(ch.id)}"><summary><b class="small">Review</b>${D.issues.length ? `<span class="pill ${D.issues.some(i => i.hard) ? 'bad' : 'brass'}">${D.issues.some(i => i.hard) ? 'breaks a rule · ' : ''}${D.issues.length} unfinished</span>` : ''}${D.flags.length ? `<span class="pill">${D.flags.length} house-ruled</span>` : ''}</summary><ul class="small" style="margin:6px 0 0;padding-left:1.2em">${D.issues.map(i => `<li>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}</li>`).join('')}${D.flags.map(f => `<li class="muted">${esc(f)}</li>`).join('')}</ul></details>` : '<div class="small"><span class="pill acc">Build complete</span></div>'}
     </article>`;
   }).join('');
-  return head + intro + handouts + partyXpPanel() + `<div class="cards">${cards}</div>`;
+  return head + intro + handouts + dmPartyPanel() + partyXpPanel() + `<div class="cards">${cards}</div>`;
 }
 
 /* ===== dice log ===== */
@@ -4628,7 +4637,7 @@ function render() {
     console.error(err);
     body = `<div class="empty"><p>Something went wrong drawing this view.</p><p class="small muted">${esc(err && err.message)}</p><button class="btn" data-act="view" data-v="chars">Back to characters</button></div>`;
   }
-  app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER) + (typeof bottomNav === 'function' ? bottomNav() : ''); if (typeof b23After === 'function') b23After();
+  app.innerHTML = viewBar() + `<main class="wrap${UI.view === 'map' && MAP.tv ? ' tvwrap' : ''}">${body}</main>` + (UI.view === 'map' && MAP.tv ? '' : (typeof installNote === 'function' ? installNote() : '') + FOOTER) + (typeof bottomNav === 'function' ? bottomNav() : ''); if (typeof b23After === 'function') b23After(); b31After();
   try { mapAfterRender(); } catch (err) { console.error(err); }
   { const t = document.querySelector('.tabs .tab[aria-current="true"]'), row = t && t.parentNode; if (row && row.scrollWidth > row.clientWidth + 2) row.scrollLeft = Math.max(0, t.offsetLeft - row.offsetLeft - (row.clientWidth - t.offsetWidth) / 2); }
   Array.from(app.querySelectorAll('.scroll-x, .steps, .roster, .srcgrid')).forEach((el, i) => { const v = scrollers[i]; if (v) { const [t, l] = v.split(':'); el.scrollTop = +t; el.scrollLeft = +l; } });
@@ -4967,8 +4976,7 @@ const ACT = {
   spelllvl(el) { UI.spellLvl = el.value; queueRender(); },
   spellinfo(el) {
     const ch = C(); const s = ch ? look(ch, 'spells', el.dataset.v) : null; if (!s) return;
-    const meta = [s.lvl ? ORD(s.lvl) + '-level ' + s.sch.toLowerCase() : s.sch + ' cantrip', s.rit ? 'ritual' : ''].filter(Boolean).join(', ');
-    openModal({ kind: 'text', title: s.name, html: `<p><i>${esc(meta)}</i></p><p><b>Casting time</b> ${esc(s.t)} · <b>Range</b> ${esc(s.r)} · <b>Components</b> ${esc(s.comp)}${s.mat ? ' (' + esc(s.mat) + ')' : ''} · <b>Duration</b> ${esc(s.dur)}</p>${md(s.d)}${s.hl ? '<p><b>At higher levels.</b></p>' + md(s.hl) : ''}<p class="small muted">${esc(s.src || '')}</p>` });
+    openModal({ kind: 'text', title: s.name, html: spellHtml(s) });
   },
   rmextra(el) { const ch = C(); ch.extraSpells.splice(+el.dataset.i, 1); commit(ch); },
   startsel(el) { UI.startSel[el.dataset.k] = +el.dataset.v; queueRender(); },
@@ -5001,7 +5009,7 @@ const ACT = {
   invcont(el) { const ch = C(); ch.inv[+el.dataset.i].cont = el.checked; commit(ch); },
   invnowt(el) { const ch = C(); ch.inv[+el.dataset.i].nowt = el.checked; commit(ch); },
   invin(el) { const ch = C(); const it = ch.inv[+el.dataset.i]; if (el.value) it.box = el.value; else delete it.box; commit(ch); },
-  iteminfo(el) { const ch = C(); const it = ch.inv[+el.dataset.i]; const d = itemDef(ch, it); if (!d) return; openModal({ kind: 'text', title: d.name, html: `<p class="small muted">${esc([d.cat, d.rar, d.att ? 'requires attunement' : '', d.cost, d.wt ? d.wt + ' lb.' : ''].filter(Boolean).join(' · '))}</p>${md(d.d)}` }); },
+  iteminfo(el) { const ch = C(); const it = ch.inv[+el.dataset.i]; const d = itemDef(ch, it); if (!d) return; openModal({ kind: 'text', title: d.name, html: itemHtml(d) }); },
   sug(el) { const ch = C(); const D = getD(ch); const t = ((D.bg && D.bg.suggest) || {})[el.dataset.s][+el.dataset.i]; const k = el.dataset.k; ch.notes[k] = (ch.notes[k] ? ch.notes[k] + '\n' : '') + t; commit(ch); },
   /* sheet */
   adv(el) { UI.adv = el.dataset.v; queueRender(); },
@@ -5272,7 +5280,7 @@ function pruneGone(cb) {
   const gone = cb.list.filter(c => c.kind === 'pc' && (S.mode === 'live' ? S.docs[c.owner] : S.mode === 'local') && !findChar(c.cid, c.owner)).map(c => c.id);
   if (gone.length) { dropCombatants(cb, gone); saveCombat(cb); }
 }
-function saveCombat(cb) { S.dm.combat = cb; saveDM({ combat: cb }); saveInit(publicCombat(cb)); }
+function saveCombat(cb) { b31Fight(cb); S.dm.combat = cb; saveDM({ combat: cb }); saveInit(publicCombat(cb)); }
 /* ties go to the higher Dex modifier; the lair always loses a tie */
 function sortCombat(cb) {
   const dx = new Map(cb.list.map(c => { const x = c.kind === 'pc' && findChar(c.cid, c.owner); return [c.id, c.kind === 'lair' ? -99 : x ? derive(x.ch).m.dex : (+c.ib || 0)]; }));
@@ -5346,7 +5354,7 @@ function skipTurn(cb, c) {
 function arrive(cb, c) {
   if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) savePlay(x.ch, { used: { a: 0, b: 0, r: 0 } }); }
   else if (c.kind === 'mon') { c.lau = 0; c.rxu = 0; }   // legendary actions and the reaction come back on its own turn
-  if (c.kind === 'lair') RUN.sel = c.id;   // show the lair actions
+  if (c.kind === 'lair' || isAbsent(c)) RUN.sel = c.id;   // show the lair actions, or the absent player's sheet
   else if (RUN.sel && (cb.list.find(x => x.id === RUN.sel) || {}).kind === 'lair') RUN.sel = null;
   if (cb.tick === 'start') fxTurn(cb, c, false);
 }
@@ -5410,6 +5418,7 @@ function hurt(t, amount, dt, crit) {
     const c = t.c, snap = { hp: c.hp, taken: c.taken || 0 };
     if (c.hp == null) c.taken = snap.taken + amount;   // HP not known: keep a tally and never call it down
     else c.hp = clamp(+c.hp - amount, 0, c.max || 9999);
+    if (!c.own && snap.hp != null && +snap.hp > 0 && c.hp != null && c.hp <= 0) b31Ev('kill', c.name);
     pushUndo(`${amount} damage to ${c.name}`, () => { const cb = cbt(), cc = cb.list.find(x => x.id === c.id); if (cc) { Object.assign(cc, snap); saveCombat(cb); } });
     if (c.conc && amount > 0) monConc(c, amount, c.hp != null && c.hp <= 0);
     saveCombat(cbt());
@@ -5421,6 +5430,7 @@ function hurt(t, amount, dt, crit) {
     const raging = (ch.play.fx || []).includes('rage') && /^(bludgeoning|piercing|slashing)$/.test(d);
     if (raging || (Dp.resist || []).some(r => r.toLowerCase() === d)) { amount = Math.floor(amount / 2); note = ' (resisted)'; }
   }
+  if (amount > 0 && before > 0 && before - amount <= 0) b31Ev('down', ch.name);
   hpChange(ch, -amount, crit);
   return { dealt: amount, note, down: amount > 0 && before - amount <= 0 };
 }
@@ -5478,6 +5488,7 @@ function handleMsg(m) {
     else if (m.kind === 'turn') resolveTurnMsg(m);
     else if (m.kind === 'claim') resolveClaim(m);
   }
+  b31Msg(m);
   if (typeof queueRender === 'function') queueRender();
 }
 const PENDING = {};
@@ -5608,10 +5619,10 @@ function viewCombat() {
       <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">Lair actions, loses initiative ties</span></button>
       <span class="row cx"><button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span></div>`;
     let hp = c.hp, max = c.max, ac = c.ac, conds = c.cond || [], sub = c.kind === 'mon' ? (c.hidden ? 'Hidden from players' : 'Monster') + (c.conc ? ' · concentrating on ' + c.conc : '') : 'Player character';
-    if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) { const D = derive(x.ch); hp = hpOf(x.ch, D); max = D.maxHp; ac = D.ac; conds = x.ch.play.cond || []; sub = playerName(x.owner) + (x.ch.play.conc ? ' · concentrating on ' + x.ch.play.conc : ''); const ds = downState(x.ch, D); if (ds) conds = [ds].concat(conds); } else sub = 'Sheet not found'; }
+    if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) { const D = derive(x.ch); hp = hpOf(x.ch, D); max = D.maxHp; ac = D.ac; conds = x.ch.play.cond || []; sub = (x.ch.play.absent ? 'Absent, you run them · ' : '') + playerName(x.owner) + (x.ch.play.conc ? ' · concentrating on ' + x.ch.play.conc : ''); const ds = downState(x.ch, D); if (ds) conds = [ds].concat(conds); } else sub = 'Sheet not found'; }
     if (c.surp) conds = conds.concat('Surprised');
     const pct = max ? clamp(hp / max * 100, 0, 100) : 0;
-    return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}${c.hidden ? ' hid' : ''}">
+    return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}${c.hidden ? ' hid' : ''}${isAbsent(c) ? ' abs' : ''}">
       <input type="checkbox" data-act="cpick" data-v="${esc(c.id)}"${RUN.picks[c.id] ? ' checked' : ''} aria-label="Select ${esc(nm)}">
       <input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
       <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length || (c.fxs || []).length ? `<span class="row small">${condPills(conds, fxPub(c))}</span>` : ''}</button>
@@ -5632,11 +5643,12 @@ function viewCombat() {
     ${S.mode === 'live' && !isResolver() ? `<div class="note row"><span class="grow">Player attacks and saves are being settled in another DM window. If that window is closed, nothing gets applied.</span><button class="btn sm" data-act="ctake">Settle them here</button></div>` : ''}
     <div class="row ctool"><button class="btn pri" data-act="cnext"${dis(!cb.list.length)} title="Next turn (key N)" aria-keyshortcuts="N">Next turn</button><button class="btn" data-act="cprev"${dis(!cb.list.length)} title="Previous turn (key P)" aria-keyshortcuts="P">Previous</button><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
     <div class="row small"><label class="chk"><input type="checkbox" data-act="cskip"${cb.skipDead !== false ? ' checked' : ''}> Auto-skip dead monsters</label><label class="row" style="gap:6px">Effects count down at <select data-act="ctick" aria-label="Effects count down at">${opt('end', 'end of turn', cb.tick !== 'start')}${opt('start', 'start of turn', cb.tick === 'start')}</select></label></div>
+    ${absentBanner(cb)}
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then search for monsters below.</div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
       <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
-      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('')}${SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('')}${ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('')}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:190px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
+      <div class="row"><select id="f-rt" aria-label="Roll to ask for">${rollOpts()}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:190px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
     <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
       <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
@@ -5688,7 +5700,7 @@ function combatDetail(c, cb) {
       <div class="small muted">${esc(speciesName(x.ch))} ${esc(classLine(x.ch))} · ${esc(playerName(x.owner))}</div>
       <div class="row small"><span class="pill">AC ${D.ac}</span><span class="pill">Passive Perception ${D.passive.per}</span>${D.casters[0] ? `<span class="pill">Spell DC ${D.casters[0].dc}</span>` : ''}<span class="pill">Speed ${D.speed}</span></div>
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
-      ${condChips(x.ch.play.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}</div>`;
+      ${condChips(x.ch.play.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}${absentPanel(c, x, D)}</div>`;
   }
   const d = monDef(c), ex = monExtra(d), spells = d ? monSpellNames(c, d) : [];
   const act = (a, kind) => `<div class="mact"><div class="row"><b>${esc(a.n)}</b>${a.use ? `<span class="pill">${esc(a.use)}</span>` : ''}<span class="spacer"></span>${a.atk != null ? `<button class="roll" data-act="matk" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${sgn(+a.atk)} to hit</button>` : ''}${a.dc && a.dc.v ? `<button class="roll" data-act="msave" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">${a.dc.ab.toUpperCase()} DC ${a.dc.v} on selected</button>` : ''}${a.atk == null && !(a.dc && a.dc.v) && a.dmg ? `<button class="roll" data-act="mdmg" data-v="${esc(c.id)}" data-k="${kind}" data-n="${esc(a.n)}">Roll damage</button>` : ''}</div><div class="rt small">${md(a.d)}</div></div>`;
@@ -5863,10 +5875,10 @@ Object.assign(ACT, {
   cpend(el) { const m = (S.pendingAtk || []).splice(+el.dataset.i, 1)[0]; if (!m) return; const t = findTarget(m.tgt); if (t) settleAtk(m, t, el.dataset.v === 'hit'); queueRender(); },
   crest(el) {
     const kind = el.dataset.v; const picked = Object.keys(RUN.picks).map(findTarget).filter(t => t && t.kind === 'pc').map(t => t.x);
-    const list = picked.length ? picked : chars();
+    const list = picked.length && !el.dataset.all ? picked : chars();
     confirmBox(`${kind === 'long' ? 'Long' : 'Short'} rest for ${list.length} character${list.length === 1 ? '' : 's'}?`, kind === 'long' ? 'Restores hit points, spell slots and resources.' : 'Restores short-rest resources. Players spend hit dice from their own sheets.', 'Rest', () => {
       for (const x of list) savePlay(x.ch, restPatch(x.ch, derive(x.ch), kind));
-      sendMsg({ kind: 'note', text: `The party takes a ${kind} rest.` }); queueRender();
+      sendMsg({ kind: 'note', text: `The party takes a ${kind} rest.`, rest: kind, cids: list.map(x => x.ch.id) }); queueRender();
     });
   },
   cask() {
@@ -5876,14 +5888,14 @@ Object.assign(ACT, {
     const picked = Object.keys(RUN.picks).map(findTarget).filter(Boolean);
     const pcs = picked.length ? picked.filter(x => x.kind === 'pc').map(x => x.x) : chars();
     const mons = picked.filter(x => x.kind === 'mon');
-    const label = t === 'save' ? `a ${ABN[v]} save` : t === 'skill' ? `a ${SKILL[v].name} check` : `a ${ABN[v]} check`;
+    const label = rollLabel(t, v);
     if (mons.length && t === 'save') resolveSave({ tgts: mons.map(x => x.c.id), ab: v, dc, dmg, half, label: ABN[v] + ' save', who: 'DM', priv: UI.priv });
     else if (mons.length) {   // an ability or skill check: roll it for the monsters too (no stat block means +0)
       const ab = t === 'skill' ? SKILL[v].ab : v;
       const parts = mons.map(x => { const d = x.def, b = d ? (t === 'skill' && d.skills && d.skills[v] != null ? +d.skills[v] : mod((d.ab || {})[ab] || 10)) : 0; const r = rollExpr('1d20' + (b ? (b > 0 ? '+' : '-') + Math.abs(b) : '')); return `${x.name} ${r.total} (${r.total >= dc ? 'passes' : 'fails'})`; });
       sendMsg({ kind: 'res', text: `${label} against DC ${dc}: ${parts.join('; ')}.`, hit: true, priv: UI.priv });
     }
-    if (pcs.length) sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label, t, ab: t === 'skill' ? SKILL[v].ab : v, skill: t === 'skill' ? v : '', dc, keys: pcs.map(x => x.owner + '|' + x.ch.id), dmg, half });
+    if (pcs.length) askRoll(pcs, label, t, v, dc, dmg, half);
     queueRender();
   },
   reqroll(el) {
@@ -6060,6 +6072,7 @@ function doLevel(e, i) {
   let rolled = null;
   if (ch.hpMode === 'roll') { c.hp = c.hp || []; rolled = rnd(def.hd); c.hp[c.lvl - 1] = rolled; }
   saveChar(ch);
+  sendMsg({ kind: 'note', ev: 'lvl', text: `${ch.name} reaches ${def.name} ${c.lvl}.` });
   const D = derive(ch);
   if (rolled != null) sendMsg({ kind: 'roll', who: ch.name, label: `Hit die for ${def.name} ${c.lvl} (d${def.hd})`, total: rolled, detail: '1d' + def.hd });
   UI.modal = { kind: 'lvl', name: def.name, lvl: c.lvl, gain: D.maxHp - before.maxHp, max: D.maxHp, cls: def.id }; renderModal(); queueRender();
@@ -6170,8 +6183,8 @@ Object.assign(ACT, {
     sendMsg({ kind: 'roll', who: ch.name, label: 'Hit die (d' + d + ')', total: Math.max(0, r.total), detail: r.detail });
     play(ch, { hp: clamp(hpOf(ch, D) + Math.max(0, r.total), 0, D.maxHp), hd: Object.assign({}, ch.play.hd || {}, { [d]: used + 1 }) }, 'spending a hit die');
   },
-  shortrest() { const ch = C(); play(ch, restPatch(ch, getD(ch), 'short'), 'short rest'); toastMsg('Short rest taken. Spend hit dice to heal.'); },
-  longrest() { const ch = C(); play(ch, restPatch(ch, getD(ch), 'long'), 'long rest'); toastMsg('Long rest taken. HP, spell slots and resources restored.'); },
+  shortrest() { const ch = C(); play(ch, restPatch(ch, getD(ch), 'short'), 'short rest'); toastMsg('Short rest taken. Spend hit dice to heal.'); b31Fire(ch, 'short'); },
+  longrest() { const ch = C(); play(ch, restPatch(ch, getD(ch), 'long'), 'long rest'); toastMsg('Long rest taken. HP, spell slots and resources restored.'); b31Fire(ch, 'long'); },
   invatt(el) {
     const ch = C(), it = ch.inv[+el.dataset.i]; if (!it) return;
     if (el.checked && !ch.free && (ch.inv || []).filter(x => x.att).length >= 3) { toastMsg('You can attune to three items at most. End one attunement first.'); queueRender(); return; }
@@ -6386,6 +6399,7 @@ function prepSess() {
     <div class="grid2">${pfield('sessions', s, 'date', 'Date (YYYY-MM-DD)')}${pfield('sessions', s, 'title', 'Title')}</div>
     ${pfield('sessions', s, 'summary', 'Summary (what players may read)', 1)}
     <div class="row"><button class="btn${s.id === shared ? '' : ' pri'}" data-act="sessshare" data-v="${esc(s.id)}">${s.id === shared ? 'Stop sharing' : 'Share this summary with players'}</button><span class="small muted">One summary is shared at a time. It shows on the Party tab.</span></div>
+    ${recapPanel()}
     ${pfield('sessions', s, 'notes', 'Private notes (DM only)', 1)}</div>`;
   return twoCol(list, ed);
 }
@@ -6424,6 +6438,7 @@ function giveLoot(x, lines) {
     const ex = ch.inv.find(y => !!d ? (y.id === d.id && !y.custom) : (y.custom && y.custom.name === (l.name || l.i)));
     if (ex) ex.q = qOf(ex) + l.n; else ch.inv.push(d ? { id: d.id, q: l.n, eq: false } : { id: uid('ci'), q: l.n, custom: { name: l.name || l.i, cat: 'gear', d: '' } });
   }
+  if (lines.length) b31Ev('loot', `${ch.name} receives ${lines.map(lineText).join(', ')}`);
   saveChar(ch); queueRender();
 }
 const whoSel = id => `<select id="${id}" aria-label="Give to">${chars().map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('')}${opt('stash', 'Party stash')}</select>`;
@@ -7689,6 +7704,7 @@ function xpStrip(ch, D, ro) {
 /* give XP; the DM's device writes it into each player's sheet */
 function awardXp(xs, each, why) {
   each = Math.max(0, Math.round(+each || 0)); if (!each || !xs.length) return;
+  b31Ev('xp', xs.map(x => x.ch.name).join(', '), each, why);
   for (const x of xs) {
     const D = derive(x.ch), base = xpOf(x.ch, D);
     const log = [{ at: Date.now(), n: each, why: String(why || '').slice(0, 60) }].concat((x.ch.play || {}).xpLog || []).slice(0, 10);
@@ -8229,6 +8245,289 @@ Object.assign(ACT, {
   pollpick(el) { const p = (S.settings || {}).poll, o = p && p.opts.find(x => x.id === el.dataset.o); if (!o) return; saveSettings({ poll: Object.assign({}, p, { closed: true, pick: o.id }), next: o.t }); queueRender(); },
   pollcancel() { saveSettings({ poll: null }); queueRender(); },
   nextclear() { saveSettings({ next: '' }); queueRender(); },
+});
+
+'use strict';
+/* ===== Build 31: command palette, session recap, DM party actions, party board, turn reminders, absent players =====
+   events:    dm/prep.ev = [{ at, k, t, n, w }], newest last, capped at EV_CAP. k: fs fe kill down xp loot lvl rest crit fumble.
+              The DM window that acts (or settles the roll) writes them; a player's level-up or rest reaches it as a message.
+   reminders: ch.rem = [{ id, on: 'start' | 'end' | 'dmg' | 'short' | 'long', t }] in the character. They fire on the device that owns the sheet
+              (or the DM's device for an absent player) as a toast plus a line under the top bar (B31.lines).
+   absent:    ch.play.absent = true: the DM runs that player's turns and gets the sheet's attacks and spells inside the combat screen. */
+const EV_CAP = 300;
+const B31 = { cur: null, hp: {}, lines: [], t0: 0 };
+const REM_ON = [['start', 'Start of my turn'], ['end', 'End of my turn'], ['dmg', 'When I take damage'], ['short', 'On a short rest'], ['long', 'On a long rest']];
+const b31Runs = x => x.mine || (isDMish() && !!x.ch.play.absent);
+const isAbsent = c => { if (c.kind !== 'pc') return false; const x = findChar(c.cid, c.owner); return !!(x && x.ch.play.absent); };
+
+/* ----- events for the session recap (DM side) ----- */
+function b31Ev(k, t, n, w) {
+  if (!isDMish()) return;
+  try {   // notes for the recap must never get in the way of the table
+    const ev = (prep().ev || []).concat([{ at: Date.now(), k, t: String(t || '').slice(0, 120), n: +n || 0, w: String(w || '').slice(0, 60) }]).slice(-EV_CAP);
+    S.prep = Object.assign(PREP_BLANK(), S.prep, { ev });
+    if (S.mode !== 'live') LS.set('prep', S.prep); else if (S.me.isOwner) queueWrite('dm/prep', { ev }, 600);   // not savePrep: that would rewrite the players' story doc for every event
+  } catch (e) { console.error(e); }
+}
+/* a fight is on from the first monster until the last one leaves the list; the last fs/fe event says which. Called before S.dm.combat is replaced. */
+function b31Fight(cb) {
+  if (!isDMish()) return;
+  try {
+    const last = (prep().ev || []).filter(e => e.k === 'fs' || e.k === 'fe').pop(), on = !!last && last.k === 'fs';
+    const mons = (cb.list || []).filter(c => c.kind === 'mon' && !c.own);
+    if (mons.length && !on) {
+      const g = {}; for (const c of mons) { const n = String(c.name || 'Creature').replace(/\s+\d+$/, ''); g[n] = (g[n] || 0) + 1; }
+      b31Ev('fs', Object.entries(g).map(([n, k]) => (k > 1 ? k + ' ' : '') + n).join(', '));
+    } else if (!mons.length && on) b31Ev('fe', '', (S.dm.combat || {}).round || 1);
+  } catch (e) { console.error(e); }
+}
+function b31Recap(since) {
+  const out = [], kills = [], crits = [], fum = [], flush = () => { if (kills.length) out.push('Defeated: ' + kills.join(', ') + '.'); kills.length = 0; };
+  for (const e of (prep().ev || []).filter(e => e.at > since)) {
+    if (e.k === 'kill') { kills.push(e.t); continue; }
+    flush();
+    if (e.k === 'fs') out.push(`A fight begins against ${e.t}.`);
+    else if (e.k === 'fe') out.push(`The fight ends after ${e.n} round${e.n === 1 ? '' : 's'}.`);
+    else if (e.k === 'down') out.push(`${e.t} goes down.`);
+    else if (e.k === 'xp') out.push(`${e.t} ${e.t.includes(', ') ? 'each gain' : 'gains'} ${fmtN(e.n)} XP${e.w ? ' for ' + e.w : ''}.`);
+    else if (e.k === 'loot' || e.k === 'lvl') out.push(e.t.replace(/\.$/, '') + '.');
+    else if (e.k === 'rest') out.push(`The party takes a ${e.t} rest.`);
+    else if (e.k === 'crit') crits.push(e.t);
+    else if (e.k === 'fumble') fum.push(e.t);
+  }
+  flush();
+  const lst = a => a.slice(0, 8).join('; ') + (a.length > 8 ? `; and ${a.length - 8} more` : '');
+  if (crits.length) out.push('Natural 20s: ' + lst(crits) + '.');
+  if (fum.length) out.push('Natural 1s: ' + lst(fum) + '.');
+  return out.map(x => '- ' + x).join('\n');
+}
+/* everything that reaches this window as a message, plus the DM-side recording of it */
+function b31Msg(m) { try { b31Msg0(m); } catch (e) { console.error(e); } }
+function b31Msg0(m) {
+  if (m.old) return;
+  const ids = m.cids || [], mine = () => chars().filter(x => b31Runs(x) && ids.includes(x.ch.id));
+  if (m.kind === 'note' && ids.length) {
+    if (!m.isMe && mine().length) toastMsg(m.text + (m.rest === 'short' ? ' Spend hit dice from your sheet.' : ''));
+    if (m.rest) for (const x of mine()) b31Fire(x.ch, m.rest);
+  }
+  if (!(isDMish() && isResolver())) return;
+  if (m.rest) b31Ev('rest', m.rest);
+  else if (m.ev === 'lvl') b31Ev('lvl', m.text);
+  else if ((m.nat === 20 || m.nat === 1) && (m.kind === 'roll' || m.kind === 'atk') && !m.priv && m.who) b31Ev(m.nat === 20 ? 'crit' : 'fumble', m.who + (m.label ? ' (' + String(m.label).replace(/ \((adv|disadv)\.\)$/, '') + ')' : ''));
+}
+
+/* ----- turn reminders ----- */
+function b31Fire(ch, on) {
+  const list = (ch.rem || []).filter(r => r.on === on); if (!list.length) return;
+  const when = (REM_ON.find(r => r[0] === on) || [0, on])[1];
+  for (const r of list) { toastMsg(`${ch.name}: ${r.t}`); B31.lines.push({ id: uid('rl'), at: Date.now(), name: ch.name, when, t: r.t }); }
+  B31.lines = B31.lines.slice(-6); queueRender();
+}
+function remBanner() {
+  const now = Date.now(), ls = B31.lines.filter(l => now - l.at < 600000);
+  return ls.length ? `<div class="reqbar rembar" role="status"><div class="reqbar-in">${ls.map(l => `<span class="row"><b>${esc(l.name)}</b> <span class="muted">${esc(l.when)}:</span> ${esc(l.t)}<button class="btn ghost sm" data-act="remx" data-v="${esc(l.id)}" aria-label="Dismiss reminder">${svgIcon('x', 16)}</button></span>`).join('')}</div></div>` : '';
+}
+function remPanel(ch, ro) {
+  const rem = ch.rem || [];
+  return `<div class="panel stack" id="rem-panel"><div class="ph">Turn reminders<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Pop up when it happens</span></div>
+    ${rem.map(r => `<div class="row small"><span class="pill">${esc((REM_ON.find(o => o[0] === r.on) || [0, r.on])[1])}</span><b class="grow">${esc(r.t)}</b>${ro ? '' : `<button class="btn ghost sm" data-act="remrm" data-v="${esc(r.id)}" aria-label="Remove the reminder ${esc(r.t)}">${svgIcon('x', 14)}</button>`}</div>`).join('') || '<span class="small muted">Nothing yet. For example “Regenerate 1d4” at the start of your turn.</span>'}
+    ${ro ? '' : `<div class="row"><select id="f-remon" aria-label="When">${REM_ON.map(([k, l]) => opt(k, l)).join('')}</select><input type="text" id="f-remt" maxlength="80" placeholder="e.g. Regenerate 1d4" aria-label="Reminder text" style="flex:1;min-width:150px"><button class="btn sm" data-act="remadd">Add</button></div>`}</div>`;
+}
+/* runs after every render: the turn moved, or damage lowered the hit points of a sheet that has a reminder for it. The first 2.5 s after connecting only learn the starting state. */
+function b31After() {
+  try {
+    if (S.mode === 'starting') return;
+    const now = Date.now(); B31.t0 = B31.t0 || now;
+    const quiet = now - B31.t0 < 2500, I = S.init || {}, cur = I.cur || null;
+    if (cur !== B31.cur) {
+      const prev = B31.cur; B31.cur = cur;
+      if (!quiet) {
+        const own = id => { const c = (I.list || []).find(x => x.id === id); return c && c.kind === 'pc' ? chars().find(x => x.ch.id === c.cid && b31Runs(x)) : null; };
+        const a = prev && own(prev), b = cur && own(cur), cc = cur && (I.list || []).find(x => x.id === cur);
+        if (a) b31Fire(a.ch, 'end');
+        if (b) b31Fire(b.ch, 'start');
+        if (cc && isDMish() && isAbsent(cc)) toastMsg(`${liveName(cc)} is absent: you run their turn.`);
+      }
+    }
+    for (const x of chars()) {
+      const id = x.ch.id;
+      if (!b31Runs(x) || !(x.ch.rem || []).some(r => r.on === 'dmg')) { delete B31.hp[id]; continue; }
+      const hp = hpOf(x.ch, derive(x.ch)), old = B31.hp[id]; B31.hp[id] = hp;
+      if (old != null && hp < old && !quiet) b31Fire(x.ch, 'dmg');
+    }
+  } catch (e) { console.error(e); }
+}
+
+/* ----- absent players ----- */
+function absentPanel(c, x, D) {
+  const abs = !!x.ch.play.absent;
+  const btn = `<button class="btn ghost sm" data-act="absent" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(abs)}>Absent: DM runs them</button>`;
+  if (!abs) return `<div class="row small">${btn}</div>`;
+  UI.cur = { cid: x.ch.id, owner: x.owner };   // the sheet's own buttons act on UI.cur
+  return `<div class="row small">${btn}<span class="pill brass">${c.id === cbt().cur ? 'Their turn: you run it' : 'You run this character'}</span></div><div class="cbsheet">${sheetView(x.ch, D, !canEditChar(x.owner), x)}</div>`;
+}
+function absentBanner(cb) {
+  const c = cb.list.find(x => x.id === cb.cur);
+  return c && isAbsent(c) ? `<div class="todo-box" id="absent-turn"><b>${esc(liveName(c))} is absent, and it is their turn: you run it.</b> Their attacks and spells are on the right.</div>` : '';
+}
+const absentBtn = (ch, owner) => {
+  const p = ch.play;
+  return isDMish() ? `<div class="row small">${p.absent ? '<span class="pill brass">Absent · DM runs them</span>' : ''}<button class="btn ghost sm" data-act="absent" data-cid="${esc(ch.id)}" data-owner="${esc(owner)}"${pressed(!!p.absent)}>Absent: DM runs them</button></div>` : p.absent ? '<div class="row small"><span class="pill brass">Absent · DM runs them</span></div>' : '';
+};
+
+/* ----- DM party actions and the board's extra columns ----- */
+const rollOpts = () => ABIL.map(a => opt('save:' + a, ABN[a] + ' save')).join('') + SKILLS.map(s => opt('skill:' + s[0], s[1] + ' check')).join('') + ABIL.map(a => opt('check:' + a, ABN[a] + ' check')).join('');
+const rollLabel = (t, v) => t === 'save' ? `a ${ABN[v]} save` : t === 'skill' ? `a ${SKILL[v].name} check` : `a ${ABN[v]} check`;
+function askRoll(pcs, label, t, v, dc, dmg, half) {
+  sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label, t, ab: t === 'skill' ? SKILL[v].ab : v, skill: t === 'skill' ? v : '', dc, keys: pcs.map(x => x.owner + '|' + x.ch.id), dmg, half });
+}
+function dmPartyPanel() {
+  if (!isDMish() || !chars().length) return '';
+  return `<div class="panel stack" id="dmparty" style="margin-bottom:12px"><div class="ph">Party actions</div>
+    <div class="row"><button class="btn" data-act="prest" data-v="short">Short rest for everyone</button><button class="btn" data-act="prest" data-v="long">Long rest for everyone</button><span class="small muted">A short rest only resets short-rest resources. Each player spends their own hit dice.</span></div>
+    <div class="row"><select id="f-pinsp" aria-label="Give inspiration to">${opt('all', 'Everyone')}${chars().map(x => opt(x.owner + '|' + x.ch.id, x.ch.name)).join('')}</select><button class="btn" data-act="pinsp">Give inspiration</button>
+      ${advMode() === 'xp' ? '<input type="number" id="f-pxp" min="1" placeholder="XP each" aria-label="Experience points for each character" style="width:110px"><button class="btn" data-act="pxp">Award XP to everyone</button>' : '<button class="btn" data-act="pmile">Level up everyone</button>'}</div>
+    <div class="row"><select id="f-pt" aria-label="Roll to ask for">${rollOpts()}</select><input type="number" id="f-pdc" min="0" placeholder="DC" aria-label="DC (optional)" style="width:70px"><button class="btn pri" data-act="pask">Ask everyone for a roll</button></div></div>`;
+}
+function boardCells(ch, D) {
+  const p = ch.play, ds = downState(ch, D);
+  const hd = Object.entries(D.hdPool).map(([d, n]) => `${n - (+(p.hd || {})[d] || 0)}d${d}`).join(' ') || '—';
+  const sl = D.slots.map((n, i) => n ? `${ORD(i + 1)} ${n - (+(p.slots || {})[i + 1] || 0)}/${n}` : '').filter(Boolean); if (D.pact) sl.push(`Pact ${D.pact.n - (+p.pact || 0)}/${D.pact.n}`);
+  const cond = [ds, ...(p.cond || []), +p.exh ? 'Exhaustion ' + p.exh : ''].filter(Boolean);
+  return `<td class="small">${esc(cond.join(', ') || '—')}</td><td class="small">${esc(p.conc || '—')}</td><td class="num">${p.insp ? '★' : '—'}</td><td class="small">${esc(sl.join(' · ') || '—')}</td><td class="num">${esc(hd)}</td>`;
+}
+
+/* ----- session recap panel (Prep > Sessions) ----- */
+const recapSince = () => Math.max(0, ...prep().sessions.map(x => +x.rcAt || 0));
+function recapPanel() {
+  const n = (prep().ev || []).filter(e => e.at > recapSince()).length;
+  return `<div class="panel stack" id="recap"><div class="ph">Recap draft</div>
+    <div class="small muted">${n ? `${n} event${n === 1 ? '' : 's'} noted since the last saved recap: fights, who went down, XP, loot, level-ups and natural 20s. Edit the draft before you save it.` : 'Nothing noted since the last saved recap. Fights, XP, loot and level-ups are noted as they happen.'}</div>
+    <textarea id="f-recap" placeholder="Build the draft, edit it here, then save it as this session's summary." aria-label="Recap draft">${esc(pp().recap || '')}</textarea>
+    <div class="row"><button class="btn" data-act="recapbuild"${dis(!n)}>Build the draft</button><button class="btn pri" data-act="recapsave" data-v="0">Save as the summary</button><button class="btn" data-act="recapsave" data-v="1">Save and share with players</button></div></div>`;
+}
+
+/* ----- command palette (Ctrl+K, or the search button in the top bar) ----- */
+const PAL = { items: [], hits: [], q: '', i: 0 };
+const spellHtml = s => `<p><i>${esc([s.lvl ? ORD(s.lvl) + '-level ' + s.sch.toLowerCase() : s.sch + ' cantrip', s.rit ? 'ritual' : ''].filter(Boolean).join(', '))}</i></p><p><b>Casting time</b> ${esc(s.t)} · <b>Range</b> ${esc(s.r)} · <b>Components</b> ${esc(s.comp)}${s.mat ? ' (' + esc(s.mat) + ')' : ''} · <b>Duration</b> ${esc(s.dur)}</p>${md(s.d)}${s.hl ? '<p><b>At higher levels.</b></p>' + md(s.hl) : ''}<p class="small muted">${esc(s.src || '')}</p>`;
+const itemHtml = d => `<p class="small muted">${esc([d.cat, d.rar, d.att ? 'requires attunement' : '', d.cost, d.wt ? d.wt + ' lb.' : ''].filter(Boolean).join(' · '))}</p>${md(d.d)}`;
+const monHtml = d => `<p class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${d.cr == null ? '?' : crLabel(d.cr)}${d.xp ? ' (' + fmtN(d.xp) + ' XP)' : ''}</p>
+  <p><b>AC</b> ${esc(d.ac)} · <b>HP</b> ${esc(d.hp)}${d.hd ? ' (' + esc(d.hd) + ')' : ''} · <b>Speed</b> ${esc(d.speed || '—')}</p>
+  <p class="small">${ABIL.map(a => `${a.toUpperCase()} ${(d.ab || {})[a] || 10} (${sgn(mod((d.ab || {})[a] || 10))})`).join(' · ')}</p>
+  ${d.senses ? `<p class="small"><b>Senses</b> ${esc(d.senses)}</p>` : ''}${d.langs ? `<p class="small"><b>Languages</b> ${esc(d.langs)}</p>` : ''}
+  ${[['traits', 'Traits'], ['actions', 'Actions'], ['bonus', 'Bonus actions'], ['reactions', 'Reactions'], ['legendary', 'Legendary actions']].filter(([k]) => (d[k] || []).length).map(([k, l]) => `<h3>${l}</h3>${d[k].map(a => `<p><b>${esc(a.n)}.</b> ${esc(a.d || '')}</p>`).join('')}`).join('')}`;
+function palItems() {
+  const e = E(), ch = e && e.ch, R = registry((ch && ch.ruleset) || RUN.rs || '2024'), out = [], dm = isDMish();
+  const act = (n, run, s) => out.push({ k: 'Action', n, s: s || '', run });
+  const view = (v, n) => { if (!tabOff(v)) act('Open ' + n, () => ACT.view({ dataset: { v } })); };
+  if (ch) { act('Short rest', () => ACT.shortrest(), 'for ' + ch.name); act('Long rest', () => ACT.longrest(), 'for ' + ch.name); act('Toggle inspiration', () => ACT.insp(), 'for ' + ch.name); }
+  if (dm) {
+    act('Short rest for everyone', () => ACT.prest({ dataset: { v: 'short' } }), 'asks first'); act('Long rest for everyone', () => ACT.prest({ dataset: { v: 'long' } }), 'asks first');
+    if (cbt().list.length) { act('Next turn', () => ACT.cnext(), 'combat'); act('Previous turn', () => ACT.cprev(), 'combat'); }
+  }
+  ['1d4', '1d6', '1d8', '1d10', '1d12', '1d20', '1d100'].forEach(x => act('Roll ' + x, () => ACT.quick({ dataset: { x } })));
+  [['chars', 'my sheet'], ['party', 'party'], ['combat', 'combat'], ['map', 'map'], ['log', 'dice log'], ['homebrew', 'homebrew']].forEach(([v, n]) => view(v, n));
+  act('Open chat', () => ACT.chat());
+  if (dm) { view('prep', 'prep'); view('campaign', 'campaign'); }
+  for (const c of CONDITIONS) out.push({ k: 'Condition', n: c, s: BASE_CONDS.includes(c) ? '' : 'homebrew', d: () => `<p>${esc(COND_RULES[c] || 'No rules text.')}</p>` });
+  if (ch) try {
+    const D = derive(ch);
+    for (const f of D.features.filter(x => !x.isFeat)) out.push({ k: 'Feature', n: f.n, s: f.from, d: () => md(f.d) });
+    for (const t of D.traits.filter(t => !t.l || t.l <= D.level)) out.push({ k: 'Feature', n: t.n, s: t.from, d: () => md(t.d) });
+    if (D.bg && D.bg.feature) out.push({ k: 'Feature', n: D.bg.feature.n, s: D.bg.name, d: () => md(D.bg.feature.d) });
+    for (const f of D.feats) out.push({ k: 'Feature', n: f.f.name, s: 'Feat · ' + f.from, d: () => md(f.f.d) });
+  } catch (er) { console.error(er); }
+  for (const s of R.list('spells')) out.push({ k: 'Spell', n: s.name, s: (s.lvl ? ORD(s.lvl) + ' level ' : 'Cantrip ') + s.sch, d: () => spellHtml(s) });
+  for (const d of R.list('items')) out.push({ k: 'Item', n: d.name, s: [d.cat, d.rar].filter(Boolean).join(' · '), d: () => itemHtml(d) });
+  for (const d of R.list('monsters')) out.push({ k: 'Monster', n: d.name, s: 'CR ' + (d.cr == null ? '?' : crLabel(d.cr)), d: () => monHtml(d) });
+  for (const f of R.list('feats')) out.push({ k: 'Feat', n: f.name, s: f.type || '', d: () => md(f.d) });
+  for (const x of chars()) out.push({ k: 'Character', n: x.ch.name, s: playerName(x.owner) + ' · ' + classLine(x.ch), run: () => ACT.openfull({ dataset: { cid: x.ch.id, owner: x.owner } }) });
+  for (const o of out) o.l = (o.n + ' ' + o.k + ' ' + o.s).toLowerCase();
+  return out;
+}
+const PAL_ORDER = ['Action', 'Feature', 'Condition', 'Character', 'Spell', 'Item', 'Monster', 'Feat'];
+function palFind(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return PAL.items.filter(x => x.k === 'Action' || x.k === 'Character').slice(0, 40);
+  const toks = q.split(/\s+/), hits = PAL.items.filter(x => toks.every(t => x.l.includes(t)));
+  const sc = x => { const n = x.n.toLowerCase(); return n === q ? 0 : n.startsWith(q) ? 1 : n.includes(q) ? 2 : 3; };
+  hits.sort((a, b) => sc(a) - sc(b) || PAL_ORDER.indexOf(a.k) - PAL_ORDER.indexOf(b.k) || a.n.localeCompare(b.n));
+  const dice = /^(?:roll\s+)?(\d*d\d+(?:[+-]\d+)?)$/.exec(q);
+  if (dice && +dice[1].match(/d(\d+)/)[1] >= 1 && +(dice[1].match(/^(\d*)d/)[1] || 1) <= 100) hits.unshift({ k: 'Action', n: 'Roll ' + dice[1], s: '', run: () => ACT.quick({ dataset: { x: dice[1] } }) });
+  return hits.slice(0, 40);
+}
+const palList = () => PAL.hits.length ? PAL.hits.map((x, i) => `<li role="presentation"><button type="button" class="palrow${i === PAL.i ? ' on' : ''}" role="option" id="pal-${i}" aria-selected="${i === PAL.i}" data-act="palgo" data-i="${i}"><span class="pill${x.k === 'Action' ? ' acc' : ''}">${esc(x.k)}</span><b>${esc(x.n)}</b><span class="small muted">${esc(x.s)}</span></button></li>`).join('') : '<li role="presentation"><span role="option" aria-selected="false" aria-disabled="true" class="small muted" style="display:block;padding:10px">Nothing matches.</span></li>';
+MODALS.pal = () => `<div class="modal palette" role="dialog" aria-modal="true" aria-label="Search">
+  <input type="search" id="f-pal" role="combobox" aria-expanded="true" aria-controls="pal-res"${PAL.hits.length ? ` aria-activedescendant="pal-${PAL.i}"` : ''} aria-label="Search rules, characters and actions" placeholder="Search spells, items, monsters, conditions, feats, characters, actions…" autocomplete="off" value="${esc(PAL.q)}">
+  <ul id="pal-res" role="listbox" aria-label="Results" class="palres">${palList()}</ul>
+  <p class="small muted">Enter opens the entry or runs the action. Up and down move. Esc closes.</p></div>`;
+function palMove(d) {
+  if (!PAL.hits.length) return;
+  PAL.i = (PAL.i + d + PAL.hits.length) % PAL.hits.length;
+  document.querySelectorAll('#pal-res .palrow').forEach((b, i) => { b.classList.toggle('on', i === PAL.i); b.setAttribute('aria-selected', String(i === PAL.i)); if (i === PAL.i) b.scrollIntoView({ block: 'nearest' }); });
+  const inp = $('#f-pal'); if (inp) inp.setAttribute('aria-activedescendant', 'pal-' + PAL.i);
+}
+function palGo(i) {
+  const x = PAL.hits[i]; if (!x) return;
+  closeModal();
+  if (x.run) x.run(); else openModal({ kind: 'text', title: x.n, html: x.d() });
+}
+const palBtn = () => S.needCampaign ? '' : `<button class="btn ghost sm chatbtn palbtn" data-act="pal" title="Search rules, characters and actions (Ctrl+K)" aria-label="Search (Ctrl+K)" aria-keyshortcuts="Control+K"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>`;
+document.addEventListener('input', e => {
+  if (!e.target || e.target.id !== 'f-pal') return;
+  PAL.q = e.target.value; PAL.i = 0; PAL.hits = palFind(PAL.q);
+  const ul = $('#pal-res'); if (ul) ul.innerHTML = palList();
+  if (PAL.hits.length) e.target.setAttribute('aria-activedescendant', 'pal-0'); else e.target.removeAttribute('aria-activedescendant');
+});
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || '').toLowerCase() === 'k') { e.preventDefault(); if (!S.needCampaign) ACT.pal(); return; }
+  if (!UI.modal || UI.modal.kind !== 'pal') return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); palMove(e.key === 'ArrowDown' ? 1 : -1); }
+  else if (e.key === 'Enter' && e.target && e.target.id === 'f-pal') { e.preventDefault(); palGo(PAL.i); }
+});
+
+Object.assign(ACT, {
+  pal() {
+    if (UI.modal && UI.modal.kind === 'pal') { closeModal(); return; }
+    PAL.items = palItems(); PAL.q = ''; PAL.i = 0; PAL.hits = palFind('');
+    openModal({ kind: 'pal' });
+  },
+  palgo(el) { palGo(+el.dataset.i); },
+  /* party actions */
+  prest(el) { ACT.crest({ dataset: { v: el.dataset.v, all: '1' } }); },
+  pinsp() {
+    const v = $('#f-pinsp').value, xs = v === 'all' ? chars() : [findChar(v.split('|')[1], v.split('|')[0])].filter(Boolean); if (!xs.length) return;
+    for (const x of xs) savePlay(x.ch, { insp: true });
+    sendMsg({ kind: 'note', text: `The DM gives inspiration to ${xs.map(x => x.ch.name).join(', ')}.`, cids: xs.map(x => x.ch.id) }); queueRender();
+  },
+  pxp() { const n = Math.round(+($('#f-pxp') || {}).value || 0); if (!(n > 0)) { toastMsg('Type how much XP each character gets.'); return; } awardXp(chars(), n, ''); queueRender(); },
+  pmile() { milestone(chars()); queueRender(); },
+  pask() {
+    const [t, v] = String($('#f-pt').value).split(':');
+    askRoll(chars(), rollLabel(t, v), t, v, Math.max(0, Math.round(+$('#f-pdc').value || 0)));
+    toastMsg('Asked everyone for ' + rollLabel(t, v) + '.'); queueRender();
+  },
+  /* recap */
+  recapbuild() { const t = b31Recap(recapSince()); if (!t) return; pp().recap = t; $('#f-recap').value = t; queueRender(); },
+  recapsave(el) {
+    const s = prep().sessions.find(x => x.id === pp().sess), txt = (($('#f-recap') || {}).value || '').trim();
+    if (!s || !txt) { toastMsg('Build or write the recap first.'); return; }
+    const go = () => { savePrep({ sessions: prep().sessions.map(x => x.id === s.id ? Object.assign({}, x, { summary: txt, rcAt: Date.now() }) : x), share: el.dataset.v === '1' ? s.id : prep().share }); pp().recap = ''; toastMsg(el.dataset.v === '1' ? 'Saved and shared with the players.' : 'Saved as this session’s summary.'); queueRender(); };
+    if ((s.summary || '').trim()) confirmBox('Replace the summary?', 'This session already has a summary. The recap replaces it.', 'Replace', go); else go();
+  },
+  /* reminders and absent players */
+  remadd() {
+    const ch = C(), t = (($('#f-remt') || {}).value || '').trim().slice(0, 80); if (!ch) return;
+    if (!t) { toastMsg('Type the reminder first.'); return; }
+    ch.rem = (ch.rem || []).concat([{ id: uid('r'), on: $('#f-remon').value, t }]); $('#f-remt').value = ''; commit(ch);
+  },
+  remrm(el) { const ch = C(); if (!ch) return; ch.rem = (ch.rem || []).filter(r => r.id !== el.dataset.v); commit(ch); },
+  remx(el) { B31.lines = B31.lines.filter(l => l.id !== el.dataset.v); queueRender(); },
+  absent(el) {
+    const x = findChar(el.dataset.cid, el.dataset.owner); if (!x || !isDMish()) return;
+    const on = !x.ch.play.absent; play(x.ch, { absent: on });
+    toastMsg(on ? `${x.ch.name} is absent: you run their turns.` : `${x.ch.name} is back.`);
+  },
 });
 </script>
 </body>
