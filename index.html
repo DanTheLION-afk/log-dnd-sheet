@@ -1371,6 +1371,7 @@ function derive(ch) {
   for (const g of G.ab) { sc[g.a] += g.n; parts[g.a].push([g.from, g.n]); if (g.max > (capMap[g.a] || 20)) capMap[g.a] = g.max; }
   for (const a of ABIL) { const cap = ch.free ? 30 : (capMap[a] || 20); if (sc[a] > cap) sc[a] = cap; }
   addAb('Other', ch.abil.misc);
+  for (const g of G.abset) if (sc[g.a] < g.n) { parts[g.a].push([g.from, g.n - sc[g.a]]); sc[g.a] = g.n; }   // "your score is N, unless it is already higher"
   for (const a of ABIL) sc[a] = clamp(sc[a], 1, 30);
   for (const a of ABIL) { D.calc['sc.' + a] = sc[a]; const v = dsv('sc.' + a); if (v != null) { sc[a] = clamp(Math.round(v), 1, 30); parts[a] = [['Set by the DM', sc[a]]]; } }
   D.sc = sc; D.parts = parts;
@@ -1437,7 +1438,7 @@ function derive(ch) {
   D.skill = {};
   for (const [id, , ab] of SKILLS) {
     const prof = skillSet.has(id), exp = D.expertise.has(id);
-    D.skill[id] = D.m[ab] + (exp ? D.pb * 2 : prof ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (+((ch.bonus.skills || {})[id]) || 0);
+    D.skill[id] = D.m[ab] + (exp ? D.pb * 2 : prof ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (+((ch.bonus.skills || {})[id]) || 0) + gsum(G.check) + gsum(G.skill.filter(g => g.v === id));
   }
   D.joat = joat;
   let expCount = +ch.expertiseBonus || 0;
@@ -1448,7 +1449,10 @@ function derive(ch) {
   }
   D.expCount = expCount;
   D.save = {};
-  for (const a of ABIL) D.save[a] = D.m[a] + (D.saveProf.has(a) ? D.pb : 0) + (+ch.bonus.save || 0) + itemBonus(ch, 'save');
+  for (const a of ABIL) D.save[a] = D.m[a] + (D.saveProf.has(a) ? D.pb : 0) + (+ch.bonus.save || 0) + itemBonus(ch, 'save') + gsum(G.save);
+  D.chk = gsum(G.check);   // a bonus to every ability check, for the plain ability rolls
+  const why = a => a.map(g => `From ${g.from}: ${sgn(g.n)}`);
+  D.saveWhy = why(G.save); D.checkWhy =why(G.check).concat(G.skill.map(g => `From ${g.from}: ${sgn(g.n)} ${(SKILL[g.v] || {}).name || g.v}`));
   if (is24) {
     const wb = Math.max(1, D.m.wis);
     if (hasChoice(/^thaumaturge$/i)) { D.skill.arcana += wb; D.skill.religion += wb; }
@@ -1510,16 +1514,16 @@ function derive(ch) {
   if (shieldIt) { ac += (+(shieldIt.d.a || {}).base || 2) + itemMod(ch, shieldIt.i, 'ac', shieldIt.d); acNote.push('Shield'); }
   if (armorIt && (hasChoice(/^defense$/i) || hasFeat('defense'))) { ac += 1; acNote.push('Defense'); }
   for (const x of items) if (x.d.cat !== 'armor' && x.d.cat !== 'shield' && itemMod(ch, x.i, 'ac', x.d)) { ac += itemMod(ch, x.i, 'ac', x.d); acNote.push(x.d.name); }
-  for (const x of items) if (x.d.att && !x.i.att && (+x.i.ac || +x.i.atk || +x.i.dmg || +x.i.save)) D.warn.push(`${x.d.name} needs attunement: its bonuses don't apply until you attune to it.`);
+  for (const x of items) if (needsAtt(ch, x.i, x.d) && !x.i.att && (+x.i.ac || +x.i.atk || +x.i.dmg || +x.i.save || (x.i.grants || []).length || magicDefault(ch, x.i, x.d))) D.warn.push(`${x.d.name} needs attunement: its bonuses don't apply until you attune to it.`);
   ac += +ch.bonus.ac || 0;
-  for (const g of G.ac) { ac += g.n; acNote.push(g.from); }
+  for (const g of G.ac) if (!g.un || (!armorIt && !shieldIt)) { ac += g.n; acNote.push(g.from); }   // un: only with no armor and no shield (Bracers of Defense)
   if (typeof fxMods === 'function') { const fm = fxMods(ch, D); if (fm.ac) { ac += fm.ac; acNote.push(fm.defs.filter(f => f.ac).map(f => f.n).join(' + ')); } }
   D.ac = ac; D.acNote = acNote.join(' + ');
   D.armorIt = armorIt; D.shieldIt = shieldIt;
 
   /* initiative & speed */
   const initPb = feats.some(x => x.f.init === 'pb' || (is24 && x.f.id === 'alert'));
-  D.init = dexM + (+ch.bonus.init || 0) + (initPb ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (!is24 && hasFeat('alert') ? 5 : 0) + gsum(G.init);   // Jack of All Trades: initiative is a Dex check
+  D.init = dexM + (+ch.bonus.init || 0) + (initPb ? D.pb : joat ? Math.floor(D.pb / 2) : 0) + (!is24 && hasFeat('alert') ? 5 : 0) + gsum(G.init) + D.chk;   // Jack of All Trades: initiative is a Dex check
   let speed = +((sub && sub.speed) || (sp && sp.speed) || 30);
   const heavy = armorIt && (armorIt.d.a || {}).cat === 'heavy';
   for (const x of cls) {
@@ -1619,7 +1623,7 @@ function derive(ch) {
     if (finesse || isMonkW) ab = D.m.dex > D.m.str ? 'dex' : 'str';
     if (D.pactBlade && !ranged && D.m.cha > D.m[ab]) ab = 'cha';
     const prof = profWeapon(weapons, d, w) || !!(D.pactBlade && !ranged);
-    const bonusAtk = itemMod(ch, it, 'atk', d), bonusDmg = itemMod(ch, it, 'dmg', d);
+    const bonusAtk = itemMod(ch, it, 'atk', d) + gsum(G.atk), bonusDmg = itemMod(ch, it, 'dmg', d) + gsum(G.dmg);
     const atk = D.m[ab] + (prof ? D.pb : 0) + bonusAtk + (archery && ranged ? 2 : 0);
     let dice = w.dmg || '1';
     if (isMonkW && martialDie && diceAvg(martialDie) > diceAvg(dice)) dice = martialDie;
@@ -1972,7 +1976,24 @@ function inFreeBag(ch, it) {
 /* is `it` somewhere inside container `top`? (stops a bag being put inside itself) */
 function inside(ch, it, top) { for (let n = 0; it && it.box && n < 5; n++) { it = ch.inv.find(x => x.id === it.box && x !== it); if (it === top) return true; } return false; }
 /* an item that needs attunement only gives its bonuses while its owner is attuned */
-function itemMod(ch, it, k, d) { d = d || itemDef(ch, it); return d && d.att && !it.att ? 0 : (+it[k] || 0); }
+function itemMod(ch, it, k, d) { d = d || itemDef(ch, it); return needsAtt(ch, it, d) && !it.att ? 0 : (+it[k] || 0); }
+/* Build 31: official magic items that give numbers, by name (the SRD 5.1 and 5.2 numbers are the same).
+   Used only for built-in items (or a custom item with that name) that carry no grants of their own, so a campaign change replaces them.
+   Belts of Giant Strength are one SRD item with six strengths, so only a name that says the giant gets a score (Str: SRD 5.1 / 5.2 Belt of Giant Strength table). */
+const GIANT_STR = { hill: 21, stone: 23, frost: 23, fire: 25, cloud: 27, storm: 29 };
+function magicDefault(ch, it, d) {
+  if (!d || (d.grants || []).length || (!it.custom && d.pack && !BUILTIN_IDS.has(d.pack))) return null;
+  const n = itemName(ch, it), G = g => ({ att: 1, g }), giant = /^belt of .*giant strength/i.test(n) && /hill|stone|frost|fire|cloud|storm/i.exec(n);
+  if (/^(ring|cloak) of protection$/i.test(n)) return G([{ k: 'ac', n: 1 }, { k: 'save', n: 1 }]);
+  if (/^bracers of defense$/i.test(n)) return G([{ k: 'ac', n: 2, un: true }]);
+  if (/^stone of good luck/i.test(n)) return G([{ k: 'check', n: 1 }, { k: 'save', n: 1 }]);
+  if (/^gauntlets of ogre power$/i.test(n)) return G([{ k: 'abset', a: 'str', n: 19 }]);
+  if (/^headband of intellect$/i.test(n)) return G([{ k: 'abset', a: 'int', n: 19 }]);
+  if (/^amulet of health$/i.test(n)) return G([{ k: 'abset', a: 'con', n: 19 }]);
+  return giant ? G([{ k: 'abset', a: 'str', n: GIANT_STR[giant[0].toLowerCase()] }]) : null;
+}
+const canEquip = (it, d) => !!d && (['weapon', 'armor', 'shield', 'magic'].includes(d.cat) || (it.grants || []).length > 0);   // an item with bonuses added can be worn too
+const needsAtt = (ch, it, d) =>!!(d && (d.att || it.natt || magicDefault(ch, it, d)));   // every table entry needs attunement
 function itemBonus(ch, k) {
   let b = 0;
   for (const it of ch.inv || []) if (it.eq) b += itemMod(ch, it, k);
@@ -3247,12 +3268,12 @@ function stepEquipment(ch, D, ro) {
     <div class="scroll-x"><table class="tbl"><thead><tr><th>Item</th><th>Qty</th><th>Equipped</th><th title="Bonus to AC / attack / damage">AC · Atk · Dmg</th><th><span class="sr-only">Sell or remove</span></th></tr></thead><tbody>
     ${(ch.inv || []).map((it, i) => {
       const d = itemDef(ch, it);
-      const eqable = d && ['weapon', 'armor', 'shield', 'magic'].includes(d.cat);
+      const eqable = canEquip(it, d);
       const up = d ? priceCp(d) : null;
       return `<tr><td><b>${esc(it.name || (d ? d.name : it.id))}</b><div class="small muted">${esc(d ? [d.cat, d.rar, d.w ? d.w.dmg + ' ' + (d.w.dt || '') : '', d.a && d.a.base ? 'AC ' + d.a.base : '', up != null ? fmtCp(up / perOf(d)) + ' each' : '', d.wt ? Math.round(unitWt(d) * 100) / 100 + ' lb.' : ''].filter(Boolean).join(' · ') : 'Missing from content')}</div>
-          <div class="row small" style="gap:8px"><label class="chk"><input type="checkbox" data-act="invcont" data-i="${i}"${isBag(ch, it) ? ' checked' : ''}${isBag(ch, it) && !it.cont ? ' disabled' : ''}${dis(ro)}> Container</label>${isBag(ch, it) ? `<label class="chk" title="A Bag of Holding always does this"><input type="checkbox" data-act="invnowt" data-i="${i}"${bagFree(ch, it) ? ' checked' : ''}${/holding/i.test(itemName(ch, it)) ? ' disabled' : ''}${dis(ro)}> Contents weigh nothing</label>` : ''}${(ch.inv || []).some(b => b !== it && isBag(ch, b) && !inside(ch, b, it)) ? `<select data-act="invin" data-i="${i}" aria-label="Carried in"${dis(ro)}>${opt('', 'Carried')}${ch.inv.filter(b => b !== it && isBag(ch, b) && !inside(ch, b, it)).map(b => opt(b.id, 'In: ' + itemName(ch, b), it.box === b.id)).join('')}</select>` : ''}</div></td>
+          <div class="row small" style="gap:8px"><label class="chk"><input type="checkbox" data-act="invcont" data-i="${i}"${isBag(ch, it) ? ' checked' : ''}${isBag(ch, it) && !it.cont ? ' disabled' : ''}${dis(ro)}> Container</label>${isBag(ch, it) ? `<label class="chk" title="A Bag of Holding always does this"><input type="checkbox" data-act="invnowt" data-i="${i}"${bagFree(ch, it) ? ' checked' : ''}${/holding/i.test(itemName(ch, it)) ? ' disabled' : ''}${dis(ro)}> Contents weigh nothing</label>` : ''}${(ch.inv || []).some(b => b !== it && isBag(ch, b) && !inside(ch, b, it)) ? `<select data-act="invin" data-i="${i}" aria-label="Carried in"${dis(ro)}>${opt('', 'Carried')}${ch.inv.filter(b => b !== it && isBag(ch, b) && !inside(ch, b, it)).map(b => opt(b.id, 'In: ' + itemName(ch, b), it.box === b.id)).join('')}</select>` : ''}<button class="btn ghost sm" data-act="invgr" data-i="${i}" title="Add bonuses this item gives while equipped: ability scores, AC, saves, checks, skills, attacks, damage"${dis(ro)}>Bonuses${(it.grants || []).length ? ' (' + it.grants.length + ')' : ''}</button></div></td>
         <td><input type="number" id="f-q-${i}" min="0" data-act="invq" data-i="${i}" value="${esc(qOf(it))}" style="width:62px"${dis(ro)}></td>
-        <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>${d.att ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
+        <td>${eqable ? `<label class="chk small"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>${needsAtt(ch, it, d) ? ` <label class="chk small"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}` : ''}</td>
         <td><span class="row" style="gap:3px;flex-wrap:nowrap">${['ac', 'atk', 'dmg'].map(k => `<input type="number" id="f-ib-${k}-${i}" data-act="invb" data-k="${k}" data-i="${i}" value="${esc(it[k] || 0)}" style="width:46px" aria-label="${k} bonus"${dis(ro)}>`).join('')}</span></td>
         <td style="white-space:nowrap">${up != null && !it.custom ? `<button class="btn ghost sm" data-act="invsell" data-i="${i}" title="Sell one for half its price"${dis(ro)}>Sell</button>` : ''}<button class="btn ghost sm danger" data-act="invrm" data-i="${i}" aria-label="Remove"${dis(ro)}>${svgIcon('x', 16)}</button></td></tr>`;
     }).join('') || '<tr><td colspan="5" class="muted">Nothing carried yet.</td></tr>'}</tbody></table></div>
@@ -3289,8 +3310,8 @@ function advSeg() {
 /* ===== Build 28: containers, companions and Wild Shape, custom sheet sections ===== */
 /* inventory with containers shown nested; each container folds away */
 function gearLine(ch, it, i, ro) {
-  const d = itemDef(ch, it), eqable = d && ['weapon', 'armor', 'shield', 'magic'].includes(d.cat), nm = esc(it.name || (d ? d.name : it.id));
-  return `<span class="grow">${it.eq ? '<b>' : ''}${d ? `<button type="button" class="rl" data-act="iteminfo" data-i="${i}" title="Show the rules for ${nm}">${nm}</button>` : nm}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>` : ''}${d && d.att ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}`;
+  const d = itemDef(ch, it), eqable = canEquip(it, d), nm =esc(it.name || (d ? d.name : it.id));
+  return `<span class="grow">${it.eq ? '<b>' : ''}${d ? `<button type="button" class="rl" data-act="iteminfo" data-i="${i}" title="Show the rules for ${nm}">${nm}</button>` : nm}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>` : ''}${needsAtt(ch, it, d) ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}`;
 }
 /* only(it, parent): which top-level items to list; equipped and attuned items are listed in their own groups, never inside a container */
 function gearRows(ch, ro, only) {
@@ -3452,10 +3473,10 @@ function sheetView(ch, D, ro, e) {
   /* Build 23: actions are assembled after the spells, so attack cantrips can sit with the attacks */
 
   /* --- skills --- */
-  const abil = `<div class="abils">${ABIL.map(a => `<div class="ab-wrap"><button class="ab" style="width:100%" ${roll(ABN[a] + ' check', D.m[a])}><div class="lbl">${ABN[a]}</div><div class="mod">${sgn(D.m[a])}</div><span class="score">${D.sc[a]}</span></button></div>`).join('')}</div>`;
-  const saves = `<div class="panel"><h3>Saving throws</h3><div class="lines">${ABIL.map(a => `<button class="ln" ${roll(ABN[a] + ' save', D.save[a], 'save')}><span class="dot${D.saveProf.has(a) ? ' on' : ''}"></span><span class="b">${sgn(D.save[a])}</span><span>${ABN[a]}</span><span></span></button>`).join('')}</div></div>`;
+  const abil = `<div class="abils">${ABIL.map(a => `<div class="ab-wrap"><button class="ab" style="width:100%" ${roll(ABN[a] + ' check', D.m[a] + D.chk)}><div class="lbl">${ABN[a]}</div><div class="mod">${sgn(D.m[a])}</div><span class="score">${D.sc[a]}</span></button></div>`).join('')}</div>`;
+  const saves = `<div class="panel"><h3>Saving throws</h3><div class="lines">${ABIL.map(a => `<button class="ln" ${roll(ABN[a] + ' save', D.save[a], 'save')}><span class="dot${D.saveProf.has(a) ? ' on' : ''}"></span><span class="b">${sgn(D.save[a])}</span><span>${ABN[a]}</span><span></span></button>`).join('')}</div>${D.saveWhy.length ? `<p class="small muted">${esc(D.saveWhy.join('. '))}</p>` : ''}</div>`;
   const skills = `<div class="panel"><h3>Skills</h3><div class="lines">${SKILLS.map(([id, n, ab]) => `<button class="ln" ${roll(n, D.skill[id])}><span class="dot${D.expertise.has(id) ? ' exp' : D.skillProf.has(id) ? ' on' : D.joat ? ' half' : ''}"></span><span class="b">${sgn(D.skill[id])}</span><span>${esc(n)}</span><span class="a">${ab.toUpperCase()}</span></button>`).join('')}</div>
-    <div class="small muted" style="margin-top:8px">Passive Perception ${D.passive.per} · Insight ${D.passive.ins} · Investigation ${D.passive.inv}</div></div>`;
+    <div class="small muted" style="margin-top:8px">Passive Perception ${D.passive.per} · Insight ${D.passive.ins} · Investigation ${D.passive.inv}</div>${D.checkWhy.length ? `<p class="small muted">${esc(D.checkWhy.join('. '))}</p>` : ''}</div>`;
   const profs = `<div class="panel stack small"><h3>Proficiencies</h3>
     ${D.armorProf.size ? `<div><span class="lbl">Armor</span><br>${esc(Array.from(D.armorProf).join(', '))}</div>` : ''}
     ${D.weaponProf.size ? `<div><span class="lbl">Weapons</span><br>${esc(Array.from(D.weaponProf).join(', '))}</div>` : ''}
@@ -5959,7 +5980,7 @@ Object.assign(ACT, {
   reqroll(el) {
     const q = S.reqs[el.dataset.rid]; if (!q) return; const [owner, cid] = el.dataset.key.split('|');
     const x = findChar(cid, owner); if (!x) return; const D = derive(x.ch), M = fxMods(x.ch, D);
-    const bonus = q.t === 'save' ? D.save[q.ab] : q.t === 'skill' ? D.skill[q.skill] : D.m[q.ab];
+    const bonus = q.t === 'save' ? D.save[q.ab] : q.t === 'skill' ? D.skill[q.skill] : D.m[q.ab] + D.chk;
     const r = d20Roll({ M, bonus, type: q.t === 'save' ? 'save' : 'check', ab: q.ab });
     sendMsg({ kind: 'roll', ref: q.rid, key: el.dataset.key, who: x.ch.name, label: q.label.replace(/^an? /, ''), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail });
   },
@@ -8725,15 +8746,16 @@ MODALS.impchar = () => {
 };
 /* ===== Build 29: grants by level on homebrew content, and campaign changes to built-in content =====
    An entry's `grants: [{l, k, ...}]` is applied in derive() by applyGrants(). l = character level (class level for classes and subclasses).
-   Kinds: ab {a, n, max} ac/hp/hpl/speed/init/sense {n}  prof {v: 'skill:id' | 'save:ab' | 'armor:..' | 'weapon:..', tool}  exp {v: skill id}
+   Kinds: ab {a, n, max}  abset {a, n: score is N unless already higher}  ac {n, un: only with no armor and no shield}  hp/hpl/speed/init/sense/save/check/atk/dmg {n} (save, check: all of them; atk, dmg: all weapons)  skill {v: skill id, n}  prof {v: 'skill:id' | 'save:ab' | 'armor:..' | 'weapon:..', tool}  exp {v: skill id}
           spell {v: spell id, ab, n: free casts or 'pb', reset}  res {name, n: number or 'pb', reset}  text {name, d}  resist {v: damage type}
    A built-in entry edited for the campaign lives in the pack "Campaign changes" (id cc-<ruleset>) under the SAME id, so registry() returns it instead. */
 const GRANT_TYPES = ['feats', 'species', 'subspecies', 'backgrounds', 'classes', 'subclasses', 'items'];
-const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance']];
+const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance'], ['abset', 'Ability score becomes (at least)'], ['save', 'All saving throws'], ['check', 'All ability checks'], ['skill', 'One skill'], ['atk', 'Weapon attack rolls'], ['dmg', 'Weapon damage rolls']];
 const NUM_G = ['n', 'Amount', 'num'];
 const GRANT_FIELDS = {
   ab: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], NUM_G, ['max', 'Cap (blank = 20)', 'num']],
-  ac: [NUM_G], hp: [NUM_G], hpl: [['n', 'Amount per level', 'num']], speed: [['n', 'Feet', 'num']], init: [NUM_G], sense: [['n', 'Feet', 'num']],
+  abset: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], ['n', 'Score', 'num']], ac: [NUM_G, ['un', 'Only with no armor and no shield', 'bool']], save: [NUM_G], check: [NUM_G], atk: [NUM_G], dmg: [NUM_G], skill: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])], NUM_G],
+  hp: [NUM_G], hpl: [['n', 'Amount per level', 'num']], speed: [['n', 'Feet', 'num']], init: [NUM_G], sense: [['n', 'Feet', 'num']],
   prof: [['v', 'Proficiency', 'select', [['', '—'], ...SKILLS.map(([s, n]) => ['skill:' + s, 'Skill: ' + n]), ...ABIL.map(a => ['save:' + a, 'Save: ' + ABN[a]]), ...['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields'].map(a => ['armor:' + a, a]), ...['Simple Weapons', 'Martial Weapons'].map(a => ['weapon:' + a, a])]], ['tool', '…or a tool (name)', 'text']],
   exp: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])]],
   spell: [['v', 'Spell', 'spell'], ['ab', 'Casting ability', 'select', [['', 'Best of Int, Wis, Cha'], ...ABIL.map(a => [a, ABN[a]])]], ['n', 'Free casts (number or pb)', 'text'], ['reset', 'Free casts return on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]],
@@ -8748,8 +8770,12 @@ function applyGrants(ch, D, feats, features) {
   for (const x of D.cls) src.push([x.def, x.c.lvl], [x.sub, x.c.lvl]);
   src.push([D.sp, D.level], [D.sub, D.level], [D.bg, D.level]);
   for (const x of feats) src.push([x.f, D.level]);
-  for (const it of ch.inv || []) if (it.eq) { const d = itemDef(ch, it); if (d && !(d.att && !it.att)) src.push([d, D.level]); }   // an item counts while equipped, and attuned if it needs attunement
-  const G = { ab: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], prof: [], exp: [], res: [], resist: [], spellSrc: [] }, seen = new Set(), by = {};
+  for (const it of ch.inv || []) if (it.eq) {   // an item counts while equipped, and attuned if it needs attunement: its own grants, the official table's, and the ones the player added to this entry
+    const d = itemDef(ch, it); if (!d || (needsAtt(ch, it, d) && !it.att)) continue;
+    const grants = (d.grants || []).concat((magicDefault(ch, it, d) || {}).g || [], it.grants || []);
+    if (grants.length) src.push([{ name: itemName(ch, it), grants }, D.level]);
+  }
+  const G = { ab: [], abset: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], save: [], check: [], skill: [], atk: [], dmg: [], prof: [], exp: [], res: [], resist: [], spellSrc: [] }, seen = new Set(), by = {};
   const uses = v => /^pb$/i.test(v) ? D.pb : Math.max(0, +v || 0);
   for (const [e, lvl] of src) {
     if (!e || !Array.isArray(e.grants) || seen.has(e)) continue;
@@ -8758,7 +8784,9 @@ function applyGrants(ch, D, feats, features) {
       const l = +g.l || 1, k = g.k, from = e.name, n = +g.n || 0;
       if (l > lvl) continue;
       if (k === 'ab') { if (ABIL.includes(g.a) && n) G.ab.push({ a: g.a, n, max: +g.max || 20, from }); }
-      else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense'].includes(k)) { if (n) G[k].push({ n, from }); }
+      else if (k === 'abset') { if (ABIL.includes(g.a) && n) G.abset.push({ a: g.a, n, from }); }
+      else if (k === 'skill') { if (SKILL[g.v] && n) G.skill.push({ v: g.v, n, from }); }
+      else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense', 'save', 'check', 'atk', 'dmg'].includes(k)) { if (n) G[k].push({ n, from, un: !!g.un }); }
       else if (k === 'prof') { const p = g.tool ? 'tool:' + g.tool : g.v; if (p) G.prof.push({ p, from }); }
       else if (k === 'exp') { if (SKILL[g.v]) G.exp.push({ v: g.v, from }); }
       else if (k === 'resist') { if (g.v) G.resist.push({ v: g.v, from }); }
@@ -8787,7 +8815,7 @@ function grantsRead(rs, id, root) {
   const out = [], el = s => root.querySelector('#' + CSS.escape(s));
   for (let i = 0; el(id + '-' + i + '-k'); i++) {
     const p = id + '-' + i, k = el(p + '-k').value, r = { l: readField(['l', '', 'num'], rs, p, root) || 1, k };
-    for (const sf of GRANT_FIELDS[k] || []) { const v = readField(sf, rs, p, root); if (v !== '' && v != null) r[sf[0]] = v; }
+    for (const sf of GRANT_FIELDS[k] || []) { const v = readField(sf, rs, p, root); if (v !== '' && v != null && v !== false) r[sf[0]] = v; }
     out.push(r);
   }
   return out;
@@ -8821,7 +8849,25 @@ function ccPanel() {
     <div class="row"><div class="seg">${['2024', '2014'].map(r => `<button data-act="hbbrs" data-v="${r}"${pressed(rs === r)}>${r}</button>`).join('')}</div><select data-act="hbbt" aria-label="What to change">${TYPES.filter(k => k !== 'subspecies').map(k => opt(k, TYPE_LABEL[k], k === t)).join('')}</select><input type="search" id="f-hbbq" data-act="hbbq" placeholder="Search" value="${esc(h.bq || '')}" style="max-width:220px"></div>
     ${list.slice(0, 100).map(e => `<div class="hb-row"><div><b>${esc(e.name)}</b> <span class="small muted">${esc(hbSummary(t, e))}</span>${over.has(e.id) ? ' <span class="pill brass">Changed for this campaign</span>' : ''}</div><div class="row"><button class="btn sm" data-act="hbccedit" data-v="${esc(e.id)}">Edit for this campaign</button>${over.has(e.id) ? `<button class="btn ghost sm" data-act="hbccrestore" data-v="${esc(e.id)}">Restore original</button>` : ''}</div></div>`).join('') || '<p class="muted">Nothing found.</p>'}${list.length > 100 ? '<p class="small muted">Showing 100. Search to narrow it down.</p>' : ''}</div></details>`;
 }
+/* Build 31: the same grants editor on one inventory entry (stored as it.grants). It reuses the homebrew handlers hbrowadd, hbrowrm and hbgk, which only need modal.type and modal.entry. */
+MODALS.itemgr = () => {
+  const m = UI.modal, ch = C(), it = ch.inv[m.i] || {};
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Item bonuses"><div class="row"><h2>${esc(itemName(ch, it))}: bonuses</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <p class="small muted">Added on top of what the item already gives. They count while the item is equipped, and attuned if it needs attunement.</p>
+    <label class="chk"><input type="checkbox" data-act="invgratt"${m.natt ? ' checked' : ''}> Needs attunement</label>
+    <div class="grid2">${grantsHTML('items', ['grants', 'Bonuses', 'grants'], m.entry.grants, ch.ruleset, 'hf-grants')}</div>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="invgrsave">Save</button></div></div>`;
+};
 Object.assign(ACT, {
+  invgr(el) { const it = C().inv[+el.dataset.i]; if (it) openModal({ kind: 'itemgr', i: +el.dataset.i, type: 'items', entry: { grants: clone(it.grants || []) }, natt: !!it.natt }); },
+  invgratt(el) { UI.modal.natt = el.checked; },
+  invgrsave() {
+    const m = UI.modal, ch = C(), it = ch.inv[m.i]; if (!it) return closeModal();
+    const g = grantsRead(ch.ruleset, 'hf-grants', document.getElementById('modal'));
+    if (g.length) it.grants = g; else delete it.grants;
+    if (m.natt) it.natt = 1; else delete it.natt;
+    closeModal(); commit(ch);
+  },
   hbgk() { const m = UI.modal, p = PACKS.find(x => x.id === m.pack); m.entry = readForm(m.type, (p && p.ruleset) || 'any', m.entry); renderModal(); },
   hbbt(el) { UI.hb.bt = el.value; queueRender(); },
   hbbrs(el) { UI.hb.brs = el.dataset.v; queueRender(); },
@@ -8930,7 +8976,7 @@ function openChoices(D) {
 /* Gear tab: search your gear or add from the item list, then Attuned / Equipped / Carried */
 function invPanel(ch, D, ro) {
   const inv = ch.inv || [], q = (UI.gq || '').trim().toLowerCase(), R = registry(ch.ruleset), purse = walletCp(ch.money), pad = 'padding:4px 0;border-bottom:1px solid var(--line)';
-  const nAtt = inv.filter(i => i.att).length, canAtt = inv.some(it => (itemDef(ch, it) || {}).att);
+  const nAtt = inv.filter(i => i.att).length, canAtt = inv.some(it => needsAtt(ch, it, itemDef(ch, it)));
   const grp = (title, hint, html, empty) => `<div class="splv"><h3>${title}</h3>${hint ? `<span class="small muted">${hint}</span>` : ''}</div>${html || `<p class="small muted">${empty}</p>`}`;
   let body;
   if (q) {
