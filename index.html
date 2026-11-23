@@ -79,19 +79,19 @@ img { max-width: 100%; }
 @media (prefers-color-scheme: dark) {
   /* Build 34, dark: the same papers under lamplight. Dusk-slate table, warm lit sheets a step lighter, soft bone ink; elevation is a lightness ladder (--bg, --surface, --surface-2, --raised), not bright borders. */
   :root:not([data-theme="light"]) {
-    --bg: #14171a; --surface: #25231f; --surface-2: #2e2c27; --raised: #35322c; --line: #3b3832; --field: #706d65; --field-bg: #1b1a17; --ink: #dcd7c9; --ink-2: #aaa597;
+    --bg: #111316; --surface: #2a2825; --surface-2: #33312c; --raised: #3b3833; --line: #46433c; --field: #78746b; --field-bg: #24221f; --ink: #dcd7c9; --ink-2: #aaa597;
     --accent: #92b2e2; --accent-soft: #28323f; --accent-ink: #0e1520; --pri: #2d4577; --pri-ink: #eceff6; --pri-line: #6486c4; --brass: #d9979e; --wax: #94495a; --danger: #ee8f98; --crimson: #962f40; --on-danger: #1a0b0e; --good: #78c4a6; --warn: #dba857; --sun: #d7ae4a; --moon: #b3b0a3; --tst-crit: #e0bb55; --tst-fail: #ee8f98; --ph: #8d897d;
     --frame: #6b675c; --scale: #8b8779;
-    --glow: #14171a; --grid: rgba(220, 215, 201, .035);
+    --glow: #111316; --grid: rgba(220, 215, 201, .03);
     --spine: #1d2226; --spine-2: #292f34; --spine-line: #343c42; --spine-field: #706d65; --on-spine: #dcd7c9; --on-spine-2: #a7a496; --spine-accent: #9bb9e6; --ribbon: #c4455b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --bg: #14171a; --surface: #25231f; --surface-2: #2e2c27; --raised: #35322c; --line: #3b3832; --field: #706d65; --field-bg: #1b1a17; --ink: #dcd7c9; --ink-2: #aaa597;
+    --bg: #111316; --surface: #2a2825; --surface-2: #33312c; --raised: #3b3833; --line: #46433c; --field: #78746b; --field-bg: #24221f; --ink: #dcd7c9; --ink-2: #aaa597;
     --accent: #92b2e2; --accent-soft: #28323f; --accent-ink: #0e1520; --pri: #2d4577; --pri-ink: #eceff6; --pri-line: #6486c4; --brass: #d9979e; --wax: #94495a; --danger: #ee8f98; --crimson: #962f40; --on-danger: #1a0b0e; --good: #78c4a6; --warn: #dba857; --sun: #d7ae4a; --moon: #b3b0a3; --tst-crit: #e0bb55; --tst-fail: #ee8f98; --ph: #8d897d;
     --frame: #6b675c; --scale: #8b8779;
-    --glow: #14171a; --grid: rgba(220, 215, 201, .035);
+    --glow: #111316; --grid: rgba(220, 215, 201, .03);
     --spine: #1d2226; --spine-2: #292f34; --spine-line: #343c42; --spine-field: #706d65; --on-spine: #dcd7c9; --on-spine-2: #a7a496; --spine-accent: #9bb9e6; --ribbon: #c4455b;
     color-scheme: dark;
 }
@@ -912,7 +912,7 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 @media (max-width: 360px) { .ph .row:has(> .exh) { flex-wrap: wrap !important; gap: 8px !important; } }
 /* ===== Build 34: dark theme rules. Dark-scoped only (OS preference first, then the manual toggle); light mode never reads them. ===== */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .06), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
+  :root:not([data-theme="light"]) { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .09), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
   /* spine: leather a step above the table; the subtree's own accent colours are softened too */
   :root:not([data-theme="light"]) .bar, :root:not([data-theme="light"]) .bnav { --brass: #d9979e; --good: #78c4a6; --warn: #dba857; --danger: #ee8f98; --ph: #8d897d; --accent-ink: #0e1520; }
   /* sheet titles: the baseline and the scale bar are pencil-grey, not bone */
@@ -920,10 +920,10 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
   :root:not([data-theme="light"]) .chead, :root:not([data-theme="light"]) .sheet .panel > h3, :root:not([data-theme="light"]) .sheet .panel > .ph, :root:not([data-theme="light"]) .mdet > .ph:first-child { --bar: linear-gradient(var(--scale), var(--scale));
     background: var(--bar) left bottom / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--scale) 0 40px, transparent 40px 80px) left bottom 1px / 160px 4px no-repeat, var(--bar) left bottom 5px / 161px 1px no-repeat, linear-gradient(90deg, var(--scale) 0 1px, transparent 1px calc(100% - 1px), var(--scale) calc(100% - 1px)) left bottom 1px / 161px 5px no-repeat; }
   /* framed numbers: a lifted fill and a pencil-grey frame instead of a bone outline */
-  :root:not([data-theme="light"]) .ab, :root:not([data-theme="light"]) .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--line); }
+  :root:not([data-theme="light"]) .ab, :root:not([data-theme="light"]) .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px color-mix(in srgb, var(--frame) 55%, var(--surface-2)); }
   :root:not([data-theme="light"]) .ab:hover { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--accent); }
   :root:not([data-theme="light"]) .ab .score { border-color: var(--frame); background: var(--surface); }
-  :root:not([data-theme="light"]) .vital { border-color: var(--frame); background: var(--surface-2); }
+  :root:not([data-theme="light"]) .vital { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px color-mix(in srgb, var(--frame) 55%, var(--surface-2)); }
   :root:not([data-theme="light"]) button.vital:hover { border-color: var(--accent); }
   :root:not([data-theme="light"]) .shield-shape { background: var(--frame); }
   :root:not([data-theme="light"]) .shield-shape::before { background: var(--surface-2); }
@@ -938,9 +938,12 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
   :root:not([data-theme="light"]) .hpbar > i { background: color-mix(in srgb, var(--good) 72%, var(--surface)); }
   :root:not([data-theme="light"]) .hpbar > i.mid { background: color-mix(in srgb, var(--warn-fill) 80%, var(--surface)); }
   :root:not([data-theme="light"]) .hpbar > i.low { background: var(--crimson); }
-  :root:not([data-theme="light"]) .pip::before { border-color: var(--pc, #6f93cf); background: var(--pc, #6f93cf); }
+  :root:not([data-theme="light"]) .pip::before { border-color: var(--pc, #5d7db5); background: var(--pc, #5d7db5); }
   :root:not([data-theme="light"]) .pip.used::before { background: transparent; border-color: var(--pcu, var(--ink-2)); }
   :root:not([data-theme="light"]) .dot.on { background: var(--ink-2); border-color: var(--ink-2); }
+  :root:not([data-theme="light"]) .pill.live { background: color-mix(in srgb, var(--sun) 16%, var(--surface)); color: var(--sun); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sun) 55%, transparent); }
+  /* the map picture only (the table display keeps full brightness) */
+  :root:not([data-theme="light"]) .mapmount:not(.tv) .mapimg { filter: brightness(.78) saturate(.9); }
   :root:not([data-theme="light"]) .cond button[aria-pressed="true"] { color: #f6e9eb; }
   /* wax: the rules glow quietly, the text stays readable */
   :root:not([data-theme="light"]) .modal, :root:not([data-theme="light"]) .mdet, :root:not([data-theme="light"]) .mdet.mcur, :root:not([data-theme="light"]) .mbprev > .rt { border-top-color: var(--wax); border-bottom-color: var(--wax); }
@@ -958,7 +961,7 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
     :root:not([data-theme="light"]) .pbar.turn { background: color-mix(in srgb, var(--sun) 10%, var(--raised)); }
   }
 }
-:root[data-theme="dark"] { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .06), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
+:root[data-theme="dark"] { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .09), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
 /* spine: leather a step above the table; the subtree's own accent colours are softened too */
 :root[data-theme="dark"] .bar, :root[data-theme="dark"] .bnav { --brass: #d9979e; --good: #78c4a6; --warn: #dba857; --danger: #ee8f98; --ph: #8d897d; --accent-ink: #0e1520; }
 /* sheet titles: the baseline and the scale bar are pencil-grey, not bone */
@@ -966,10 +969,10 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 :root[data-theme="dark"] .chead, :root[data-theme="dark"] .sheet .panel > h3, :root[data-theme="dark"] .sheet .panel > .ph, :root[data-theme="dark"] .mdet > .ph:first-child { --bar: linear-gradient(var(--scale), var(--scale));
   background: var(--bar) left bottom / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--scale) 0 40px, transparent 40px 80px) left bottom 1px / 160px 4px no-repeat, var(--bar) left bottom 5px / 161px 1px no-repeat, linear-gradient(90deg, var(--scale) 0 1px, transparent 1px calc(100% - 1px), var(--scale) calc(100% - 1px)) left bottom 1px / 161px 5px no-repeat; }
 /* framed numbers: a lifted fill and a pencil-grey frame instead of a bone outline */
-:root[data-theme="dark"] .ab, :root[data-theme="dark"] .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--line); }
+:root[data-theme="dark"] .ab, :root[data-theme="dark"] .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px color-mix(in srgb, var(--frame) 55%, var(--surface-2)); }
 :root[data-theme="dark"] .ab:hover { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--accent); }
 :root[data-theme="dark"] .ab .score { border-color: var(--frame); background: var(--surface); }
-:root[data-theme="dark"] .vital { border-color: var(--frame); background: var(--surface-2); }
+:root[data-theme="dark"] .vital { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px color-mix(in srgb, var(--frame) 55%, var(--surface-2)); }
 :root[data-theme="dark"] button.vital:hover { border-color: var(--accent); }
 :root[data-theme="dark"] .shield-shape { background: var(--frame); }
 :root[data-theme="dark"] .shield-shape::before { background: var(--surface-2); }
@@ -984,9 +987,12 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 :root[data-theme="dark"] .hpbar > i { background: color-mix(in srgb, var(--good) 72%, var(--surface)); }
 :root[data-theme="dark"] .hpbar > i.mid { background: color-mix(in srgb, var(--warn-fill) 80%, var(--surface)); }
 :root[data-theme="dark"] .hpbar > i.low { background: var(--crimson); }
-:root[data-theme="dark"] .pip::before { border-color: var(--pc, #6f93cf); background: var(--pc, #6f93cf); }
+:root[data-theme="dark"] .pip::before { border-color: var(--pc, #5d7db5); background: var(--pc, #5d7db5); }
 :root[data-theme="dark"] .pip.used::before { background: transparent; border-color: var(--pcu, var(--ink-2)); }
 :root[data-theme="dark"] .dot.on { background: var(--ink-2); border-color: var(--ink-2); }
+:root[data-theme="dark"] .pill.live { background: color-mix(in srgb, var(--sun) 16%, var(--surface)); color: var(--sun); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sun) 55%, transparent); }
+/* the map picture only (the table display keeps full brightness) */
+:root[data-theme="dark"] .mapmount:not(.tv) .mapimg { filter: brightness(.78) saturate(.9); }
 :root[data-theme="dark"] .cond button[aria-pressed="true"] { color: #f6e9eb; }
 /* wax: the rules glow quietly, the text stays readable */
 :root[data-theme="dark"] .modal, :root[data-theme="dark"] .mdet, :root[data-theme="dark"] .mdet.mcur, :root[data-theme="dark"] .mbprev > .rt { border-top-color: var(--wax); border-bottom-color: var(--wax); }
