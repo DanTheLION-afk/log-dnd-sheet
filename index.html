@@ -1268,7 +1268,7 @@ function spellDmgBonus(ch, D, s, c, m) {
   return b;
 }
 function spellMathFor(ch, D, s, slot, c) {
-  const m = spellMath(s, slot, D.level, D.m[c.ab]);
+  const m = spellMath(s, slot, D.level, D.m[c.ab], ch.ruleset);
   const b = spellDmgBonus(ch, D, s, c, m);
   m.bonus = b;
   if (b) m.dmg = m.dmg + (b > 0 ? '+' : '-') + Math.abs(b);
@@ -1794,6 +1794,7 @@ function derive(ch) {
   } else {
     options.push([10 + dexM, 'Unarmored']);
     if (is24 && hasChoice(/^armor of shadows$/i)) options.push([13 + dexM, 'Mage Armor (Armor of Shadows)']);
+    if ((ch.play.fx || []).includes('magearmor')) options.push([13 + dexM, 'Mage Armor']);   // the spell, switched on from a cast (it ends if you don armor)
     for (const x of cls) {
       const un = x.def.unarmored || (hasFeatureIn(x, /^unarmored defense/i) ? (x.def.id === 'barbarian' ? { add: ['con'], shield: true } : x.def.id === 'monk' ? { add: ['wis'], shield: false } : null) : null);
       if (un && (un.shield || !shieldIt)) options.push([10 + dexM + sum((un.add || []).map(a => D.m[a])), x.def.name + ' Unarmored Defense']);
@@ -2321,17 +2322,24 @@ function embedUsed(ch, localOnly) {
 'use strict';
 /* ===== effects that change rolls, dice helpers, spell maths ===== */
 const FX_LIB = [
-  { id: 'rage', n: 'Rage', need: /^rage$/i, dmgFn: 'rage', strMelee: 1, note: 'Resistance to bludgeoning, piercing and slashing. Advantage on Strength checks and saves.' },
-  { id: 'reckless', n: 'Reckless Attack', need: /^reckless attack$/i, advAtk: 1, strMelee: 1, note: 'Attacks against you have advantage until your next turn.' },
+  { id: 'rage', n: 'Rage', need: /^rage$/i, dmgFn: 'rage', strMelee: 1, advSv: 'str', advCk: 'str', note: 'Resistance to bludgeoning, piercing and slashing. Advantage on Strength checks and saves. Lasts up to 1 minute (10 rounds); it ends when the fight or a rest does.' },
+  { id: 'reckless', n: 'Reckless Attack', need: /^reckless attack$/i, advAtk: 1, strMelee: 1, advAgainst: 1, note: 'Attacks against you have advantage until your next turn. Ends with the fight or a rest.' },
   { id: 'sneak', n: 'Sneak Attack', need: /^sneak attack$/i, dmgFn: 'sneak', weaponOnly: 1, once: 1, note: 'Once per turn. Switches itself off after it lands.' },
   { id: 'bless', n: 'Bless', atk: '1d4', save: '1d4' },
   { id: 'bane', n: 'Bane', atk: '-1d4', save: '-1d4' },
-  { id: 'guidance', n: 'Guidance', check: '1d4' },
-  { id: 'mark', n: 'Hunter’s Mark', dmg: '1d6', weaponOnly: 1 },
+  { id: 'guidance', n: 'Guidance', check: '1d4', note: 'Adds 1d4 to your ability checks (2014: once, then it ends; 2024: checks with the skill you chose). Switch it off when it is used up.' },
+  { id: 'resist', n: 'Resistance', rs: '2014', save: '1d4', note: 'Once: add 1d4 to one saving throw, then switch this off.' },
+  { id: 'resist24', n: 'Resistance', rs: '2024', note: 'Pick a damage type: damage of that type you take is reduced by 1d4, once per turn.' },
+  { id: 'mark', n: 'Hunter’s Mark', dmg: '1d6', weaponOnly: 1, note: 'Extra 1d6 on weapon hits against your marked quarry (the sheet adds it to every weapon hit, so switch it off for other targets).' },
+  { id: 'hex', n: 'Hex', dmg: '1d6', weaponOnly: 1, note: 'Extra 1d6 Necrotic on hits against the cursed creature (the sheet adds it to every weapon hit). It has disadvantage on checks with the ability you chose.' },
   { id: 'favor', n: 'Divine Favor', dmg: '1d4', weaponOnly: 1 },
   { id: 'shield', n: 'Shield spell', ac: 5, note: 'Lasts until the start of your next turn.' },
   { id: 'sof', n: 'Shield of Faith', ac: 2 },
-  { id: 'haste', n: 'Haste', ac: 2, note: 'Advantage on Dexterity saves, doubled speed, one extra limited action.' },
+  { id: 'magearmor', n: 'Mage Armor', note: 'Base AC 13 + Dexterity modifier while you wear no armor.' },
+  { id: 'heroism', n: 'Heroism', note: 'Immune to Frightened. Temporary hit points equal to the caster’s spellcasting modifier at the start of each of your turns.' },
+  { id: 'faerie', n: 'Faerie Fire', advAgainst: 1, note: 'Attack rolls against you have advantage if the attacker can see you. You can’t benefit from Invisible.' },
+  { id: 'binsp', n: 'Bardic Inspiration', note: 'Once: add the die you were given to one ability check, attack roll or saving throw, then switch this off.' },
+  { id: 'haste', n: 'Haste', ac: 2, advSv: 'dex', note: 'Advantage on Dexterity saves, doubled speed, one extra limited action. When it ends: 2014 you can’t move or act until after your next turn; 2024 you are Incapacitated with Speed 0 until the end of your next turn.' },
   { id: 'cover', n: 'Half cover', ac: 2 },
   { id: 'dstrike', n: 'Divine Strike', need: /^divine strike$/i, dmgFn: 'lvl', lvlCls: 'cleric', lvlAt: 14, die: '1d8', weaponOnly: 1, once: 1, note: 'Once on each of your turns: extra Necrotic or Radiant damage. Switches itself off after it lands.' },
   { id: 'pstrike', n: 'Primal Strike', need: /^primal strike$/i, dmgFn: 'lvl', lvlCls: 'druid', lvlAt: 15, die: '1d8', weaponOnly: 1, once: 1, note: 'Once on each of your turns: extra Cold, Fire, Lightning or Thunder damage. Switches itself off after it lands.' },
@@ -2368,7 +2376,7 @@ function exhRule(n, rs) {
 }
 function fxAvailable(ch, D) {
   const names = (D.features || []).map(x => x.n).concat((D.features || []).flatMap(x => [].concat((ch.choices || {})[x.key] || [])).filter(v => typeof v === 'string'));
-  const lib = FX_LIB.filter(f => !f.need || names.some(n => f.need.test(n)));
+  const lib = FX_LIB.filter(f => (!f.need || names.some(n => f.need.test(n))) && (!f.rs || f.rs === ch.ruleset));
   return lib.concat((ch.customFx || []).map(f => Object.assign({ custom: 1 }, f)));
 }
 function fxMods(ch, D) {
@@ -2413,7 +2421,7 @@ function takeAdv() {
 function d20Roll(o) {
   const M = o.M, t = o.type;
   const dice = M ? M.defs.filter(f => f[t] && (t !== 'atk' || fxApplies(f, o.a) || !f.strMelee)).map(f => f[t]) : [];
-  const um = o.type === 'death' ? 'normal' : takeAdv(); let adv = um === 'adv', dis = um === 'dis';
+  const um = o.type === 'death' || o.noAdv ? 'normal' : takeAdv(); let adv = um === 'adv', dis = um === 'dis';   // noAdv: the DM's own advantage switch isn't meant for automatic monster rolls
   if (t === 'atk' && o.vex) adv = true;
   if (o.dis) dis = true;
   if (M) {
@@ -2421,6 +2429,7 @@ function d20Roll(o) {
     if (t === 'check' && M.disCheck) dis = true;
     if (t === 'save' && M.disSave) dis = true;
     if (t === 'save' && M.disDex && o.ab === 'dex') dis = true;
+    if (o.ab && M.defs.some(f => f[t === 'save' ? 'advSv' : t === 'check' ? 'advCk' : ''] === o.ab)) adv = true;   // Rage: Strength checks and saves; Haste: Dexterity saves
     if (M.disHeavy && ['str', 'dex', 'con'].includes(t === 'atk' ? o.a && o.a.ab : o.ab) && t !== 'death') dis = true;   // heavily encumbered
   }
   const mode = adv && !dis ? 'adv' : dis && !adv ? 'dis' : 'normal';
@@ -2441,16 +2450,49 @@ function addDice(base, inc, n) {
   if (b && i && b[2] === i[2]) return (+b[1] + (+i[1]) * n) + 'd' + b[2] + b[3];
   return i ? base + '+' + (+i[1] * n) + 'd' + i[2] : base;
 }
+/* Build 35: what a spell does to other creatures or to the caster's own sheet, by spell name (slug), "name@2014" or "name@2024" when the editions differ.
+   fx = FX_LIB id switched on for the target; to = allies (chosen creatures, you if none), self, or foes (a failed save, or the chosen creatures, gets it);
+   only = nothing else happens (no save, damage or healing roll: the data's dice are part of the effect, e.g. Hex's 1d6 rides on hits); r = rounds a fight row keeps it;
+   cond/rep/then/wake = the condition a failed save applies, the repeat save at the end of each of its turns, a second stage, "ends when damaged"; st = ends when the caster's next turn starts */
+const SPELL_EFFECTS = {
+  bless: { fx: 'bless', to: 'allies', only: 1, r: 10 },
+  bane: { fx: 'bane', to: 'foes', r: 10 },
+  shield: { fx: 'shield', to: 'self', only: 1, st: 1 },
+  'shield-of-faith': { fx: 'sof', to: 'allies', only: 1, r: 99 },
+  'mage-armor': { fx: 'magearmor', to: 'allies', only: 1 },
+  heroism: { fx: 'heroism', to: 'allies', only: 1, r: 10, temp: 1 },
+  guidance: { fx: 'guidance', to: 'allies', only: 1, r: 10 },
+  'resistance@2014': { fx: 'resist', to: 'allies', only: 1, r: 10 },
+  'resistance@2024': { fx: 'resist24', to: 'allies', only: 1, r: 10 },
+  haste: { fx: 'haste', to: 'allies', only: 1, r: 10 },
+  'hunters-mark': { fx: 'mark', to: 'self', only: 1 },
+  hex: { fx: 'hex', to: 'self', only: 1 },
+  'divine-favor': { fx: 'favor', to: 'self', only: 1, r: 10 },
+  'faerie-fire': { fx: 'faerie', to: 'foes', r: 10, adv: 1 },
+  'hold-person': { cond: 'Paralyzed', to: 'foes', r: 10, rep: 1 },
+  entangle: { cond: 'Restrained', to: 'foes', r: 10 },
+  'sleep@2014': { to: 'foes', only: 1, pool: 1 },   // not damage: 5d8 hit points of creatures, lowest current hit points first
+  'sleep@2024': { to: 'foes', cond: 'Incapacitated', r: 1, then: 'Unconscious', wake: 1 },
+  command: { to: 'foes', r: 1, note: 'follows the command on its next turn (Approach, Drop, Flee, Grovel or Halt)' },
+};
+const spellEff = (s, rs) => { const k = slug(s.name); return SPELL_EFFECTS[k + '@' + rs] || SPELL_EFFECTS[k] || null; };
 /* what a spell does at a given slot: damage, healing, save and whether a save halves */
-function spellMath(s, slot, lvl, mod) {
+function spellMath(s, slot, lvl, mod, rs) {
   const base = s.d || '', desc = base + ' ' + (s.hl || '');
   const o = { dmg: '', heal: '', half: !!s.half || /half as much damage|half damage/i.test(desc), save: s.save || '', dt: s.dt || '' };
   if (!o.save) { const m = base.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) sav/i); if (m) o.save = m[1].slice(0, 3).toLowerCase(); }
   const at = slot || s.lvl, up = Math.max(0, at - s.lvl);
   const inc = re => { const m = desc.match(re); return m ? m[1] : ''; };
+  const se = spellEff(s, rs);
+  if (se && se.only) { o.save = ''; o.half = false; if (se.pool) o.pool = addDice('5d8', '2d8', up); return o; }   // Haste is no Dexterity save, Hex deals nothing on the cast, Sleep (2014) is a pool of hit points
   if (s.lvl === 0) { if (s.dmg) o.dmg = scaleCantrip(s.dmg, lvl); }
   else if (s.dmgAt && s.dmgAt[at]) o.dmg = s.dmgAt[at];
   else if (s.dmg) o.dmg = addDice(s.dmg, inc(/damage(?: \([^)]*\))? increases by (\d+d\d+)/i), up);
+  else if (s.atk) {   // 2024 Spiritual Weapon: "Force damage equal to 1d8 plus your spellcasting ability modifier"
+    const m = base.match(/(\w+) damage equal to (\d+d\d+) plus your spellcasting ability modifier/i);
+    if (m) { o.dmg = addDice(m[2], inc(/damage increases by (\d+d\d+) for (?:every|each) slot level above/i), up) + '+MOD'; o.dt = o.dt || m[1]; }
+  }
+  if (o.dmg) o.dmg = o.dmg.replace(/\+MOD/i, mod ? (mod > 0 ? '+' : '-') + Math.abs(mod) : '');   // 2014 Spiritual Weapon carries "+MOD" in its table
   let heal = s.healAt ? (s.healAt[at] || s.healAt[Object.keys(s.healAt)[0]]) : '';
   if (!heal && !s.dmg) { const m = base.match(/regains?[^.]*?(\d+d\d+)([^.]*modifier)?/i); if (m) heal = addDice(m[1], inc(/healing increases by (\d+d\d+)/i), up) + (m[2] ? '+MOD' : ''); }
   if (heal) o.heal = heal.replace(/\+?MOD/i, mod ? (mod > 0 ? '+' : '-') + Math.abs(mod) : '');
@@ -2766,7 +2808,9 @@ function saveChar(ch) {
   }
 }
 function savePlay(ch, patch) {
+  const was = ch.play.conc;
   Object.assign(ch.play, patch);
+  if (was && 'conc' in patch && patch.conc !== was) concEnded(ch, was);   // every way concentration ends (damage, a condition, 0 HP, a new spell, a rest) passes here
   if (S.mode === 'live') {
     const owner = ch._owner || S.me.id;
     if (!canEditChar(owner)) return;
@@ -3611,7 +3655,7 @@ function advSeg() {
 /* inventory with containers shown nested; each container folds away */
 function gearLine(ch, it, i, ro) {
   const d = itemDef(ch, it), eqable = canEquip(it, d), nm =esc(it.name || (d ? d.name : it.id));
-  return `<span class="grow">${it.eq ? '<b>' : ''}${d ? `<button type="button" class="rl" data-act="iteminfo" data-i="${i}" title="Show the rules for ${nm}">${nm}</button>` : nm}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>` : ''}${needsAtt(ch, it, d) ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}`;
+  return `<span class="grow">${it.eq ? '<b>' : ''}${d ? `<button type="button" class="rl" data-act="iteminfo" data-i="${i}" title="Show the rules for ${nm}">${nm}</button>` : nm}${it.eq ? '</b>' : ''}${qOf(it) !== 1 ? ' ×' + qOf(it) : ''}</span>${useKind(ch, it, d) ? `<button class="btn sm" data-act="invuse" data-i="${i}"${dis(ro || qOf(it) < 1)}>${useKind(ch, it, d) === 'heal' ? 'Drink' : 'Use'}</button>` : ''}${eqable ? `<label class="chk"><input type="checkbox" data-act="inveq" data-i="${i}"${it.eq ? ' checked' : ''}${dis(ro)}> Equipped</label>` : ''}${needsAtt(ch, it, d) ? `<label class="chk"><input type="checkbox" data-act="invatt" data-i="${i}"${it.att ? ' checked' : ''}${dis(ro)}> Attuned</label>` : ''}`;
 }
 /* only(it, parent): which top-level items to list; equipped and attuned items are listed in their own groups, never inside a container */
 function gearRows(ch, ro, only) {
@@ -3626,11 +3670,13 @@ function gearRows(ch, ro, only) {
   return inv.map((it, i) => [it, i]).filter(([it]) => only(it, parent)).map(([it, i]) => node(it, i)).join('');
 }
 /* tracked counter: pips for small maxima, otherwise a stepper */
-function resCtl(r, p, ro) {
-  const u = +(p.res || {})[r.key] || 0, left = Math.max(0, r.max - u);
-  return r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}" data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)} ${i + 1} of ${r.max}, ${i < left ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`;
+/* act (Build 35, from resActs): { fx } makes a pip click also switch that effect on or off (Rage); { btns } adds one-tap uses next to the counter (ACT.resuse) */
+function resCtl(r, p, ro, act) {
+  act = act || {}; const u = +(p.res || {})[r.key] || 0, left = Math.max(0, r.max - u), fx = act.fx ? ` data-fx="${esc(act.fx)}"` : '';
+  const btns = (act.btns || []).map((b, i) => `<button class="btn sm" data-act="resuse" data-k="${esc(r.key)}" data-i="${i}"${dis(ro || left < (b.min || b.cost || 1))}>${esc(b.l)}</button>`).join('');
+  return (r.max <= 8 ? `<span class="pips">${Array.from({ length: r.max }, (_, i) => `<button class="pip circ${i < left ? '' : ' used'}" data-act="res" data-k="${esc(r.key)}"${fx} data-n="${i < left ? u + 1 : u - 1}" aria-label="${esc(r.n)} ${i + 1} of ${r.max}, ${i < left ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span>` : `<span class="row" style="gap:4px"><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u + 1}"${dis(ro || left <= 0)}>−</button><span class="num" style="font-size:18px;min-width:56px;text-align:center">${left} / ${r.max}</span><button class="btn sm" data-act="res" data-k="${esc(r.key)}" data-n="${u - 1}"${dis(ro || u <= 0)}>+</button></span>`) + btns;
 }
-const resRow = (r, p, ro) => `<div class="row"><span class="grow"><b>${ruleLink('Feature', r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${resCtl(r, p, ro)}</div>`;
+const resRow = (r, p, ro, act) => `<div class="row"><span class="grow"><b>${ruleLink('Feature', r.n)}</b> <span class="small muted">${r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest'}${r.note ? ' · ' + esc(r.note) : ''}</span></span>${resCtl(r, p, ro, act)}</div>`;
 /* custom sections: one renderer for every field type (text, number, checkbox, counter) */
 const FIELD_TYPES = [['text', 'Notes'], ['num', 'Number'], ['check', 'Checkbox'], ['count', 'Counter']];
 const RESET_OPTS = [['long', 'Long rest'], ['short', 'Short rest'], ['none', 'No reset']];
@@ -3763,7 +3809,7 @@ function sheetView(ch, D, ro, e) {
     </tbody></table></div></div>`;
   const res = (D.res.some(r => !r.cf) || D.info.length) ?`<div class="panel stack"><h3>Class resources</h3>
     ${D.info.length ? `<div class="row small">${D.info.map(([k, v]) => `<span class="pill">${esc(k)}: <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
-    ${D.res.filter(r => !r.cf).map(r => resRow(r, p, ro, true)).join('')}
+    ${D.res.filter(r => !r.cf).map(r => resRow(r, p, ro, resActs(r, ch, D))).join('')}
     ${ro ? '' : '<p class="small muted">Track your own counters under Notes: add a section and a counter field.</p>'}
   </div>` : '';
   const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px;flex-wrap:nowrap">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm exh" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
@@ -5398,7 +5444,12 @@ const ACT = {
   cond(el) { const ch = C(); const c = (ch.play.cond || []).slice(); const v = el.dataset.v; const i = c.indexOf(v); if (i >= 0) c.splice(i, 1); else c.push(v); play(ch, condPatch(ch.play.cond || [], c)); },
   slot(el) { const ch = C(); const l = el.dataset.l; const D = getD(ch); play(ch, { slots: Object.assign({}, ch.play.slots || {}, { [l]: clamp(+el.dataset.n, 0, D.slots[l - 1] || 0) }) }); },
   pact(el) { const ch = C(); const D = getD(ch); play(ch, { pact: clamp(+el.dataset.n, 0, D.pact ? D.pact.n : 0) }); },
-  res(el) { const ch = C(); const D = getD(ch); const r = D.res.find(x => x.key === el.dataset.k); if (!r) return; play(ch, { res: Object.assign({}, ch.play.res || {}, { [r.key]: clamp(+el.dataset.n, 0, r.max) }) }); },
+  res(el) {
+    const ch = C(); const D = getD(ch); const r = D.res.find(x => x.key === el.dataset.k); if (!r) return;
+    const was = +(ch.play.res || {})[r.key] || 0, now = clamp(+el.dataset.n, 0, r.max), fx = el.dataset.fx;
+    play(ch, { res: Object.assign({}, ch.play.res || {}, { [r.key]: now }) });
+    if (fx && now !== was && (now > was) !== (ch.play.fx || []).includes(fx)) ACT.fx({ dataset: { v: fx } });   // Rage: spending a use switches it on, giving it back switches it off
+  },
   /* initiative */
   /* homebrew */
   hbpack(el) { UI.hb.pack = el.dataset.v; UI.hb.q = ''; queueRender(); },
@@ -5641,7 +5692,7 @@ function publicCombat(cb) {
   };
 }
 /* timed effects: players get names, rounds left and the save to end them, nothing else */
-const fxPub = c => (c.fxs || []).map(f => ({ id: f.id, n: f.n, r: f.r, sv: f.ab ? f.ab.toUpperCase() + ' DC ' + f.dc : '' }));
+const fxPub = c => (c.fxs || []).map(f => Object.assign({ id: f.id, n: f.n, r: f.r, sv: f.ab ? f.ab.toUpperCase() + ' DC ' + f.dc : '' }, f.adv ? { adv: 1 } : {}));
 const fxText = f => f.n + (f.r != null ? ' · ' + f.r + (f.r === 1 ? ' round' : ' rounds') : '') + (f.sv ? ' · ends on ' + f.sv : '');
 /* effect pills, then conditions that are not just the same effect again */
 const condPills = (conds, fx) => (fx || []).map(f => `<span class="pill bad" title="Effect">${esc(fxText(f))}</span>`).concat(conds.filter(k => !(fx || []).some(f => f.n === k)).map(k => `<span class="pill bad">${esc(k)}</span>`)).join('');
@@ -5671,7 +5722,8 @@ function monDef(c) { return c && c.cmp ? cmpDef(c) : c && c.mid ? edDef(c, regis
 const rsOf = c => { const x = c.kind === 'pc' && findChar(c.cid, c.owner); return x ? x.ch.ruleset : (c.rs || RUN.rs); };
 const nameOf = c => c.hidden ? 'Something unseen' : liveName(c);
 const monSaveBonus = (c, ab) => { const d = monDef(c); return d ? (d.saves && d.saves[ab] != null ? +d.saves[ab] : mod((d.ab || {})[ab] || 10)) : (+c.sv || 0); };
-const monSave = (c, ab) => { const b = monSaveBonus(c, ab); return rollExpr('1d20' + (b ? (b > 0 ? '+' : '-') + Math.abs(b) : '')); };
+/* a monster's save counts its conditions and spell effects (Paralyzed fails Strength and Dexterity saves, Bane subtracts 1d4) */
+const monSave = (c, ab) => d20Roll({ M: monFx(c), bonus: monSaveBonus(c, ab), type: 'save', ab, noAdv: true });
 /* counts and lair text from the stat block text; legendary actions default to 3 per round and resistance to 3 per day */
 function monExtra(d) {
   if (!d) return { la: 0, lr: 0, lair: '' };
@@ -5693,17 +5745,71 @@ function setCond(c, v, on) {
   c.cond = (c.cond || []).filter(k => k !== v).concat(on ? [v] : []);
   if (on && CONC_END.includes(v)) c.conc = '';
 }
+/* Build 35: f = { n, r, ab, dc } plus, from spells and features, cond (the condition it applies under its own name), fx (an FX_LIB id: rolls change, see monFx and fxOn),
+   src + by (the spell and the caster's character id: concentration ending removes it, endConc), adv (attacks against it have advantage), st (ends when its owner's next turn starts),
+   wake (ends when it takes damage), th (the condition a failed repeat save turns it into, fxThen) */
 function addFx(cb, c, f) {   // f may come from a player's message: clean it
   const n = String(f.n || '').trim().slice(0, 40); if (!n) return;
-  const ab = ABIL.includes(f.ab) ? f.ab : '', r = Math.round(+f.r) > 0 ? clamp(Math.round(+f.r), 1, 99) : null, cond = CONDITIONS.find(k => k.toLowerCase() === n.toLowerCase()) || '';
-  (c.fxs = c.fxs || []).push({ id: uid('x'), n: cond || n, r, ab, dc: ab ? clamp(Math.round(+f.dc) || 10, 1, 40) : 0, cond });
+  const ab = ABIL.includes(f.ab) ? f.ab : '', r = Math.round(+f.r) > 0 ? clamp(Math.round(+f.r), 1, 99) : null, cond = CONDITIONS.find(k => k.toLowerCase() === String(f.cond || n).toLowerCase()) || '';
+  const e = { id: uid('x'), n: f.cond && cond ? n : cond || n, r, ab, dc: ab ? clamp(Math.round(+f.dc) || 10, 1, 40) : 0, cond };
+  if (FX_LIB.some(x => x.id === f.fx)) e.fx = f.fx;
+  if (f.src) { e.src = String(f.src).slice(0, 40); e.by = String(f.by || '').slice(0, 40); }
+  for (const k of ['adv', 'st', 'wake']) if (f[k]) e[k] = 1;
+  if (CONDITIONS.includes(f.th)) e.th = f.th;
+  (c.fxs = c.fxs || []).push(e);
   if (cond) setCond(c, cond, true);
+  if (e.fx && c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) fxOn(x.ch, { fx: e.fx, src: e.src, by: e.by, v: +f.v || 0 }); }
   saveCombat(cb);
+}
+/* a sheet switch (FX_LIB id) turned on or off by a spell; play.fxw remembers which spell and caster did it, and the value (Heroism's temporary hit points) */
+function fxOn(ch, e) {
+  savePlay(ch, { fx: Array.from(new Set([...(ch.play.fx || []), e.fx])), fxw: (ch.play.fxw || []).filter(w => w.id !== e.fx).concat(e.src ? [{ id: e.fx, s: e.src, by: e.by || '', v: +e.v || 0 }] : []) });
+}
+const fxOff = (ch, id) => savePlay(ch, { fx: (ch.play.fx || []).filter(i => i !== id), fxw: (ch.play.fxw || []).filter(w => w.id !== id) });
+/* put a spell's effect on a creature: a fight row gets a timed effect (a character's sheet switch comes with it), a character outside the fight just gets the switch */
+function applyEff(cb, id, e) {
+  const t = findTarget(id); if (!t) return;
+  const c = t.c || (t.kind === 'pc' && cb.list.find(x => x.kind === 'pc' && x.cid === t.x.ch.id));
+  if (c) addFx(cb, c, e); else if (e.fx && FX_LIB.some(x => x.id === e.fx)) fxOn(t.x.ch, e);
+  if (e.temp && t.kind === 'pc') savePlay(t.x.ch, { temp: Math.max(+t.x.ch.play.temp || 0, +e.v || 0) });
+}
+/* a caster's concentration ended: take its effects off every fight row and sheet */
+function endConc(cb, by, src) {
+  let n = 0;
+  for (const c of cb.list) for (const f of (c.fxs || []).slice()) if (f.src === src && f.by === by) { fxDrop(c, f, ' (concentration ended)'); n++; }
+  for (const x of chars()) { const w = (x.ch.play.fxw || []).filter(q => q.s === src && q.by === by); if (w.length && canEditChar(x.owner)) { savePlay(x.ch, { fx: (x.ch.play.fx || []).filter(i => !w.some(q => q.id === i)), fxw: (x.ch.play.fxw || []).filter(q => !w.includes(q)) }); n++; } }
+  if (n) saveCombat(cb);
+}
+/* sent from savePlay whenever a character's concentration changes or ends; only spells that leave effects behind matter */
+function concEnded(ch, spell) {
+  if (!spellEff({ name: spell }, ch.ruleset)) return;
+  sendMsg({ kind: 'turn', act: 'concend', cid: ch.id, owner: ch._owner || S.me.id, src: spell, who: ch.name, text: `${ch.name} stops concentrating on ${spell}.` });
+}
+const wakeFx = c => { for (const f of (c.fxs || []).filter(x => x.wake)) fxDrop(c, f, ' (woken by damage)'); };
+/* 2014 Sleep: the rolled pool of hit points puts the lowest-hit-point creatures to sleep first; undead and creatures immune to being charmed are skipped */
+function sleepPool(cb, m) {
+  let left = Math.max(0, +m.pool || 0); const asleep = [], skipped = [];
+  const rows = (m.tgts || []).map(id => { const t = findTarget(id); return t && { id, t, hp: t.kind === 'pc' ? hpOf(t.x.ch, derive(t.x.ch)) : t.c.hp, cond: t.kind === 'pc' ? t.x.ch.play.cond || [] : t.c.cond || [] }; }).filter(r => r && r.hp != null && !r.cond.includes('Unconscious')).sort((a, b) => a.hp - b.hp);
+  for (const r of rows) {
+    const d = r.t.def;
+    if (d && (/^undead/i.test(d.type || '') || (d.cimm || []).some(s => /charmed/i.test(s)))) { skipped.push(r.t.name + ' (immune)'); continue; }
+    if (r.hp > left) { skipped.push(r.t.name + ' (' + r.hp + ' HP, too many)'); break; }
+    left -= r.hp; applyEff(cb, r.id, m.eff || {}); asleep.push(r.t.name);
+  }
+  saveCombat(cb);
+  sendMsg({ kind: 'res', text: `${m.label || 'Sleep'}: ${m.pool} hit points. ${asleep.length ? asleep.join(', ') + ' fall unconscious' : 'Nobody falls asleep'}${skipped.length ? '; not affected: ' + skipped.join(', ') : ''}. Damage or a shake wakes them.`, hit: true });
 }
 function fxDrop(c, f, why) {
   c.fxs = (c.fxs || []).filter(x => x.id !== f.id);
   if (f.cond) setCond(c, f.cond, false);
+  if (f.fx && c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) fxOff(x.ch, f.fx); }
   sendMsg({ kind: 'res', text: `${nameOf(c)}: ${f.n} ends${why}.`, hit: true });
+}
+/* the repeat save failed: a two-stage effect (2024 Sleep) turns into its second condition */
+function fxThen(cb, c, f) {
+  c.fxs = (c.fxs || []).filter(x => x.id !== f.id); if (f.cond) setCond(c, f.cond, false);
+  addFx(cb, c, { n: f.n, cond: f.th, r: 9, src: f.src, by: f.by, wake: f.wake });
+  sendMsg({ kind: 'res', text: `${nameOf(c)} fails the second save against ${f.n} and is ${f.th}.`, hit: true });
 }
 function fxSave(c, f) {
   if (c.kind === 'pc') { sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label: `a ${ABN[f.ab]} save to end ${f.n}`, t: 'save', ab: f.ab, dc: f.dc, keys: [c.owner + '|' + c.cid], fx: { cid: c.cid, id: f.id } }); return; }
@@ -5715,6 +5821,7 @@ function fxSave(c, f) {
 function fxTurn(cb, c, end) {
   for (const f of (c.fxs || []).slice()) {
     if (end && f.ab) fxSave(c, f);
+    if (end && f.th && (c.fxs || []).includes(f)) { if (c.kind !== 'pc') fxThen(cb, c, f); continue; }   // a player's answer decides (fxSaved)
     if (end === (cb.tick !== 'start') && f.r != null && (c.fxs || []).includes(f) && --f.r <= 0) fxDrop(c, f, ' (duration over)');
   }
 }
@@ -5722,6 +5829,7 @@ function fxTurn(cb, c, end) {
 function fxSaved(q, pass) {
   const cb = cbt(), c = cb.list.find(x => x.kind === 'pc' && x.cid === q.fx.cid), f = c && (c.fxs || []).find(x => x.id === q.fx.id);
   if (f && pass) { fxDrop(c, f, ' (saved)'); saveCombat(cb); }
+  else if (f && f.th) { fxThen(cb, c, f); saveCombat(cb); }
 }
 function skipTurn(cb, c) {
   if (c.kind === 'mon' && cb.skipDead !== false && c.hp != null && c.hp <= 0) return true;
@@ -5732,7 +5840,11 @@ function skipTurn(cb, c) {
   return true;
 }
 function arrive(cb, c) {
-  if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) savePlay(x.ch, { used: { a: 0, b: 0, r: 0 } }); }
+  for (const f of (c.fxs || []).filter(x => x.st)) fxDrop(c, f, '');   // "until the start of your next turn" (Shield)
+  if (c.kind === 'pc') {
+    const x = findChar(c.cid, c.owner), hw = x && (x.ch.play.fxw || []).find(w => w.id === 'heroism');
+    if (x) savePlay(x.ch, Object.assign({ used: { a: 0, b: 0, r: 0 } }, hw && +hw.v > (+x.ch.play.temp || 0) ? { temp: +hw.v } : {}));   // Heroism: temporary hit points at the start of each turn
+  }
   else if (c.kind === 'mon') { c.lau = 0; c.rxu = 0; }   // legendary actions and the reaction come back on its own turn
   if (c.kind === 'lair' || isAbsent(c)) RUN.sel = c.id;   // show the lair actions, or the absent player's sheet
   else if (RUN.sel && (cb.list.find(x => x.id === RUN.sel) || {}).kind === 'lair') RUN.sel = null;
@@ -5775,9 +5887,18 @@ function condsOf(id) {
   const c = (isDMish() ? cbt().list : (S.init || {}).list || []).find(x => x.id === id);
   return !c ? [] : c.kind === 'pc' ? pc(c.cid, c.owner) : c.cond || [];
 }
-const advVs = id => condsOf(id).some(c => (COND_FX[c] || {}).advAgainst);
+/* conditions, or spell effects such as Faerie Fire and Reckless Attack, that give attackers advantage against a target id */
+const FX_ADV = new Set(FX_LIB.filter(f => f.advAgainst).map(f => f.id));
+function advVs(id) {
+  if (condsOf(id).some(c => (COND_FX[c] || {}).advAgainst)) return true;
+  id = String(id || '');
+  const onSheet = (cid, owner) => { const x = findChar(cid, owner); return !!x && (x.ch.play.fx || []).some(i => FX_ADV.has(i)); };
+  if (id.startsWith('pc|')) { const [, owner, cid] = id.split('|'); return onSheet(cid, owner); }
+  const c = (isDMish() ? cbt().list : (S.init || {}).list || []).find(x => x.id === id);
+  return !c ? false : c.kind === 'pc' ? onSheet(c.cid, c.owner) : (c.fxs || c.fx || []).some(f => f.adv);
+}
 /* a monster's own conditions change its attack rolls the way a character's do */
-const monFx = c => fxMods({ play: { cond: c.cond || [] }, ruleset: rsOf(c) }, {});
+const monFx = c => fxMods({ play: { cond: c.cond || [], fx: (c.fxs || []).map(f => f.fx).filter(Boolean) }, ruleset: rsOf(c) }, {});
 /* targets a sheet can aim at: the fight if one is running, otherwise the rest of the party */
 function targetsFor(ch, owner) {
   const I = S.init || {};
@@ -5804,6 +5925,7 @@ function hurt(t, amount, dt, crit) {
     if (!c.own && snap.hp != null && +snap.hp > 0 && c.hp != null && c.hp <= 0) b31Ev('kill', c.name);
     pushUndo(`${amount} damage to ${c.name}`, () => { const cb = cbt(), cc = cb.list.find(x => x.id === c.id); if (cc) { Object.assign(cc, snap); saveCombat(cb); } });
     if (c.conc && amount > 0) monConc(c, amount, c.hp != null && c.hp <= 0);
+    if (amount > 0) wakeFx(c);
     saveCombat(cbt());
     return { dealt: amount, note, down: c.hp != null && c.hp <= 0 };
   }
@@ -5818,6 +5940,7 @@ function hurt(t, amount, dt, crit) {
   if (amount > 0 && ch.play.ws && ch.ruleset !== '2024') amount = wsDamage(ch, amount);
   if (amount > 0 && before > 0 && before - amount <= 0) b31Ev('down', ch.name);
   hpChange(ch, -amount, crit);
+  if (amount > 0) { const pc = cbt().list.find(c => c.kind === 'pc' && c.cid === ch.id); if (pc && (pc.fxs || []).some(f => f.wake)) { wakeFx(pc); saveCombat(cbt()); } }
   return { dealt, note, down: amount > 0 && before - amount <= 0 };
 }
 function mend(t, amount) {
@@ -5859,6 +5982,7 @@ function handleMsg(m) {
     const pass = q.dc ? m.total >= q.dc : null;
     q.answers[m.key] = { total: m.total, pass, who: m.who };
     if (isResolver() && !m.old && q.fx) fxSaved(q, pass);
+    if (isResolver() && !m.old && q.eff && pass === false) applyEff(cbt(), 'pc|' + m.key, q.eff);   // a spell's or monster's rider on a failed save
     if (isResolver() && !m.old && q.dmg != null) {
       const t = findTarget('pc|' + m.key);
       const amt = pass ? (q.half ? Math.floor(q.dmg / 2) : 0) : q.dmg;
@@ -5913,10 +6037,11 @@ function resolveSave(m) {
     const pass = r.total >= (+m.dc || 0);
     const amt = m.dmg == null ? 0 : pass ? (m.half ? Math.floor(m.dmg / 2) : 0) : m.dmg;
     const h = amt ? hurt(t, amt, m.dt) : { dealt: 0, note: '', down: false };
-    parts.push(`${t.name} ${pass ? 'saves' : 'fails'}${m.dmg != null ? ` (${h.dealt}${h.note})` : ''}${h.down ? ', down' : ''}`);
+    if (!pass && m.eff) applyEff(cbt(), t.c.id, m.eff);
+    parts.push(`${t.name} ${pass ? 'saves' : 'fails'}${m.dmg != null ? ` (${h.dealt}${h.note})` : ''}${h.down ? ', down' : ''}${!pass && m.eff ? ` and ${m.eff.note || 'is affected: ' + m.eff.n + (m.eff.cond ? ' (' + m.eff.cond + ')' : '')}` : ''}`);
   }
   if (parts.length) sendMsg({ kind: 'res', ref: m.rid, text: `${m.label}: ${parts.join('; ')}.`, hit: true, priv: m.priv });
-  if (pcs.length) sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label: `a ${ABN[m.ab || 'dex']} save against ${m.label}`, t: 'save', ab: m.ab || 'dex', dc: +m.dc || 0, keys: pcs, dmg: m.dmg, half: !!m.half, dt: m.dt });
+  if (pcs.length) sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label: `a ${ABN[m.ab || 'dex']} save against ${m.label}`, t: 'save', ab: m.ab || 'dex', dc: +m.dc || 0, keys: pcs, dmg: m.dmg, half: !!m.half, dt: m.dt, eff: m.eff });
 }
 function resolveApply(m) {
   const names = [];
@@ -5962,7 +6087,7 @@ function restPatch(ch, D, kind) {
       if (is24 && /:(rage_count|channel_divinity_charges|second_wind_uses|wild_shape_uses)$/.test(r.key)) res[r.key] = Math.max(0, (+res[r.key] || 0) - 1);
       else if (r.reset === 'short') res[r.key] = 0;
     }
-    return { res, pact: 0 };
+    return Object.assign({ res, pact: 0 }, fightFxOff(ch));   // a short rest ends Rage and Reckless Attack
   }
   const hd = Object.assign({}, ch.play.hd || {});
   let regain = is24 ? 999 : Math.max(1, Math.floor(D.level / 2));
@@ -5971,6 +6096,7 @@ function restPatch(ch, D, kind) {
   const none = new Set(D.res.filter(r => r.reset === 'none').map(r => r.key));   // counters that never reset on their own
   const res = {}; for (const k of Object.keys(ch.play.res || {})) res[k] = none.has(k) ? ch.play.res[k] : 0; for (const r of D.res) if (r.reset !== 'none') res[r.key] = 0;
   const out = { hp: D.maxHp, temp: 0, slots, pact: 0, res, hd, ds: [0, 0], exh: Math.max(0, (+ch.play.exh || 0) - 1), conc: '', concDC: 0, concN: 0 };
+  Object.assign(out, fightFxOff(ch));   // ...and so does a long one
   if (is24 && (D.traits || []).some(t => /^resourceful$/i.test(t.n || ''))) out.insp = true;   // Human: Heroic Inspiration after every long rest
   return out;
 }
@@ -5980,12 +6106,14 @@ const RUN = { sel: null, picks: {}, q: '', rs: LS.get('rs', '2024'), tgt: '', hp
 /* clickable pips: a filled pip is still available, a hollow one is spent; tapping one spends or restores up to it */
 const combatPips = (c, k, max, label) => `<span class="pips" role="group" aria-label="${label}">${Array.from({ length: max }, (_, i) => { const spent = i < (+c[k] || 0); return `<button class="pip${spent ? ' used' : ''}" data-act="cpip" data-v="${esc(c.id)}" data-k="${k}" data-n="${spent ? i : i + 1}" aria-label="${label} ${i + 1} of ${max}, ${spent ? 'spent' : 'available'}"></button>`; }).join('')}</span>`;
 /* add an effect: name (a condition name also applies that condition), rounds, and an optional save that ends it */
-const fxForm = (btn, id) => `<div class="row" data-fxf="${esc(id)}"><input type="text" list="fxnames" data-k="n" placeholder="Effect or condition" aria-label="Effect" style="width:190px"><input type="number" min="1" data-k="r" placeholder="Rounds" aria-label="Rounds" style="width:92px"><select data-k="ab" aria-label="Save that ends it"><option value="">No save</option>${ABIL.map(a => opt(a, a.toUpperCase() + ' save')).join('')}</select><input type="number" min="1" data-k="dc" placeholder="DC" aria-label="Save DC" style="width:62px">${btn}</div><datalist id="fxnames">${CONDITIONS.map(k => `<option value="${k}">`).join('')}</datalist>`;
+const fxForm = (btn, id) => `<div class="row" data-fxf="${esc(id)}"><input type="text" id="f-fx-${esc(id)}-n" list="fxnames" data-k="n" placeholder="Effect or condition" aria-label="Effect" style="width:190px"><input type="number" id="f-fx-${esc(id)}-r" min="1" data-k="r" placeholder="Rounds" aria-label="Rounds" style="width:92px"><select id="f-fx-${esc(id)}-ab" data-k="ab" aria-label="Save that ends it"><option value="">No save</option>${ABIL.map(a => opt(a, a.toUpperCase() + ' save')).join('')}</select><input type="number" id="f-fx-${esc(id)}-dc" min="1" data-k="dc" placeholder="DC" aria-label="Save DC" style="width:62px">${btn}</div><datalist id="fxnames">${CONDITIONS.map(k => `<option value="${k}">`).join('')}</datalist>`;
 function fxRead(el) {
   const b = el.closest('[data-fxf]'), g = k => b.querySelector(`[data-k="${k}"]`).value, n = g('n').trim(), ab = g('ab'), dc = +g('dc');
   if (!n) { toastMsg('Name the effect first.'); return null; }
   if (ab && !dc) { toastMsg('Type the DC of the save.'); return null; }
-  return { n, r: +g('r') || null, ab, dc };
+  const out = { n, r: +g('r') || null, ab, dc };
+  b.querySelectorAll('input,select').forEach(i => { i.value = ''; });   // the fields keep what you typed across a redraw (they have ids), so a used form is emptied here
+  return out;
 }
 function crLabel(v) { return v === 0.125 ? '1/8' : v === 0.25 ? '1/4' : v === 0.5 ? '1/2' : String(v); }
 function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>`; }
@@ -6320,7 +6448,7 @@ Object.assign(ACT, {
   mroll(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), d = monDef(c); if (!d) return; const ab = el.dataset.ab, sv = !!el.dataset.sv;
     const b = el.dataset.b != null ? +el.dataset.b : sv && d.saves && d.saves[ab] != null ? +d.saves[ab] : mod(d.ab[ab]);   // data-b: a skill's own bonus
-    const r = d20Roll({ bonus: b, type: sv ? 'save' : 'check' });
+    const r = d20Roll({ M: monFx(c), bonus: b, type: sv ? 'save' : 'check', ab });
     sendMsg({ kind: 'roll', who: seenName(c), label: el.dataset.l ? el.dataset.l + ' check' : ABN[ab] + (sv ? ' save' : ' check'), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, priv: UI.priv });
   },
   matk(el) {
@@ -6338,7 +6466,7 @@ Object.assign(ACT, {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a || !a.dc) return;
     const tg = Object.keys(RUN.picks).filter(id => id !== c.id); if (!tg.length) { toastMsg('Tick the creatures it hits in the turn order first.'); return; }
     const dm = a.dmg ? rollDmgList(a.dmg) : null;
-    sendMsg({ kind: 'save', rid: uid('s'), who: seenName(c), label: `${seenName(c)}: ${a.n}`, ab: a.dc.ab, dc: a.dc.v, dmg: dm ? dm.total : null, half: !!a.dc.half, dt: dm ? dm.dt : '', tgts: tg, tgtNames: tg.map(id => (findTarget(id) || {}).name).filter(Boolean).join(', '), priv: UI.priv });
+    sendMsg({ kind: 'save', rid: uid('s'), who: seenName(c), label: `${seenName(c)}: ${a.n}`, ab: a.dc.ab, dc: a.dc.v, dmg: dm ? dm.total : null, half: !!a.dc.half, dt: dm ? dm.dt : '', eff: monRider(a, c), tgts: tg, tgtNames: tg.map(id => (findTarget(id) || {}).name).filter(Boolean).join(', '), priv: UI.priv });
   },
   mdmg(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return; const dm = rollDmgList(a.dmg || []);
@@ -6411,15 +6539,19 @@ function casterFor(ch, D, cid) {
   const g = (D.grants || []).find(x => x.id === cid); if (g) return { id: g.id, name: g.name, ab: g.ab, dc: g.dc, atk: g.atk };
   const ab = D.extraAb || 'cha'; return { id: '', name: 'Other', ab, dc: 8 + D.pb + D.m[ab], atk: D.pb + D.m[ab] };
 }
-function castNow(e, s, c, key, tgts, opts) {
-  const ch = e.ch, D = getD(ch), M = fxMods(ch, D), p = ch.play, patch = {};
-  let slotLvl = s.lvl;
+/* what casting with this slot key spends (a play patch) and the slot level the spell counts as */
+function slotPatch(ch, D, s, key) {
+  const p = ch.play, patch = {}; let lvl = s.lvl;
   if (s.lvl > 0) {
-    if (key === 'pact') { slotLvl = D.pact.lvl; patch.pact = (+p.pact || 0) + 1; }
-    else if (/^res:/.test(key)) { const rk = key.slice(4), gx = grantByRes(D, rk); slotLvl = (gx && gx.x.at) || s.lvl; patch.res = Object.assign({}, p.res || {}, { [rk]: (+(p.res || {})[rk] || 0) + 1 }); }
-    else if (key !== 'ritual' && key !== 'free') { slotLvl = +key; patch.slots = Object.assign({}, p.slots || {}, { [slotLvl]: (+(p.slots || {})[slotLvl] || 0) + 1 }); }
+    if (key === 'pact') { lvl = D.pact.lvl; patch.pact = (+p.pact || 0) + 1; }
+    else if (/^res:/.test(key)) { const rk = key.slice(4), gx = grantByRes(D, rk); lvl = (gx && gx.x.at) || s.lvl; patch.res = Object.assign({}, p.res || {}, { [rk]: (+(p.res || {})[rk] || 0) + 1 }); }
+    else if (key !== 'ritual' && key !== 'free') { lvl = +key; patch.slots = Object.assign({}, p.slots || {}, { [lvl]: (+(p.slots || {})[lvl] || 0) + 1 }); }
   }
-  if (s.conc) { patch.conc = s.name; patch.concDC = 0; patch.concN = 0; }
+  return { lvl, patch };
+}
+function castNow(e, s, c, key, tgts, opts) {
+  const ch = e.ch, D = getD(ch), M = fxMods(ch, D), p = ch.play, sp = slotPatch(ch, D, s, key), patch = sp.patch, slotLvl = sp.lvl;
+  if (s.conc) { patch.conc = s.name; patch.concDC = 0; patch.concN = 0; if (p.conc === s.name) concEnded(ch, s.name); }   // casting it again ends the old effects; another spell ends its own (savePlay)
   if (Object.keys(patch).length && canEditChar(e.owner)) play(ch, patch, 'casting ' + s.name);
   const m = spellMathFor(ch, D, s, slotLvl, c), dt = (opts && opts.dt) || m.dt;   // dt: the type picked for Chromatic Orb
   const who = ch.name, label = s.name + (s.lvl && slotLvl > s.lvl ? ` (level ${slotLvl} slot)` : ''), priv = privOn();
@@ -6427,6 +6559,17 @@ function castNow(e, s, c, key, tgts, opts) {
   const names = ids => ids.map(id => id === 'self' ? ch.name : (all.find(t => t.id === id) || {}).name).filter(Boolean).join(', ');
   const others = tgts.filter(id => id !== 'self' && all.some(t => t.id === id));
   const aim = i => others.length ? others[i % others.length] : '';   // pieces go round the chosen targets
+  const se = spellEff(s, ch.ruleset), me = 'pc|' + e.owner + '|' + ch.id;
+  const eff = se && JSON.parse(JSON.stringify({ n: s.name, r: se.r, src: s.name, by: ch.id, fx: se.fx, cond: se.cond, adv: se.adv, st: se.st, wake: se.wake, th: se.then, temp: se.temp, v: se.temp ? D.m[c.ab] : 0, note: se.note, ab: se.rep || se.then ? m.save : '', dc: c.dc }));
+  if (se && se.only) {   // Bless, Haste, Hex, Sleep (2014)...: the effect is the whole spell
+    const ids = se.to === 'self' ? [me] : others.concat(tgts.includes('self') ? [me] : []); if (!ids.length) ids.push(me);
+    if (se.pool) {
+      const dr = rollExpr(m.pool), pool = Math.max(0, dr.total);
+      if (others.length) sendMsg({ kind: 'turn', act: 'sleep', tgts: others, pool, label, eff: Object.assign({}, eff, { cond: 'Unconscious', r: 10, wake: 1 }), who, text: `${who} casts ${label}: ${dr.detail} = ${pool} hit points of creatures.`, priv });
+      else sendMsg({ kind: 'roll', who, label: label + ' (hit points of creatures)', total: pool, detail: dr.detail + ' · lowest current hit points first. Tick the creatures to apply it.', priv });
+    } else sendMsg({ kind: 'turn', act: 'speff', tgts: ids, eff, who, text: `${who} casts ${label} on ${ids.map(id => id === me ? ch.name : (all.find(t => t.id === id) || {}).name).filter(Boolean).join(', ')}.`, priv });
+    return;
+  }
   if (s.atk) {
     // Scorching Ray and Eldritch Blast: a separate attack and damage roll for every ray or beam
     for (let i = 0; i < (m.n > 1 ? m.n : 1); i++) {
@@ -6438,7 +6581,7 @@ function castNow(e, s, c, key, tgts, opts) {
     }
   } else if (m.save) {
     const dr = m.dmg ? rollExpr(m.dmg) : null;
-    if (others.length) sendMsg({ kind: 'save', rid: uid('s'), who, label, ab: m.save, dc: c.dc, dmg: dr ? Math.max(0, dr.total) : null, half: m.half, dt, tgts: others, tgtNames: names(others), priv });
+    if (others.length) sendMsg({ kind: 'save', rid: uid('s'), who, label, ab: m.save, dc: c.dc, dmg: dr ? Math.max(0, dr.total) : null, half: m.half, dt, tgts: others, tgtNames: names(others), eff: se && se.to === 'foes' ? eff : undefined, priv });
     else sendMsg({ kind: 'roll', who, label, total: dr ? dr.total : undefined, detail: `${dr ? dr.detail + ' ' + (dt || '') + ' damage · ' : ''}${ABN[m.save]} save DC ${c.dc}${m.half ? ', half on a success' : ''}`, priv });
   } else if (m.heal) {
     const hr = rollExpr(m.heal), amount = Math.max(0, hr.total);
@@ -6465,15 +6608,16 @@ MODALS.cast = () => {
   const c = casterFor(ch, D, m.cid), opts = slotOptions(ch, D, s, m.cid);
   if (!opts.some(o => o.k === m.slot)) m.slot = opts.length ? opts[0].k : '';
   const cur = opts.find(o => o.k === m.slot), math = spellMathFor(ch, D, s, cur ? cur.l : s.lvl, c);
-  const all = targetsFor(ch), needs = s.atk || math.save || math.dmg || math.heal;
+  const se = spellEff(s, ch.ruleset), ally = !!(se && se.to === 'allies');
+  const all = targetsFor(ch), needs = s.atk || math.save || math.dmg || math.heal || ally || (se && se.pool);
   const tg = m.tg || (m.tg = {});
   const pick = math.pick ? `<label class="field"><span class="lbl">Damage type</span><select data-act="castdt">${math.pick.map(t => opt(t, t, m.dt === t)).join('')}</select></label>` : '';
   const pickers = pick + (!needs ? '' : s.atk && !(math.n > 1)
     ? `<label class="field"><span class="lbl">Target</span><select id="f-ctgt">${opt('', 'No target: just roll')}${all.map(t => opt(t.id, t.name, UI.tgt === t.id)).join('')}</select></label>`
-    : `<div class="stack"><span class="lbl">${math.heal ? 'Who is healed' : math.n > 1 ? `Aim the ${math.noun}s: they go round the ticked targets` : 'Who is caught in it'}</span><div class="row">${math.heal ? `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="self"${tg.self ? ' checked' : ''}> Yourself</label>` : ''}${all.map(t => `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="${esc(t.id)}"${tg[t.id] ? ' checked' : ''}> ${esc(t.name)}</label>`).join('')}</div>${all.length ? '' : '<span class="small muted">No fight is running, so this just rolls.</span>'}</div>`);
+    : `<div class="stack"><span class="lbl">${math.heal ? 'Who is healed' : ally ? 'Who gets it (nobody ticked: you)' : math.n > 1 ? `Aim the ${math.noun}s: they go round the ticked targets` : 'Who is caught in it'}</span><div class="row">${math.heal || ally ? `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="self"${tg.self ? ' checked' : ''}> Yourself</label>` : ''}${all.map(t => `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="${esc(t.id)}"${tg[t.id] ? ' checked' : ''}> ${esc(t.name)}</label>`).join('')}</div>${all.length ? '' : '<span class="small muted">No fight is running, so this just rolls.</span>'}</div>`);
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Cast a spell"><div class="row"><h2>Cast ${esc(s.name)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="stack"><span class="lbl">Spell slot</span>${opts.length ? `<div class="row">${opts.map(o => `<button class="btn sm" data-act="castslot" data-v="${o.k}"${pressed(m.slot === o.k)}>${esc(o.label)}${o.left != null ? ` <span class="muted">${o.left} left</span>` : ''}</button>`).join('')}</div>` : '<div class="errline">No spell slots left for this spell. Take a rest, or ask the DM for an exception.</div>'}</div>
-    <div class="row small">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${math.save ? `<span class="pill">${ABN[math.save]} save DC ${c.dc}${math.half ? ', half on a success' : ''}</span>` : ''}${math.dmg ? `<span class="pill">${esc(dmgLabel(math))} ${esc(math.dt || '')}</span>` : ''}${math.heal ? `<span class="pill acc">heals ${esc(math.heal)}</span>` : ''}${s.conc ? `<span class="pill acc">Concentration${ch.play.conc && ch.play.conc !== s.name ? ': ends ' + esc(ch.play.conc) : ''}</span>` : ''}</div>
+    <div class="row small">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${math.save ? `<span class="pill">${ABN[math.save]} save DC ${c.dc}${math.half ? ', half on a success' : ''}</span>` : ''}${math.dmg ? `<span class="pill">${esc(dmgLabel(math))} ${esc(math.dt || '')}</span>` : ''}${math.heal ? `<span class="pill acc">heals ${esc(math.heal)}</span>` : ''}${math.pool ? `<span class="pill">${esc(math.pool)} hit points of creatures</span>` : ''}${se && !se.only && se.cond ? `<span class="pill">failed save: ${esc(se.cond)}</span>` : ''}${s.conc ? `<span class="pill acc">Concentration${ch.play.conc && ch.play.conc !== s.name ? ': ends ' + esc(ch.play.conc) : ''}</span>` : ''}</div>
     ${pickers}
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="castgo"${dis(!opts.length)}>Cast</button></div></div>`;
 };
@@ -6537,7 +6681,12 @@ Object.assign(ACT, {
   tgt(el) { UI.tgt = el.value; queueRender(); },
   sec(el) { UI.sec = el.dataset.v; queueRender(); },
   ptab(el) { UI.partyTab = el.dataset.v; queueRender(); },
-  fx(el) { const ch = C(); const cur = new Set(ch.play.fx || []); if (cur.has(el.dataset.v)) cur.delete(el.dataset.v); else cur.add(el.dataset.v); play(ch, { fx: Array.from(cur) }); },
+  fx(el) {
+    const ch = C(), id = el.dataset.v, cur = new Set(ch.play.fx || []), on = !cur.has(id);
+    if (on) cur.add(id); else cur.delete(id);
+    play(ch, { fx: Array.from(cur), fxw: (ch.play.fxw || []).filter(w => w.id !== id) });   // a hand switch forgets which spell it came from
+    fxTimer(ch, id, on);
+  },
   fxadd() {
     const ch = C(); const n = ($('#f-fxn').value || '').trim(); if (!n) { toastMsg('Give the effect a name.'); return; }
     const f = { id: uid('fx'), n };
@@ -6558,7 +6707,11 @@ Object.assign(ACT, {
   concskip() { play(C(), { concDC: 0, concN: 0 }); },
   cast(el) {
     const e = E(); if (!e) return; const ch = e.ch, D = getD(ch), s = look(ch, 'spells', el.dataset.v); if (!s) return;
-    if (s.lvl === 0) { castNow(e, s, casterFor(ch, D, el.dataset.c), '', UI.tgt ? [UI.tgt] : []); return; }
+    if (s.lvl === 0) {
+      const se = spellEff(s, ch.ruleset), pc = /^pc\|/.test(UI.tgt || '') || ((S.init || {}).list || []).some(c => c.id === UI.tgt && c.kind === 'pc');
+      castNow(e, s, casterFor(ch, D, el.dataset.c), '', UI.tgt && (pc || !(se && se.to === 'allies')) ? [UI.tgt] : []);   // Guidance and Resistance go to a character (you, with none picked), never to a monster picked as the attack target
+      return;
+    }
     openModal({ kind: 'cast', sid: s.id, cid: el.dataset.c, slot: '', tg: {} });
   },
   castslot(el) { UI.modal.slot = el.dataset.v; renderModal(); },
@@ -8186,7 +8339,7 @@ MODALS.xpend = () => {
     <p class="small muted">This clears the turn order for everyone. Saved encounters stay.</p>
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn" data-act="xpendgo" data-v="0">End without XP</button><button class="btn pri" data-act="xpendgo" data-v="1"${dis(!each)}>Give ${fmtN(each)} XP each and end</button></div></div>`;
 };
-function endCombatNow() { const o = cbt(); RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [], skipDead: o.skipDead !== false, tick: o.tick === 'start' ? 'start' : 'end' }); queueRender(); }
+function endCombatNow() { const o = cbt(); for (const x of chars()) { const pt = fightFxOff(x.ch); if (pt.fx && canEditChar(x.owner)) savePlay(x.ch, pt); }   /* Rage and Reckless Attack end with the fight */ RUN.picks = {}; RUN.sel = null; S.pendingAtk = []; saveCombat({ round: 1, cur: null, list: [], skipDead: o.skipDead !== false, tick: o.tick === 'start' ? 'start' : 'end' }); queueRender(); }
 Object.assign(ACT, {
   setadv(el) { saveSettings({ adv: el.dataset.v }); queueRender(); },
   xpgive() {
@@ -8378,6 +8531,13 @@ function resolveTurnMsg(m) {
     const c = cb.list.find(x => x.kind === 'pc' && x.cid === m.cid && x.owner === m.owner); if (!c) return;
     const f = m.act === 'fxrm' && (c.fxs || []).find(x => x.id === m.fid);
     if (m.act === 'fx') addFx(cb, c, m.fx || {}); else if (f) { fxDrop(c, f, ' (ended early)'); saveCombat(cb); }
+  }
+  else if (m.act === 'speff') { for (const id of (m.tgts || []).slice(0, 12)) applyEff(cb, id, m.eff || {}); saveCombat(cb); }   // a spell or feature puts an effect on these targets
+  else if (m.act === 'concend') endConc(cb, String(m.cid || ''), String(m.src || ''));
+  else if (m.act === 'sleep') sleepPool(cb, m);
+  else if (m.act === 'fxoff') {   // a sheet switch turned off by hand: drop its timer (Rage)
+    const c = cb.list.find(x => x.kind === 'pc' && x.cid === m.cid && x.owner === m.owner);
+    if (c && (c.fxs || []).some(f => f.fx === m.fx)) { c.fxs = c.fxs.filter(f => f.fx !== m.fx); saveCombat(cb); }
   }
   else if (m.act === 'join') {
     if (cb.list.some(x => x.kind === 'pc' && x.cid === m.cid)) return;
@@ -9265,14 +9425,16 @@ function whatCanIDo(ch, D, known, ro, inFight) {
   }
   const nk = s => String(s).toLowerCase().replace(/[^a-z]/g, ''), rs = D.res.filter(r => !r.cf);
   const feats = [...D.features.filter(x => !x.isFeat), ...D.traits.filter(t => !t.l || t.l <= D.level), ...(D.bg && D.bg.feature ? [D.bg.feature] : []), ...D.feats.map(x => ({ n: x.f.name, d: x.f.d }))];
+  const libs = fxAvailable(ch, D).filter(x => x.need), onFx = new Set(p.fx || []);
   for (const f of feats) {
     if (/^(Spellcasting|Pact Magic|Ability Score Improvement)$|Subclass$/.test(f.n)) continue;
     const r = nk(f.n).length > 3 && rs.find(z => !taken.has(z.key) && (nk(z.n).includes(nk(f.n)) || nk(f.n).includes(nk(z.n)))), k = actKind(f.d);
-    if (k === 'Other' && !r) continue;
+    const lib = libs.find(x => x.need.test(f.n)), smite = /^(divine smite|paladin.s smite)$/i.test(f.n);   // Rage, Reckless Attack, Sneak Attack... switch an effect; Divine Smite adds radiant dice
+    if (k === 'Other' && !r && !lib && !smite) continue;
     if (r) taken.add(r.key);
-    G[k].push(row(ruleLink('Feature', f.n), f.from || '', r ? resCtl(r, p, ro) : ''));
+    G[k].push(row(ruleLink('Feature', f.n), f.from || '', (r ? resCtl(r, p, ro, resActs(r, ch, D)) : '') + (lib ? `<button class="btn sm" data-act="fx" data-v="${esc(lib.id)}"${pressed(onFx.has(lib.id))}${dis(ro)} title="${esc(lib.note || '')}">${onFx.has(lib.id) ? 'On' : 'Use'}</button>` : '') + (smite ? `<button class="btn sm" data-act="smite"${dis(ro)} title="Spend a spell slot for extra radiant damage on a hit">Smite…</button>` : '')));
   }
-  for (const r of rs.filter(z => !taken.has(z.key))) G.Other.push(row(ruleLink('Feature', r.n), (r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest') + (r.note ? ' · ' + r.note : ''), resCtl(r, p, ro)));
+  for (const r of rs.filter(z => !taken.has(z.key))) G.Other.push(row(ruleLink('Feature', r.n), (r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest') + (r.note ? ' · ' + r.note : ''), resCtl(r, p, ro, resActs(r, ch, D))));
   const slots = D.slots.map((n, i) => n ? `${ORD(i + 1)}: ${n - (+(p.slots || {})[i + 1] || 0)} of ${n}` : '').filter(Boolean).concat(D.pact ? [`Pact: ${D.pact.n - (+p.pact || 0)} of ${D.pact.n}`] : []);
   const key = { Action: 'a', 'Bonus action': 'b', Reaction: 'r' };
   return `<div class="panel stack canpanel"><div class="ph">What you can do<span class="spacer"></span><button class="btn ghost sm" data-act="pal" title="Search rules, spells and items (Ctrl+K)">Look up a rule</button></div>
@@ -9538,6 +9700,127 @@ Object.assign(ACT, {
     toastMsg(`${c.name} is back to its stat block.`); queueRender();
   },
 });
+
+'use strict';
+/* ===== Build 35: effects that do something =====
+   spells:    SPELL_EFFECTS (near spellMath) says what a cast puts on whom; castNow sends it as { kind: 'turn', act: 'speff' | 'sleep' } or as an `eff` on the save message,
+              resolveTurnMsg / resolveSave / handleMsg apply it with applyEff (monsters and characters in the fight: addFx; a sheet outside the fight: fxOn).
+   concent.:  savePlay sees every change of play.conc and sends act 'concend'; endConc removes what that spell and caster left (fight rows by src + by, sheets by play.fxw).
+   features:  resActs(r, ch, D) gives a class resource its fx switch (Rage) or its one-tap uses (ACT.resuse, MODALS.resuse); FX_LIB rows get a toggle in "What you can do".
+   items:     useKind / ACT.invuse. monsters: monRider reads "or be Paralyzed" from an action's text for ACT.msave. */
+const FX_FIGHT = ['rage', 'reckless'];   // ends with the fight or a rest
+const FX_TIMED = { rage: { r: 10 }, reckless: { st: 1 } };   // the 1-minute limit of Rage, "until your next turn" of Reckless Attack; counted by the DM's screen when the character is in the fight
+function fxTimer(ch, id, on) {
+  const t = FX_TIMED[id]; if (!t || !((S.init || {}).list || []).some(c => c.kind === 'pc' && c.cid === ch.id)) return;
+  const owner = ch._owner || S.me.id, n = (FX_LIB.find(f => f.id === id) || {}).n;
+  if (on) sendMsg({ kind: 'turn', act: 'speff', tgts: ['pc|' + owner + '|' + ch.id], eff: Object.assign({ n, fx: id, src: n, by: ch.id }, t), who: ch.name, text: `${ch.name} uses ${n}.` });
+  else sendMsg({ kind: 'turn', act: 'fxoff', cid: ch.id, owner, fx: id, who: ch.name, text: `${ch.name} ends ${n}.` });
+}
+const fightFxOff = ch => FX_FIGHT.some(i => (ch.play.fx || []).includes(i)) ? { fx: ch.play.fx.filter(i => !FX_FIGHT.includes(i)), fxw: (ch.play.fxw || []).filter(w => !FX_FIGHT.includes(w.id)) } : {};
+const spendRes = (ch, r, n) => play(ch, { res: Object.assign({}, ch.play.res || {}, { [r.key]: Math.min(r.max, (+(ch.play.res || {})[r.key] || 0) + n) }) }, 'using ' + r.n);
+/* what a class resource can do besides count: { fx } = a pip click also switches that effect; btns = one-tap uses { l, cost, roll, heal, note, pool: 'heal' | 'cure', give } (SRD 5.1 and 5.2.1 text) */
+function resActs(r, ch, D) {
+  const s = (r.key + ' ' + r.n).toLowerCase(), is24 = ch.ruleset === '2024', lvl = id => ((D.cls || []).find(x => x.def.id === id) || { c: { lvl: 0 } }).c.lvl;
+  if (/rage/.test(s)) return { fx: 'rage' };
+  if (/second wind|swind/.test(s)) return { btns: [{ l: 'Second Wind', cost: 1, roll: '1d10+' + lvl('fighter'), heal: 1, note: 'regains hit points (1d10 + fighter level).' }] };
+  if (/\bloh\b|lay on hands/.test(s)) return { btns: [{ l: 'Heal…', min: 1, pool: 'heal', note: 'Restores hit points from the pool, no more than are left. No effect on undead and constructs.' }, { l: 'Cure (5)', cost: 5, pool: 'cure', note: is24 ? 'Spends 5 points to remove the Poisoned condition (no hit points restored).' : 'Spends 5 points to cure one disease or neutralize one poison.' }] };
+  if (/bardic/.test(s)) return { btns: [{ l: 'Give…', cost: 1, give: 1, note: is24 ? 'A creature within 60 feet other than you gets the die for 1 hour: once, it adds the die to a D20 Test.' : 'A creature within 60 feet other than you gets the die for 10 minutes: once, it adds the die to an ability check, attack roll or saving throw.' }] };
+  if (/ki_points|focus_points/.test(s)) return { btns: is24 ? [
+    { l: 'Flurry of Blows', cost: 1, note: 'two Unarmed Strikes as a Bonus Action.' },
+    { l: 'Patient Defense', cost: 1, note: 'Disengage and Dodge as a Bonus Action (until your next turn attacks against you have disadvantage and you have advantage on Dexterity saves).' },
+    { l: 'Step of the Wind', cost: 1, note: 'Disengage and Dash as a Bonus Action; your jump distance is doubled for the turn.' }] : [
+    { l: 'Flurry of Blows', cost: 1, note: 'two unarmed strikes as a bonus action, right after the Attack action.' },
+    { l: 'Patient Defense', cost: 1, note: 'Dodge as a bonus action (until your next turn attacks against you have disadvantage and you have advantage on Dexterity saves).' },
+    { l: 'Step of the Wind', cost: 1, note: 'Disengage or Dash as a bonus action; your jump distance is doubled for the turn.' }] };
+  if (/action_surge|asurge/.test(s)) return { btns: [{ l: 'Action Surge', cost: 1, note: is24 ? 'one additional action this turn (not the Magic action).' : 'one additional action on top of your action and bonus action.' }] };
+  if (/channel/.test(s)) return { btns: [{ l: 'Use', cost: 1, note: 'spends a Channel Divinity use. Read the feature for the options (Turn Undead and your subclass).' }] };
+  if (/sorcery/.test(s)) return { btns: [{ l: 'Spend 1', cost: 1, note: 'spends 1 sorcery point (Metamagic, Flexible Casting).' }, { l: 'Spend 2', cost: 2, note: 'spends 2 sorcery points (Metamagic, Flexible Casting).' }] };
+  return {};
+}
+Object.assign(ACT, {
+  resuse(el) {
+    const e = E(); if (!e) return; const ch = e.ch, D = getD(ch), r = D.res.find(x => x.key === el.dataset.k), b = r && (resActs(r, ch, D).btns || [])[+el.dataset.i]; if (!b) return;
+    if (b.pool || b.give) { openModal({ kind: 'resuse', key: r.key, i: +el.dataset.i }); return; }
+    if (r.max - (+(ch.play.res || {})[r.key] || 0) < (b.cost || 0) && !ch.free) { toastMsg(`No ${r.n} left.`); return; }
+    if (b.cost) spendRes(ch, r, b.cost);
+    if (b.roll) { const dr = rollExpr(b.roll), n = Math.max(0, dr.total); if (b.heal) hpChange(ch, n); sendMsg({ kind: 'roll', who: ch.name, label: `${b.l}${b.heal ? ': heals' : ''}`, total: n, detail: dr.detail, priv: privOn() }); }
+    else sendMsg({ kind: 'note', text: `${ch.name} uses ${b.l}: ${b.note}`, priv: privOn() });
+  },
+  rugo() {
+    const m = UI.modal, e = E(); if (!e) return; const ch = e.ch, D = getD(ch), r = D.res.find(x => x.key === m.key), b = r && (resActs(r, ch, D).btns || [])[m.i]; if (!b) return;
+    const left = r.max - (+(ch.play.res || {})[r.key] || 0), tid = $('#f-ru-t').value, who = ch.name, priv = privOn(), me = 'pc|' + e.owner + '|' + ch.id;
+    const tg = tid === 'self' ? { name: ch.name } : targetsFor(ch).find(t => t.id === tid); if (!tg) return;
+    if (b.pool === 'heal') {
+      const n = clamp(Math.round(+$('#f-ru-n').value) || 0, 0, left); if (!n) { toastMsg('Type how many points to spend.'); return; }
+      spendRes(ch, r, n); closeModal();
+      if (tid === 'self') { hpChange(ch, n); sendMsg({ kind: 'roll', who, label: 'Lay on Hands: heals', total: n, detail: 'from the pool', priv }); }
+      else sendMsg({ kind: 'apply', rid: uid('h'), who, label: 'Lay on Hands', amount: n, heal: true, tgts: [tid], tgtNames: tg.name, priv });
+    } else if (b.pool === 'cure') {
+      if (left < 5 && !ch.free) { toastMsg('Fewer than 5 points left in the pool.'); return; }
+      spendRes(ch, r, 5); closeModal(); sendMsg({ kind: 'note', text: `${who} uses Lay on Hands on ${tg.name}: ${b.note}`, priv });
+    } else if (b.give) {
+      if (left < 1 && !ch.free) { toastMsg('No Bardic Inspiration left.'); return; }
+      const die = infoVal(D, 'Inspiration die') || r.note || 'd6'; spendRes(ch, r, 1); closeModal();
+      sendMsg({ kind: 'turn', act: 'speff', tgts: [tid], eff: { n: `Bardic Inspiration (${die})`, fx: 'binsp', r: 99, src: 'Bardic Inspiration', by: ch.id }, who, text: `${who} gives ${tg.name} a Bardic Inspiration die (${die}).`, priv });
+    }
+  },
+  /* Divine Smite: a button for after a melee weapon hit (2014 feature; 2024 the Divine Smite spell, Bonus Action) */
+  smite() { openModal({ kind: 'smite', slot: '', crit: false, ud: false }); },
+  smitego() {
+    const m = UI.modal, e = E(); if (!e || !m.slot) return; const ch = e.ch, D = getD(ch), sp = slotPatch(ch, D, SMITE, m.slot), tid = $('#f-sm-t').value, ud = $('#f-sm-ud').checked, cr = $('#f-sm-cr').checked;
+    const dr = rollExpr(smiteDice(ch.ruleset, sp.lvl, ud, cr) + 'd8'), who = ch.name, priv = privOn(), label = `Divine Smite (level ${sp.lvl} slot)`, tg = targetsFor(ch).find(t => t.id === tid);
+    closeModal(); if (Object.keys(sp.patch).length && canEditChar(e.owner)) play(ch, sp.patch, 'Divine Smite');
+    if (tg) sendMsg({ kind: 'apply', rid: uid('d'), who, label, amount: Math.max(0, dr.total), heal: false, dt: 'Radiant', tgts: [tid], tgtNames: tg.name, priv });
+    else sendMsg({ kind: 'roll', who, label: label + ' extra damage', total: Math.max(0, dr.total), detail: dr.detail + ' Radiant', priv });
+  },
+  /* Drink / Use: a healing potion heals and a used-up item loses one from its quantity; other potions and antitoxin are used up with their text as a note */
+  invuse(el) {
+    const e = E(); if (!e) return; const ch = e.ch, it = ch.inv[+el.dataset.i], d = it && itemDef(ch, it), k = it && useKind(ch, it, d); if (!k) return;
+    if (qOf(it) < 1) { toastMsg('None left.'); return; }
+    const nm = itemName(ch, it), who = ch.name, priv = privOn();
+    it.q = qOf(it) - 1; saveChar(ch);
+    if (k === 'heal') { const dr = rollExpr(potionDice(nm)), n = Math.max(0, dr.total); hpChange(ch, n); sendMsg({ kind: 'roll', who, label: `${nm}: heals`, total: n, detail: dr.detail, priv }); }
+    else { sendMsg({ kind: 'note', text: `${who} uses ${nm}. ${String((d && d.d) || '').replace(/\s+/g, ' ').slice(0, 220)}`, priv }); if (/speed/i.test(nm)) fxOn(ch, { fx: 'haste', src: nm }); }
+    queueRender();
+  },
+});
+const SMITE = { id: 'divine-smite', name: 'Divine Smite', lvl: 1 };
+/* 2d8, +1d8 per slot level above 1st (2014 stops at 5d8), +1d8 against an undead or a fiend; a critical hit doubles the dice */
+const smiteDice = (rs, lvl, vs, crit) => ((rs === '2014' ? Math.min(5, 1 + lvl) : 1 + lvl) + (vs ? 1 : 0)) * (crit ? 2 : 1);
+MODALS.smite = () => {
+  const m = UI.modal, e = E(); if (!e) return ''; const ch = e.ch, D = getD(ch), opts = slotOptions(ch, D, SMITE, 'paladin').filter(o => o.k !== 'ritual');
+  if (!opts.some(o => o.k === m.slot)) m.slot = opts.length ? opts[0].k : '';
+  const cur = opts.find(o => o.k === m.slot), all = targetsFor(ch), t0 = UI.tgt && findTarget(UI.tgt), vs = !!(t0 && t0.def && /^(undead|fiend)/i.test(t0.def.type || ''));
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Divine Smite"><div class="row"><h2>Divine Smite</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <p class="small muted">${ch.ruleset === '2024' ? 'A Bonus Action you take right after hitting with a Melee weapon or an Unarmed Strike: 2d8 Radiant, +1d8 for each slot level above 1, +1d8 against a Fiend or an Undead.' : 'After a melee weapon hit: 2d8 radiant for a 1st-level slot, +1d8 per slot level above 1st (at most 5d8), +1d8 against an undead or a fiend.'}</p>
+    <div class="stack"><span class="lbl">Spell slot</span>${opts.length ? `<div class="row">${opts.map(o => `<button class="btn sm" data-act="castslot" data-v="${o.k}"${pressed(m.slot === o.k)}>${esc(o.label)}${o.left != null ? ` <span class="muted">${o.left} left</span>` : ''}</button>`).join('')}</div>` : '<div class="errline">No spell slots left.</div>'}</div>
+    <label class="field"><span class="lbl">Target</span><select id="f-sm-t">${opt('', 'No target: just roll')}${all.map(t => opt(t.id, t.name, UI.tgt === t.id)).join('')}</select></label>
+    <div class="row"><label class="chk small"><input type="checkbox" id="f-sm-ud"${vs ? ' checked' : ''}> Undead or fiend</label><label class="chk small"><input type="checkbox" id="f-sm-cr"> Critical hit (double the dice)</label>${cur ? `<span class="pill">${smiteDice(ch.ruleset, +cur.l, vs, false)}d8 Radiant</span>` : ''}</div>
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="smitego"${dis(!opts.length)}>Smite</button></div></div>`;
+};
+MODALS.resuse = () => {
+  const m = UI.modal, e = E(); if (!e) return ''; const ch = e.ch, D = getD(ch), r = D.res.find(x => x.key === m.key), b = r && (resActs(r, ch, D).btns || [])[m.i]; if (!b) return '';
+  const left = r.max - (+(ch.play.res || {})[r.key] || 0), all = (b.give ? [] : [{ id: 'self', name: 'Yourself' }]).concat(targetsFor(ch));
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(r.n)}"><div class="row"><h2>${esc(r.n)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
+    <p class="small muted">${esc(b.note || '')}</p>
+    <label class="field"><span class="lbl">${b.give ? 'Give it to' : 'Touch'}</span><select id="f-ru-t">${all.map(t => opt(t.id, t.name)).join('')}</select></label>
+    ${b.pool === 'heal' ? `<label class="field"><span class="lbl">Hit points to restore (${left} left in the pool)</span><input type="number" id="f-ru-n" min="1" max="${left}" value="${Math.min(left, 5)}"></label>` : ''}
+    <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="rugo"${dis(!all.length)}>${esc(b.pool === 'cure' ? 'Cure' : b.give ? 'Give the die' : 'Restore')}</button></div></div>`;
+};
+/* Drink / Use on a gear row (gearLine) */
+const useKind = (ch, it, d) => /^potions? of (greater |superior |supreme )?healing$/i.test(itemName(ch, it)) ? 'heal' : d && (/^potions?$/i.test(d.kind || '') || d.id === 'antitoxin') ? 'note' : '';
+const potionDice = name => ({ greater: '4d4+4', superior: '8d4+8', supreme: '10d4+20' })[((/(greater|superior|supreme)/i.exec(name) || [])[1] || '').toLowerCase()] || '2d4+2';   // Potions of Healing table, SRD 5.1 and 5.2.1
+/* the condition a failed save puts on its targets, read from the action text ("or be Paralyzed", "Failure: ... has the Poisoned condition"): the first one named, how long, and a repeat save.
+   shortcut: only the first condition and stage of an effect, the DM adds any other by hand with Add effect. */
+function monRider(a, c) {
+  const t = String(a.d || '').replace(/\s+/g, ' ');
+  if (!a.dc || !a.dc.v || !/saving throw/i.test(t)) return undefined;
+  const i = t.search(/Failure:|on a failed save|saving throw(?: against this magic)? or /i); if (i < 0) return undefined;
+  const tail = t.slice(i).split(/Failure or Success:|Success:/i)[0], m = new RegExp('\\b(' + CONDITIONS.map(k => k.toLowerCase()).join('|') + ')\\b', 'i').exec(tail); if (!m) return undefined;
+  const mins = /for (\d+) minutes?/i.exec(tail), r = mins ? +mins[1] * 10 : /until the (?:end|start) of [^.]{0,40}turn/i.test(tail) ? 1 : null;
+  const rep = /repeats? the (?:saving throw|save) at the end of (?:each of )?(?:its|the [a-z ]+?’s|the [a-z ]+?'s) (?:next )?turns?/i.test(tail);
+  return JSON.parse(JSON.stringify({ n: String(a.n).replace(/\s*\(.*\)$/, ''), cond: CONDITIONS.find(k => k.toLowerCase() === m[1].toLowerCase()), r, ab: rep ? a.dc.ab : '', dc: rep ? a.dc.v : 0, src: a.n, by: c.id }));
+}
 </script>
 </body>
 </html>
