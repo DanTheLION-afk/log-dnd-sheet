@@ -1246,7 +1246,7 @@ function classGrants(ch, D, features) {
     const all = [].concat(ch.choices.discoveries || []).filter(Boolean).slice(0, 2).map(id => look(ch, 'spells', id)).filter(Boolean).map(s => ({ id: s.id, name: s.name, lvl: s.lvl, l: 6, free: 0, at: s.lvl, ok: true }));
     out.push({ key: 'disc', name: 'Magical Discoveries', ab: (bard && bard.ab) || 'cha', classGrant: 1, disc: 1, maxLvl: bard ? bard.maxLvl : 0, all, spells: all });
   }
-  for (const g of out) { g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
+  for (const g of out) { g.dc = 8 + D.pb + D.sdcB + D.m[g.ab]; g.atk = D.pb + D.satkB + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
 }
 function classGrantPanel(ch, D, ro, R, g) {
   const head = t => `<div class="ph">${t}<span class="spacer"></span><span class="pill acc">Save DC ${g.dc}</span><span class="pill acc">Attack ${sgn(g.atk)}</span></div>`;
@@ -1587,7 +1587,7 @@ function grantsOf(ch, D, feats, sp, sub, bg) {
     if (c.s) { const s = look(ch, 'spells', c.s); if (s) all.push({ id: s.id, name: s.name, lvl: s.lvl, l: 1, free: 1, at: s.lvl, ok: true }); }
     out.push({ key, name: 'Magic Initiate' + (list ? ' (' + cap(list) + ')' : ''), from: x.from || '', ab, choose: is24, abChosen: !is24 || !!c.ab, mi: { list, fixedList: !!fixedList, c: cs, s: c.s || '' }, all, spells: all });
   });
-  for (const g of out) { g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; }
+  for (const g of out) { g.dc = 8 + D.pb + D.sdcB + D.m[g.ab]; g.atk = D.pb + D.satkB + D.m[g.ab]; g.id = 'g:' + g.key; }
   return out;
 }
 function grantByRes(D, rk) {
@@ -1755,6 +1755,7 @@ function derive(ch) {
   D.save = {};
   for (const a of ABIL) D.save[a] = D.m[a] + (D.saveProf.has(a) ? D.pb : 0) + (+ch.bonus.save || 0) + itemBonus(ch, 'save') + gsum(G.save);
   D.chk = gsum(G.check);   // a bonus to every ability check, for the plain ability rolls
+  D.sdcB = gsum(G.sdc); D.satkB = gsum(G.satk);   // Build 38: items and homebrew can add to spell save DC and spell attack rolls
   const why = a => a.map(g => `From ${g.from}: ${sgn(g.n)}`);
   D.saveWhy = why(G.save); D.checkWhy =why(G.check).concat(G.skill.map(g => `From ${g.from}: ${sgn(g.n)} ${(SKILL[g.v] || {}).name || g.v}`));
   if (is24) {
@@ -1868,7 +1869,7 @@ function derive(ch) {
     else if (row.p) limit = row.p;
     else if (row.k) limit = row.k;
     if (sc_ === (x.sub && x.sub.spell) && Array.isArray(x.sub.spell.known) && sc_.prep !== 'level' && sc_.prep !== 'half') limit = +x.sub.spell.known[lvl - 1] || null;
-    const ent = { id: x.def.id, name: x.sub && sc_ === x.sub.spell ? x.sub.name : x.def.name, ab: sc_.ab, dc: 8 + D.pb + abm, atk: D.pb + abm, cantrips, limit, maxLvl, book: !!sc_.book, prepMode: sc_.prep || 'known', list, prog: sc_.prog, lvl, ritual: !!sc_.ritual };
+    const ent = { id: x.def.id, name: x.sub && sc_ === x.sub.spell ? x.sub.name : x.def.name, ab: sc_.ab, dc: 8 + D.pb + D.sdcB + abm, atk: D.pb + D.satkB + abm, cantrips, limit, maxLvl, book: !!sc_.book, prepMode: sc_.prep || 'known', list, prog: sc_.prog, lvl, ritual: !!sc_.ritual };
     ent.cantripLimit = cantrips > 0 ? cantrips : (/^SRD/.test(x.def.src || '') && sc_ === x.def.spell ? 0 : null);
     ent.always = [];
     if (is24) { const lf = features.find(z => z.f && z.f.landOpts && z.cls === x.def.id); const land = lf && [].concat(ch.choices[lf.key] || [])[0]; if (land && LAND_SPELLS[land]) for (const [l, s] of LAND_SPELLS[land]) if (l <= lvl) ent.always.push(s); }
@@ -1900,7 +1901,7 @@ function derive(ch) {
 
   D.grants = grantsOf(ch, D, feats, sp, sub, bg);
   if (is24) classGrants(ch, D, features);
-  for (const g of G.spellSrc) { g.ab = g.ab || bestMental(D); g.dc = 8 + D.pb + D.m[g.ab]; g.atk = D.pb + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
+  for (const g of G.spellSrc) { g.ab = g.ab || bestMental(D); g.dc = 8 + D.pb + D.sdcB + D.m[g.ab]; g.atk = D.pb + D.satkB + D.m[g.ab]; g.id = 'g:' + g.key; D.grants.push(g); }
 
   /* attacks */
   D.attacks = [];
@@ -1945,7 +1946,7 @@ function derive(ch) {
   /* Build 36: action grants. An attack becomes an attack row (so the roll buttons, targets and advantage all work); the save DC and damage are kept for whatCanIDo */
   D.gacts = G.acts.map(g => {
     const ab = ABIL.includes(g.ab) ? g.ab : '', m = ab ? D.m[ab] : 0, dice = String(g.dmg || '').replace(/\s+/g, '');
-    const dc = !g.save ? 0 : /^spell$/i.test(String(g.dc || '')) || !g.dc ? 8 + D.pb + D.m[ab || bestMental(D)] : evalMax(String(g.dc).replace(/\bab\b/gi, ab || bestMental(D)), D.level, D);
+    const dc = !g.save ? 0 : /^spell$/i.test(String(g.dc || '')) || !g.dc ? 8 + D.pb + D.sdcB + D.m[ab || bestMental(D)] : evalMax(String(g.dc).replace(/\bab\b/gi, ab || bestMental(D)), D.level, D);
     const o = { key: g.key, name: g.name, act: g.act, save: g.save || '', dc, dmg: dice ? dice + (g.atk && m ? (m > 0 ? '+' : '-') + Math.abs(m) : '') : '', dt: g.dt || '' };
     if (g.atk === 'melee' || g.atk === 'ranged') { o.ai = D.attacks.length; D.attacks.push({ name: g.name, atk: m + D.pb + (+g.bonus || 0), dmg: o.dmg || '0', dt: g.dt || '', props: '', range: '', prof: true, flat: !o.dmg, ab: ab || 'str', melee: g.atk === 'melee', weapon: false, ga: 1 }); }
     return o;
@@ -2294,11 +2295,11 @@ function inside(ch, it, top) { for (let n = 0; it && it.box && n < 5; n++) { it 
 const attOn = (ch, it) => !!it.att && (ch.free || (ch.inv || []).filter(x => x.att).indexOf(it) < 3);
 function itemMod(ch, it, k, d) { d = d || itemDef(ch, it); return needsAtt(ch, it, d) && !attOn(ch, it) ? 0 : (+it[k] || 0); }
 /* Build 31: official magic items that give numbers, by name (the SRD 5.1 and 5.2 numbers are the same).
-   Used only for built-in items (or a custom item with that name) that carry no grants of their own, so a campaign change replaces them.
+   Used for any item with that name that carries no grants of their own (built-in, custom or pack), so a campaign change replaces them.
    Belts of Giant Strength are one SRD item with six strengths, so only a name that says the giant gets a score (Str: SRD 5.1 / 5.2 Belt of Giant Strength table). */
 const GIANT_STR = { hill: 21, stone: 23, frost: 23, fire: 25, cloud: 27, storm: 29 };
 function magicDefault(ch, it, d) {
-  if (!d || (d.grants || []).length || (!it.custom && d.pack && !BUILTIN_IDS.has(d.pack))) return null;
+  if (!d || (d.grants || []).length || (!it.custom && d.pack && !BUILTIN_IDS.has(d.pack) && (SRD[ch.ruleset] || SRD['2014']).items.some(x => x.id === d.id))) return null;   // a campaign edit of a built-in item replaces its table entry; a new pack item without grants gets the name defaults
   const n = itemName(ch, it), G = g => ({ att: 1, g }), giant = /^belt of .*giant strength/i.test(n) && /hill|stone|frost|fire|cloud|storm/i.exec(n);
   if (/^(ring|cloak) of protection$/i.test(n)) return G([{ k: 'ac', n: 1 }, { k: 'save', n: 1 }]);
   if (/^bracers of defense$/i.test(n)) return G([{ k: 'ac', n: 2, un: true }]);
@@ -2306,6 +2307,10 @@ function magicDefault(ch, it, d) {
   if (/^gauntlets of ogre power$/i.test(n)) return G([{ k: 'abset', a: 'str', n: 19 }]);
   if (/^headband of intellect$/i.test(n)) return G([{ k: 'abset', a: 'int', n: 19 }]);
   if (/^amulet of health$/i.test(n)) return G([{ k: 'abset', a: 'con', n: 19 }]);
+  const plus = +(/\+\s*([123])(?!\d)/.exec(n) || [])[1] || 0, sp = x => [{ k: 'sdc', n: x }, { k: 'satk', n: x }];   // Build 38: '+1' in the name, as 'X +1', 'X, +1' or 'X (+1)'
+  if (plus && /amulet of the devout|rod of the pact keeper/i.test(n)) return G(sp(plus));
+  if (plus && /wand of the war mage/i.test(n)) return G([{ k: 'satk', n: plus }]);
+  if (/^robe of the archmagi/i.test(n)) return G(sp(2));
   return giant ? G([{ k: 'abset', a: 'str', n: GIANT_STR[giant[0].toLowerCase()] }]) : null;
 }
 const canEquip = (it, d) => !!d && (['weapon', 'armor', 'shield', 'magic'].includes(d.cat) || (it.grants || []).length > 0);   // an item with bonuses added can be worn too
@@ -3879,7 +3884,7 @@ function sheetView(ch, D, ro, e) {
     for (const id of new Set([...(st.c || []), ...(c.book ? (st.p || []) : (st.s || [])), ...c.always])) { const s = look(ch, 'spells', id); if (s) known.push({ s, c }); }
   }
   const xab = D.extraAb || 'cha';
-  for (const id of ch.extraSpells || []) { const s = look(ch, 'spells', id); if (s) known.push({ s, c: { id: '', name: 'Other', ab: xab, dc: 8 + D.pb + D.m[xab], atk: D.pb + D.m[xab] } }); }
+  for (const id of ch.extraSpells || []) { const s = look(ch, 'spells', id); if (s) known.push({ s, c: { id: '', name: 'Other', ab: xab, dc: 8 + D.pb + D.sdcB + D.m[xab], atk: D.pb + D.satkB + D.m[xab] } }); }
   for (const g of D.grants || []) for (const x of g.spells) { const s = look(ch, 'spells', x.id); if (!s) continue; const r = x.free ? D.res.find(z => z.key === g.id + ':' + x.id) : null; known.push({ s, c: { id: g.id, name: g.name, ab: g.ab, dc: g.dc, atk: g.atk, freeTxt: r ? `free ${Math.max(0, r.max - (+(p.res || {})[r.key] || 0))} of ${r.max}` : '' } }); }
   if (known.length || D.slots.some(Boolean) || D.pact) {
     const lv = Array.from(new Set(known.map(x => x.s.lvl)));
@@ -6620,7 +6625,7 @@ function slotOptions(ch, D, s, cid) {
 function casterFor(ch, D, cid) {
   const c = D.casters.find(x => x.id === cid); if (c) return c;
   const g = (D.grants || []).find(x => x.id === cid); if (g) return { id: g.id, name: g.name, ab: g.ab, dc: g.dc, atk: g.atk };
-  const ab = D.extraAb || 'cha'; return { id: '', name: 'Other', ab, dc: 8 + D.pb + D.m[ab], atk: D.pb + D.m[ab] };
+  const ab = D.extraAb || 'cha'; return { id: '', name: 'Other', ab, dc: 8 + D.pb + D.sdcB + D.m[ab], atk: D.pb + D.satkB + D.m[ab] };
 }
 /* what casting with this slot key spends (a play patch) and the slot level the spell counts as */
 function slotPatch(ch, D, s, key) {
@@ -9358,11 +9363,11 @@ MODALS.impchar = () => {
           spell {v: spell id, ab, n: free casts or 'pb', reset}  res {name, n: number or 'pb', reset}  text {name, d}  resist {v: damage type}
    A built-in entry edited for the campaign lives in the pack "Campaign changes" (id cc-<ruleset>) under the SAME id, so registry() returns it instead. */
 const GRANT_TYPES = ['feats', 'species', 'subspecies', 'backgrounds', 'classes', 'subclasses', 'items'];
-const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance'], ['abset', 'Ability score becomes (at least)'], ['save', 'All saving throws'], ['check', 'All ability checks'], ['skill', 'One skill'], ['atk', 'Weapon attack rolls'], ['dmg', 'Weapon damage rolls'], ['action', 'Action, bonus action or reaction'], ['choice', 'A choice for the player']];
+const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance'], ['abset', 'Ability score becomes (at least)'], ['save', 'All saving throws'], ['check', 'All ability checks'], ['skill', 'One skill'], ['atk', 'Weapon attack rolls'], ['dmg', 'Weapon damage rolls'], ['satk', 'Spell attack rolls'], ['sdc', 'Spell save DC'], ['action', 'Action, bonus action or reaction'], ['choice', 'A choice for the player']];
 const NUM_G = ['n', 'Amount', 'num'], GW = ['w', 'Only for this weapon (name, blank = all weapons)', 'text'];
 const GRANT_FIELDS = {
   ab: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], NUM_G, ['max', 'Cap (blank = 20)', 'num']],
-  abset: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], ['n', 'Score', 'num']], ac: [NUM_G, ['un', 'Only with no armor and no shield', 'bool']], save: [NUM_G], check: [NUM_G], atk: [NUM_G, GW], dmg: [NUM_G, GW], skill: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])], NUM_G],
+  abset: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], ['n', 'Score', 'num']], ac: [NUM_G, ['un', 'Only with no armor and no shield', 'bool']], save: [NUM_G], check: [NUM_G], satk: [NUM_G], sdc: [NUM_G], atk: [NUM_G, GW], dmg: [NUM_G, GW], skill: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])], NUM_G],
   hp: [NUM_G], hpl: [['n', 'Amount per level', 'num']], speed: [['n', 'Feet', 'num']], init: [NUM_G], sense: [['n', 'Feet', 'num']],
   prof: [['v', 'Proficiency', 'select', [['', '—'], ...SKILLS.map(([s, n]) => ['skill:' + s, 'Skill: ' + n]), ...ABIL.map(a => ['save:' + a, 'Save: ' + ABN[a]]), ...['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields'].map(a => ['armor:' + a, a]), ...['Simple Weapons', 'Martial Weapons'].map(a => ['weapon:' + a, a])]], ['tool', '…or a tool (name)', 'text'], ['weapon', '…or one named weapon', 'text']],
   exp: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])]],
@@ -9393,7 +9398,7 @@ function applyGrants(ch, D, feats, features) {
     const grants = (d.grants || []).concat((magicDefault(ch, it, d) || {}).g || [], it.grants || []);
     if (grants.length) src.push([{ name: itemName(ch, it), grants }, D.level]);
   }
-  const G = { ab: [], abset: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], save: [], check: [], skill: [], atk: [], dmg: [], prof: [], exp: [], res: [], resist: [], acts: [], spellSrc: [] }, seen = new Set(), by = {};
+  const G = { ab: [], abset: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], save: [], check: [], satk: [], sdc: [], skill: [], atk: [], dmg: [], prof: [], exp: [], res: [], resist: [], acts: [], spellSrc: [] }, seen = new Set(), by = {};
   const uses = v => /^pb$/i.test(v) ? D.pb : Math.max(0, +v || 0);
   const one = (g, e, lvl, depth) => {
     const l = +g.l || 1, k = g.k, from = e.name, n = +g.n || 0;
@@ -9401,7 +9406,7 @@ function applyGrants(ch, D, feats, features) {
     if (k === 'ab') { if (ABIL.includes(g.a) && n) G.ab.push({ a: g.a, n, max: +g.max || 20, from }); }
     else if (k === 'abset') { if (ABIL.includes(g.a) && n) G.abset.push({ a: g.a, n, from }); }
     else if (k === 'skill') { if (SKILL[g.v] && n) G.skill.push({ v: g.v, n, from }); }
-    else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense', 'save', 'check', 'atk', 'dmg'].includes(k)) { if (n) G[k].push({ n, from, un: !!g.un, w: String(g.w || '').trim() }); }
+    else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense', 'save', 'check', 'satk', 'sdc', 'atk', 'dmg'].includes(k)) { if (n) G[k].push({ n, from, un: !!g.un, w: String(g.w || '').trim() }); }
     else if (k === 'prof') { const p = g.tool ? 'tool:' + g.tool : g.weapon ? 'weapon:' + g.weapon : g.v; if (p) G.prof.push({ p, from }); }
     else if (k === 'exp') { if (SKILL[g.v]) G.exp.push({ v: g.v, from }); }
     else if (k === 'resist') { if (g.v) G.resist.push({ v: g.v, from }); }
