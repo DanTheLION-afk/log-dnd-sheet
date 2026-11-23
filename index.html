@@ -6,7 +6,7 @@
 <title>Party Ledger</title>
 <meta name="description" content="D&amp;D 5e and 5.5e character builder with a live party view for the DM.">
 <meta name="theme-color" content="#1b232b" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#080a09" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#1d2226" media="(prefers-color-scheme: dark)">
 <script>try { var t = JSON.parse(localStorage.getItem("pl.theme") || "\"\""); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) { }</script>
 <link rel="manifest" href="party-manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="party-icon-192.png">
@@ -77,19 +77,22 @@ img { max-width: 100%; }
   --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #5f6c66;
 }
 @media (prefers-color-scheme: dark) {
+  /* Build 34, dark: the same papers under lamplight. Dusk-slate table, warm lit sheets a step lighter, soft bone ink; elevation is a lightness ladder (--bg, --surface, --surface-2, --raised), not bright borders. */
   :root:not([data-theme="light"]) {
-    --bg: #0b0e0c; --surface: #1e2522; --surface-2: #28302d; --line: #3b4641; --field: #707e78; --field-bg: #0b0e0c; --ink: #e9e7dd; --ink-2: #a8b2ac;
-    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --pri: #2c4f96; --pri-ink: #f3f1e8; --pri-line: #86b4ee; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
-    --glow: #0b0e0c; --grid: rgba(233, 231, 221, .06);
-    --spine: #050706; --spine-2: #1e2522; --spine-line: #34403a; --spine-field: #707e78;
+    --bg: #14171a; --surface: #25231f; --surface-2: #2e2c27; --raised: #35322c; --line: #3b3832; --field: #706d65; --field-bg: #1b1a17; --ink: #dcd7c9; --ink-2: #aaa597;
+    --accent: #92b2e2; --accent-soft: #28323f; --accent-ink: #0e1520; --pri: #2d4577; --pri-ink: #eceff6; --pri-line: #6486c4; --brass: #d9979e; --wax: #94495a; --danger: #ee8f98; --crimson: #962f40; --on-danger: #1a0b0e; --good: #78c4a6; --warn: #dba857; --sun: #d7ae4a; --moon: #b3b0a3; --tst-crit: #e0bb55; --tst-fail: #ee8f98; --ph: #8d897d;
+    --frame: #6b675c; --scale: #8b8779;
+    --glow: #14171a; --grid: rgba(220, 215, 201, .035);
+    --spine: #1d2226; --spine-2: #292f34; --spine-line: #343c42; --spine-field: #706d65; --on-spine: #dcd7c9; --on-spine-2: #a7a496; --spine-accent: #9bb9e6; --ribbon: #c4455b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --bg: #0b0e0c; --surface: #1e2522; --surface-2: #28302d; --line: #3b4641; --field: #707e78; --field-bg: #0b0e0c; --ink: #e9e7dd; --ink-2: #a8b2ac;
-    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --pri: #2c4f96; --pri-ink: #f3f1e8; --pri-line: #86b4ee; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
-    --glow: #0b0e0c; --grid: rgba(233, 231, 221, .06);
-    --spine: #050706; --spine-2: #1e2522; --spine-line: #34403a; --spine-field: #707e78;
+    --bg: #14171a; --surface: #25231f; --surface-2: #2e2c27; --raised: #35322c; --line: #3b3832; --field: #706d65; --field-bg: #1b1a17; --ink: #dcd7c9; --ink-2: #aaa597;
+    --accent: #92b2e2; --accent-soft: #28323f; --accent-ink: #0e1520; --pri: #2d4577; --pri-ink: #eceff6; --pri-line: #6486c4; --brass: #d9979e; --wax: #94495a; --danger: #ee8f98; --crimson: #962f40; --on-danger: #1a0b0e; --good: #78c4a6; --warn: #dba857; --sun: #d7ae4a; --moon: #b3b0a3; --tst-crit: #e0bb55; --tst-fail: #ee8f98; --ph: #8d897d;
+    --frame: #6b675c; --scale: #8b8779;
+    --glow: #14171a; --grid: rgba(220, 215, 201, .035);
+    --spine: #1d2226; --spine-2: #292f34; --spine-line: #343c42; --spine-field: #706d65; --on-spine: #dcd7c9; --on-spine-2: #a7a496; --spine-accent: #9bb9e6; --ribbon: #c4455b;
     color-scheme: dark;
 }
 
@@ -859,8 +862,8 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 }
 @media (max-width: 480px) { .crow .cx { flex-wrap: wrap; } .irow .pill { white-space: normal; } }
 :root { --warn-fill: #c77d0a; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --warn-fill: #e3ab4d; } }
-:root[data-theme="dark"] { --warn-fill: #e3ab4d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --warn-fill: #cf9a45; } }
+:root[data-theme="dark"] { --warn-fill: #cf9a45; }
 .hpbar > i.mid { background: var(--warn-fill); }
 /* ===== Build 33b: review fixes ===== */
 .roll.pri { background: var(--pri); color: var(--pri-ink); border-color: var(--pri-line); }
@@ -907,6 +910,99 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 }
 @media (max-width: 480px) { .steps { flex-wrap: wrap; overflow-x: visible; } }
 @media (max-width: 360px) { .ph .row:has(> .exh) { flex-wrap: wrap !important; gap: 8px !important; } }
+/* ===== Build 34: dark theme rules. Dark-scoped only (OS preference first, then the manual toggle); light mode never reads them. ===== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .06), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
+  /* spine: leather a step above the table; the subtree's own accent colours are softened too */
+  :root:not([data-theme="light"]) .bar, :root:not([data-theme="light"]) .bnav { --brass: #d9979e; --good: #78c4a6; --warn: #dba857; --danger: #ee8f98; --ph: #8d897d; --accent-ink: #0e1520; }
+  /* sheet titles: the baseline and the scale bar are pencil-grey, not bone */
+  :root:not([data-theme="light"]) .panel > h3, :root:not([data-theme="light"]) .ph { background: linear-gradient(var(--frame), var(--frame)) left bottom / 100% 1px no-repeat; }
+  :root:not([data-theme="light"]) .chead, :root:not([data-theme="light"]) .sheet .panel > h3, :root:not([data-theme="light"]) .sheet .panel > .ph, :root:not([data-theme="light"]) .mdet > .ph:first-child { --bar: linear-gradient(var(--scale), var(--scale));
+    background: var(--bar) left bottom / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--scale) 0 40px, transparent 40px 80px) left bottom 1px / 160px 4px no-repeat, var(--bar) left bottom 5px / 161px 1px no-repeat, linear-gradient(90deg, var(--scale) 0 1px, transparent 1px calc(100% - 1px), var(--scale) calc(100% - 1px)) left bottom 1px / 161px 5px no-repeat; }
+  /* framed numbers: a lifted fill and a pencil-grey frame instead of a bone outline */
+  :root:not([data-theme="light"]) .ab, :root:not([data-theme="light"]) .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--line); }
+  :root:not([data-theme="light"]) .ab:hover { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--accent); }
+  :root:not([data-theme="light"]) .ab .score { border-color: var(--frame); background: var(--surface); }
+  :root:not([data-theme="light"]) .vital { border-color: var(--frame); background: var(--surface-2); }
+  :root:not([data-theme="light"]) button.vital:hover { border-color: var(--accent); }
+  :root:not([data-theme="light"]) .shield-shape { background: var(--frame); }
+  :root:not([data-theme="light"]) .shield-shape::before { background: var(--surface-2); }
+  :root:not([data-theme="light"]) .hp.down { border-color: var(--crimson); }
+  :root:not([data-theme="light"]) .sigil { background: color-mix(in srgb, var(--frame) 60%, var(--surface)); color: var(--ink); }
+  /* nested boxes sit one step lighter than the sheet */
+  :root:not([data-theme="light"]) .choice:not([aria-pressed="true"]), :root:not([data-theme="light"]) .ctm { background: var(--surface-2); }
+  /* gilt is the one glow: the current turn gets a soft halo */
+  :root:not([data-theme="light"]) .irow.cur, :root:not([data-theme="light"]) .crow.cur { box-shadow: inset 6px 0 0 var(--sun), 0 0 22px -8px color-mix(in srgb, var(--sun) 60%, transparent); }
+  /* gauges and glyphs: no mint, no white discs */
+  :root:not([data-theme="light"]) .hpbar { border-color: color-mix(in srgb, var(--field) 65%, var(--surface)); }
+  :root:not([data-theme="light"]) .hpbar > i { background: color-mix(in srgb, var(--good) 72%, var(--surface)); }
+  :root:not([data-theme="light"]) .hpbar > i.mid { background: color-mix(in srgb, var(--warn-fill) 80%, var(--surface)); }
+  :root:not([data-theme="light"]) .hpbar > i.low { background: var(--crimson); }
+  :root:not([data-theme="light"]) .pip::before { border-color: var(--pc, #6f93cf); background: var(--pc, #6f93cf); }
+  :root:not([data-theme="light"]) .pip.used::before { background: transparent; border-color: var(--pcu, var(--ink-2)); }
+  :root:not([data-theme="light"]) .dot.on { background: var(--ink-2); border-color: var(--ink-2); }
+  :root:not([data-theme="light"]) .cond button[aria-pressed="true"] { color: #f6e9eb; }
+  /* wax: the rules glow quietly, the text stays readable */
+  :root:not([data-theme="light"]) .modal, :root:not([data-theme="light"]) .mdet, :root:not([data-theme="light"]) .mdet.mcur, :root:not([data-theme="light"]) .mbprev > .rt { border-top-color: var(--wax); border-bottom-color: var(--wax); }
+  :root:not([data-theme="light"]) .mdet > .lbl, :root:not([data-theme="light"]) .rt h3 { border-bottom-color: var(--wax); }
+  /* raised surfaces: menus, modals, roll cards, the phone turn bar */
+  :root:not([data-theme="light"]) .modal, :root:not([data-theme="light"]) .popmenu, :root:not([data-theme="light"]) .bmenu { background: var(--raised); border-color: color-mix(in srgb, var(--ink) 14%, var(--raised)); box-shadow: none; }
+  :root:not([data-theme="light"]) .modal { border-top-color: var(--wax); border-bottom-color: var(--wax); }
+  :root:not([data-theme="light"]) .popmenu button:hover, :root:not([data-theme="light"]) .bmenu button:hover { background: color-mix(in srgb, var(--ink) 9%, var(--raised)); }
+  :root:not([data-theme="light"]) .tst:not(.msg), :root:not([data-theme="light"]) .tst.msg { background: var(--raised); color: var(--ink); border: 1px solid color-mix(in srgb, var(--ink) 14%, var(--raised)); box-shadow: none; }
+  :root:not([data-theme="light"]) .tst.crit { box-shadow: 0 0 0 2px var(--tst-crit); }
+  :root:not([data-theme="light"]) .tst.fail { box-shadow: 0 0 0 2px var(--tst-fail); }
+  :root:not([data-theme="light"]) .bnav { box-shadow: none; }
+  @media (max-width: 1100px) {
+    :root:not([data-theme="light"]) .pbar { background: var(--raised); box-shadow: none; }
+    :root:not([data-theme="light"]) .pbar.turn { background: color-mix(in srgb, var(--sun) 10%, var(--raised)); }
+  }
+}
+:root[data-theme="dark"] { background: radial-gradient(1100px 520px at 50% 0, rgba(215, 174, 74, .06), transparent 70%) 0 0 / 100% 560px no-repeat, linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
+/* spine: leather a step above the table; the subtree's own accent colours are softened too */
+:root[data-theme="dark"] .bar, :root[data-theme="dark"] .bnav { --brass: #d9979e; --good: #78c4a6; --warn: #dba857; --danger: #ee8f98; --ph: #8d897d; --accent-ink: #0e1520; }
+/* sheet titles: the baseline and the scale bar are pencil-grey, not bone */
+:root[data-theme="dark"] .panel > h3, :root[data-theme="dark"] .ph { background: linear-gradient(var(--frame), var(--frame)) left bottom / 100% 1px no-repeat; }
+:root[data-theme="dark"] .chead, :root[data-theme="dark"] .sheet .panel > h3, :root[data-theme="dark"] .sheet .panel > .ph, :root[data-theme="dark"] .mdet > .ph:first-child { --bar: linear-gradient(var(--scale), var(--scale));
+  background: var(--bar) left bottom / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--scale) 0 40px, transparent 40px 80px) left bottom 1px / 160px 4px no-repeat, var(--bar) left bottom 5px / 161px 1px no-repeat, linear-gradient(90deg, var(--scale) 0 1px, transparent 1px calc(100% - 1px), var(--scale) calc(100% - 1px)) left bottom 1px / 161px 5px no-repeat; }
+/* framed numbers: a lifted fill and a pencil-grey frame instead of a bone outline */
+:root[data-theme="dark"] .ab, :root[data-theme="dark"] .pc .stat { border-color: var(--frame); background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--line); }
+:root[data-theme="dark"] .ab:hover { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4px var(--accent); }
+:root[data-theme="dark"] .ab .score { border-color: var(--frame); background: var(--surface); }
+:root[data-theme="dark"] .vital { border-color: var(--frame); background: var(--surface-2); }
+:root[data-theme="dark"] button.vital:hover { border-color: var(--accent); }
+:root[data-theme="dark"] .shield-shape { background: var(--frame); }
+:root[data-theme="dark"] .shield-shape::before { background: var(--surface-2); }
+:root[data-theme="dark"] .hp.down { border-color: var(--crimson); }
+:root[data-theme="dark"] .sigil { background: color-mix(in srgb, var(--frame) 60%, var(--surface)); color: var(--ink); }
+/* nested boxes sit one step lighter than the sheet */
+:root[data-theme="dark"] .choice:not([aria-pressed="true"]), :root[data-theme="dark"] .ctm { background: var(--surface-2); }
+/* gilt is the one glow: the current turn gets a soft halo */
+:root[data-theme="dark"] .irow.cur, :root[data-theme="dark"] .crow.cur { box-shadow: inset 6px 0 0 var(--sun), 0 0 22px -8px color-mix(in srgb, var(--sun) 60%, transparent); }
+/* gauges and glyphs: no mint, no white discs */
+:root[data-theme="dark"] .hpbar { border-color: color-mix(in srgb, var(--field) 65%, var(--surface)); }
+:root[data-theme="dark"] .hpbar > i { background: color-mix(in srgb, var(--good) 72%, var(--surface)); }
+:root[data-theme="dark"] .hpbar > i.mid { background: color-mix(in srgb, var(--warn-fill) 80%, var(--surface)); }
+:root[data-theme="dark"] .hpbar > i.low { background: var(--crimson); }
+:root[data-theme="dark"] .pip::before { border-color: var(--pc, #6f93cf); background: var(--pc, #6f93cf); }
+:root[data-theme="dark"] .pip.used::before { background: transparent; border-color: var(--pcu, var(--ink-2)); }
+:root[data-theme="dark"] .dot.on { background: var(--ink-2); border-color: var(--ink-2); }
+:root[data-theme="dark"] .cond button[aria-pressed="true"] { color: #f6e9eb; }
+/* wax: the rules glow quietly, the text stays readable */
+:root[data-theme="dark"] .modal, :root[data-theme="dark"] .mdet, :root[data-theme="dark"] .mdet.mcur, :root[data-theme="dark"] .mbprev > .rt { border-top-color: var(--wax); border-bottom-color: var(--wax); }
+:root[data-theme="dark"] .mdet > .lbl, :root[data-theme="dark"] .rt h3 { border-bottom-color: var(--wax); }
+/* raised surfaces: menus, modals, roll cards, the phone turn bar */
+:root[data-theme="dark"] .modal, :root[data-theme="dark"] .popmenu, :root[data-theme="dark"] .bmenu { background: var(--raised); border-color: color-mix(in srgb, var(--ink) 14%, var(--raised)); box-shadow: none; }
+:root[data-theme="dark"] .modal { border-top-color: var(--wax); border-bottom-color: var(--wax); }
+:root[data-theme="dark"] .popmenu button:hover, :root[data-theme="dark"] .bmenu button:hover { background: color-mix(in srgb, var(--ink) 9%, var(--raised)); }
+:root[data-theme="dark"] .tst:not(.msg), :root[data-theme="dark"] .tst.msg { background: var(--raised); color: var(--ink); border: 1px solid color-mix(in srgb, var(--ink) 14%, var(--raised)); box-shadow: none; }
+:root[data-theme="dark"] .tst.crit { box-shadow: 0 0 0 2px var(--tst-crit); }
+:root[data-theme="dark"] .tst.fail { box-shadow: 0 0 0 2px var(--tst-fail); }
+:root[data-theme="dark"] .bnav { box-shadow: none; }
+@media (max-width: 1100px) {
+  :root[data-theme="dark"] .pbar { background: var(--raised); box-shadow: none; }
+  :root[data-theme="dark"] .pbar.turn { background: color-mix(in srgb, var(--sun) 10%, var(--raised)); }
+}
 </style>
 </head>
 <body>
