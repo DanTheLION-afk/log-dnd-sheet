@@ -44,17 +44,18 @@ img { max-width: 100%; }
 /* Layout: sticky ledger bar on top; roster rail on the left, working sheet on the right; stacks to one column on phones. */
 :root {
   /* Survey sheet, light: limewash stone ground, bone sheets, blue-black ink. Lapis = what you act on, wax = rubric and harm, gilt = what is live right now. */
-  --bg: #d8ddd8;
+  --bg: #bcc0c1;
   --surface: #f6f7f2;
   --surface-2: #e7eae4;
-  --line: #b3bbb3;
+  --line: #a3aaa8;
   --field: #6b7770;
   --field-bg: #ffffff;
   --ink: #182028;
-  --ink-2: #475460;
-  --accent: #2a4d93;
+  --ink-2: #3d4955;
+  --accent: #254687;
   --accent-soft: #dbe3f3;
   --accent-ink: #ffffff;
+  --pri: #254687; --pri-ink: #ffffff; --pri-line: #254687;   /* the one filled button: deep lapis; the light blue below is for links, focus and selected text only */
   --brass: #8d1c32;   /* wax rubric, safe as text (name kept: many rules read it) */
   --danger: #b0202f;
   --crimson: #a11d2e;
@@ -63,8 +64,8 @@ img { max-width: 100%; }
   --warn: #8a5200;
   --sun: #c79a2a;     /* gilt */
   --moon: #5a6a78;
-  --glow: #d8ddd8;
-  --grid: rgba(24, 32, 40, .055);
+  --glow: #bcc0c1;
+  --grid: rgba(24, 32, 40, .08);
   --rule: color-mix(in srgb, var(--line) 60%, transparent);
   --shadow: 0 0 0 0 transparent;
   --spine: #1b232b; --spine-2: #26313b; --spine-line: #3a4752; --spine-field: #6f7d88; --on-spine: #e9e7dd; --on-spine-2: #aab4ae; --spine-accent: #9cc4f2; --ribbon: #d04a63;
@@ -77,18 +78,18 @@ img { max-width: 100%; }
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1210; --surface: #171c1a; --surface-2: #212826; --line: #2f3834; --field: #6a7872; --field-bg: #0f1210; --ink: #e9e7dd; --ink-2: #a8b2ac;
-    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
-    --glow: #0f1210; --grid: rgba(233, 231, 221, .04);
-    --spine: #080a09; --spine-2: #171c1a; --spine-line: #2a332f; --spine-field: #6a7872;
+    --bg: #0b0e0c; --surface: #1e2522; --surface-2: #28302d; --line: #3b4641; --field: #707e78; --field-bg: #0b0e0c; --ink: #e9e7dd; --ink-2: #a8b2ac;
+    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --pri: #2c4f96; --pri-ink: #f3f1e8; --pri-line: #86b4ee; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
+    --glow: #0b0e0c; --grid: rgba(233, 231, 221, .06);
+    --spine: #050706; --spine-2: #1e2522; --spine-line: #34403a; --spine-field: #707e78;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --bg: #0f1210; --surface: #171c1a; --surface-2: #212826; --line: #2f3834; --field: #6a7872; --field-bg: #0f1210; --ink: #e9e7dd; --ink-2: #a8b2ac;
-    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
-    --glow: #0f1210; --grid: rgba(233, 231, 221, .04);
-    --spine: #080a09; --spine-2: #171c1a; --spine-line: #2a332f; --spine-field: #6a7872;
+    --bg: #0b0e0c; --surface: #1e2522; --surface-2: #28302d; --line: #3b4641; --field: #707e78; --field-bg: #0b0e0c; --ink: #e9e7dd; --ink-2: #a8b2ac;
+    --accent: #86b4ee; --accent-soft: #182736; --accent-ink: #0c1424; --pri: #2c4f96; --pri-ink: #f3f1e8; --pri-line: #86b4ee; --brass: #f08a9d; --danger: #f2808c; --crimson: #b83448; --on-danger: #1a0b0e; --good: #62c7a4; --warn: #e3ab4d; --sun: #d6aa3c; --moon: #b9c6c2; --tst-crit: #e8c25a; --tst-fail: #f08a8f; --ph: #8a9690;
+    --glow: #0b0e0c; --grid: rgba(233, 231, 221, .06);
+    --spine: #050706; --spine-2: #1e2522; --spine-line: #34403a; --spine-field: #707e78;
     color-scheme: dark;
 }
 
@@ -509,7 +510,8 @@ button.vital:hover { border-color: var(--accent); }
 /* ===== Build 33: survey sheet. Stone ground with a 5-ft grid, bone sheets, blue-black ink.
    Serif (Vollkorn) names things and carries prose; sans (Atkinson Hyperlegible) runs the controls.
    Lapis = act, wax = rubric and harm, gilt = what is live now (turn, crit). Signature: ability frames, scale-bar titles, stat-block frame. ===== */
-body { background: linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); background-attachment: fixed; font-variant-numeric: lining-nums; }
+html { background: linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }   /* on the root so the grid covers the whole page, short or long, and iOS never needs background-attachment: fixed */
+body { background: transparent; font-variant-numeric: lining-nums; }
 body::before { background: var(--spine); }
 h1, h2 { font-family: var(--f-display); font-weight: 600; letter-spacing: .01em; }
 .rt { font: 16px/1.5 var(--f-serif); font-variant-numeric: lining-nums; max-width: 66ch; }
@@ -540,12 +542,16 @@ h1, h2 { font-family: var(--f-display); font-weight: 600; letter-spacing: .01em;
 /* sheets: flat bone panels. Titles sit on a map scale bar (ticks every 8px, a long tick every 40px: five-foot squares). */
 .panel, .pc, .hp, .vital, .modal, .xpbox, .irow, .crow, .lg, .turnbar, .stat, .choice, .picked, .rowed, .empty, .note, .crules, .todo-box, .popmenu, .bmenu, .ctm { border-radius: 3px; }
 .panel, .pc, .hp, .modal, .popmenu, .bmenu { box-shadow: none; }
-.panel > h3, .ph, .chead { --tick: color-mix(in srgb, var(--ink) 50%, transparent); }
-.panel > h3, .ph { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .02em; text-transform: none; color: var(--ink); padding-bottom: 10px; margin-bottom: 10px; border: 0;
-  background: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 8px) left bottom / 201px 4px no-repeat, repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 40px) left bottom / 201px 8px no-repeat, linear-gradient(var(--ink), var(--ink)) left bottom / 100% 1px no-repeat; }
+.panel > h3, .ph { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .02em; text-transform: none; color: var(--ink); align-items: center; padding-bottom: 14px; margin-bottom: 0; border: 0;
+  background: linear-gradient(var(--field), var(--field)) left bottom / 100% 1px no-repeat; }
+.panel > h3 + *, .ph + * { margin-top: 12px; }
+.panel.stack > h3 + *, .panel.stack > .ph + * { margin-top: 2px; }
+/* a real map scale bar (four 40px segments, outlined) on the character header, the sheet's panels and the stat block name; every other title gets a plain baseline */
+.chead, .sheet .panel > h3, .sheet .panel > .ph, .mdet > .ph:first-child { --bar: linear-gradient(var(--ink), var(--ink));
+  background: var(--bar) left bottom / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--ink) 0 40px, transparent 40px 80px) left bottom 1px / 160px 4px no-repeat, var(--bar) left bottom 5px / 161px 1px no-repeat, linear-gradient(90deg, var(--ink) 0 1px, transparent 1px calc(100% - 1px), var(--ink) calc(100% - 1px)) left bottom 1px / 161px 5px no-repeat; }
 .ph .small, .panel > h3 .small, .ph .pill, .ph .seg { font-family: var(--f-body); letter-spacing: 0; }
 .ph .seg button { font-family: var(--f-label); }
-.chead { border: 0; padding-bottom: 14px; background: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 8px) left bottom / 281px 5px no-repeat, repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 40px) left bottom / 281px 10px no-repeat, linear-gradient(var(--ink), var(--ink)) left bottom / 100% 2px no-repeat; }
+.chead { border: 0; padding-bottom: 16px; }
 .chead .cname { font-family: var(--f-serif); font-size: 40px; font-weight: 600; letter-spacing: -.005em; }
 @media (max-width: 600px) { .chead .cname { font-size: 31px; } }
 .splv h3 { font-family: var(--f-display); font-weight: 700; font-size: 16px; letter-spacing: .03em; text-transform: none; color: var(--brass); }
@@ -587,17 +593,19 @@ h1, h2 { font-family: var(--f-display); font-weight: 600; letter-spacing: .01em;
 /* buttons: lapis for the one thing to do, outlined for the rest */
 .btn { padding-inline: 14px; background: transparent; border-color: var(--field); font-weight: 600; }
 .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
-.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.btn.pri:hover { background: var(--accent); filter: brightness(1.1); }
+.btn.pri { background: var(--pri); border-color: var(--pri-line); color: var(--pri-ink); font-weight: 700; }
+.btn.pri:hover { background: var(--pri); filter: brightness(1.12); }
 .btn.ghost { border-color: transparent; }
 .btn.ghost:hover { background: var(--surface-2); border-color: transparent; }
 .btn.danger { border-color: color-mix(in srgb, var(--danger) 60%, var(--field)); }
 .seg { border-color: var(--field); }
 .seg button { background: transparent; font-weight: 600; }
-.seg button[aria-pressed="true"], .btn[aria-pressed="true"], .secnav button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.pill { border: 0; border-radius: 2px; font-size: 12.5px; font-weight: 600; letter-spacing: 0; padding: 1px 7px; }
+.seg button[aria-pressed="true"], .btn[aria-pressed="true"], .secnav button[aria-pressed="true"], .fxrow button[aria-pressed="true"] { background: var(--pri); color: var(--pri-ink); border-color: var(--pri-line); }
+.pill { border: 1px solid transparent; border-radius: 2px; font-size: 12.5px; font-weight: 600; letter-spacing: 0; padding: 0 6px; }
 .pill.acc { background: var(--accent-soft); color: var(--accent); }
-.pill.brass { background: var(--sun); color: #1d1600; }
+.pill.brass { background: transparent; color: var(--ink); border-color: var(--ink-2); }   /* a neutral flag; gilt is only for live state */
+.pill.todo { background: transparent; color: var(--brass); border-color: var(--brass); }
+.pill.live { background: var(--sun); color: #1d1600; }
 .pill.bad { background: color-mix(in srgb, var(--danger) 16%, var(--surface)); color: var(--danger); }
 .cond button { border-radius: 3px; }
 .cond button[aria-pressed="true"] { background: var(--crimson); border-color: var(--crimson); color: #fff; }
@@ -843,7 +851,7 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 .who:hover, .choice:hover { transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .btn, .roll, .cond button, .secnav button, .who, .choice { transform: none !important; } a, .rl { transition: none; } }
 /* phones: every control 44px, clusters 8px apart */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 700px) {
   .btn.sm, .btn.exh, .roll, .seg button, .seg button.mini, .cond button, .secnav button, .themebtn, .campbtn, .chatbtn, .pillbtn, .tab, label.chk { min-height: 44px; }
   .btn.exh, .themebtn, .chatbtn { min-width: 44px; }
   .pip { width: 44px; height: 44px; }
@@ -854,6 +862,51 @@ a:hover, .rl:hover { text-decoration-thickness: 2px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --warn-fill: #e3ab4d; } }
 :root[data-theme="dark"] { --warn-fill: #e3ab4d; }
 .hpbar > i.mid { background: var(--warn-fill); }
+/* ===== Build 33b: review fixes ===== */
+.roll.pri { background: var(--pri); color: var(--pri-ink); border-color: var(--pri-line); }
+.roll.pri:hover { color: var(--pri-ink); }
+.step[aria-current="true"]::before { background: var(--pri); color: var(--pri-ink); border-color: var(--pri-line); }
+.maphint .btn { background: #2c4f96; color: #f3f1e8; border: 1px solid #86b4ee; }
+/* the sheet's wax small-caps heads and framed numbers reach Join, Party and Prep */
+#app h2 { color: var(--brass); }
+.pc .stat { border: 2px solid var(--ink); border-radius: 10px; box-shadow: inset 0 0 0 2px var(--surface), inset 0 0 0 3px var(--line); }
+.pc .stat .v { font-size: 24px; }
+/* combat rows: survivors are standard buttons, the rest sit behind one menu */
+.cact { display: contents; }
+.cmorewrap { position: relative; display: inline-block; }
+.crow .cx, .crow .cq { gap: 8px; }
+.ctools > summary { list-style: none; cursor: pointer; }
+.ctools > summary::-webkit-details-marker { display: none; }
+.popmenu button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+@media (min-width: 701px) { .cmenu .crx-m { display: none; } .ctools > summary { display: none; } }
+@media (max-width: 700px) {
+  .ctools { width: 100%; }
+  .ctools > summary { display: flex; justify-content: center; }
+  .ctools > .ctool { margin-top: 8px; }
+  .crow:not(.lair) { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "ini name name" "ini hp ac" "pick act act"; gap: 6px 10px; align-items: center; padding: 8px 10px; }
+  .crow:not(.lair) > .ini { grid-area: ini; align-self: stretch; width: auto; min-height: 56px; font-size: 22px; }
+  .crow > input[data-act="cpick"] { grid-area: pick; justify-self: center; width: 32px; height: 32px; }
+  .crow:not(.lair) > .cname { grid-area: name; flex: none; }
+  .crow:not(.lair) > .chp { grid-area: hp; flex: none; min-width: 0; }
+  .crow:not(.lair) > .cac { grid-area: ac; }
+  .crow > .cact { grid-area: act; display: flex; gap: 8px; align-items: center; }
+  .crow .cq { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; }
+  .crow .cq input { flex: 1 1 44px; width: auto; min-width: 44px; }
+  .crow .cx .pips, .crow .cx .crx-d { display: none; }
+}
+/* the DM pane reads like a stat block: tracker strip above the wax frame, type line, AC and HP, abilities, actions; the monster browser follows the same heads */
+.mwrap { gap: 12px; }
+.mstrip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 3px; padding: 8px 12px; gap: 8px; }
+.mdet > .mtype { font-family: var(--f-serif); font-style: italic; font-size: 15px; }
+.rt h3 { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .02em; color: var(--brass); padding-bottom: 3px; border-bottom: 1px solid var(--brass); margin: 12px 0 6px; }
+.mbprev > .rt { border-top: 5px double var(--brass); border-bottom: 5px double var(--brass); padding-block: 8px; }
+/* 360px and narrower: nothing clips without a cue */
+@media (max-width: 360px) {
+  .who.addnew { min-width: 44px; width: 44px; padding: 0; justify-content: center; }
+  .who.addnew .grow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (max-width: 480px) { .steps { flex-wrap: wrap; overflow-x: visible; } }
+@media (max-width: 360px) { .ph .row:has(> .exh) { flex-wrap: wrap !important; gap: 8px !important; } }
 </style>
 </head>
 <body>
@@ -2974,7 +3027,7 @@ function viewChars() {
 function issuePill(D) {
   if (!D.issues.length) return '';
   const hard = D.issues.some(i => i.hard);
-  return `<button class="pill ${hard ? 'bad' : 'brass'} pillbtn" data-act="gobuild" data-v="${D.issues[0].step}" title="${esc(D.issues.map(i => i.msg).join('\n'))}">${hard ? 'Breaks a rule · ' : ''}${D.issues.length} left to do</button>`;
+  return `<button class="pill ${hard ? 'bad' : 'todo'} pillbtn" data-act="gobuild" data-v="${D.issues[0].step}" title="${esc(D.issues.map(i => i.msg).join('\n'))}">${hard ? 'Breaks a rule · ' : ''}${D.issues.length} left to do</button>`;
 }
 function charEditor(e) {
   const ch = e.ch, ro = !canEditChar(e.owner);
@@ -3159,7 +3212,7 @@ function stepClass(ch, D, ro) {
   const others = R.list('classes').filter(c => !ch.classes.some(x => x.id === c.id));
   const firstDef = D.cls[0] && D.cls[0].def;
   const leaveOK = !firstDef || mcReqMet(firstDef, D);
-  const add = total < capLevel() && others.length ? `<div class="panel stack"><h3>Multiclass</h3><div class="row">${fselect({ id: 'f-addclass', items: others, none: false, ro, key: 'addclass', label: c => c.name + (mcReqText(c) ? ` (needs ${mcReqText(c)}${mcReqMet(c, D) ? '' : ', not met'})` : '') })}<button class="btn" data-act="addclass"${dis(ro)}>Add a level</button></div>
+  const add = total < capLevel() && others.length ? `<div class="panel stack"><h3>Multiclass</h3><div class="row">${fselect({ id: 'f-addclass', items: others, none: false, ro, key: 'addclass', label: c => c.name + (mcReqText(c) ? ` (${mcReqMet(c, D) ? '' : 'needs '}${mcReqText(c)})` : '') })}<button class="btn" data-act="addclass"${dis(ro)}>Add a level</button></div>
       <p class="small muted">${leaveOK ? '' : `Your ${esc(firstDef.name)} scores don't meet its own multiclass requirement (${esc(mcReqText(firstDef))}). `}${ch.free ? 'Exceptions are on, so unmet requirements only warn.' : 'You need the listed scores in both your current class and the new one. The DM can allow an exception under Basics.'}</p></div>` : '';
   const tools = `<div class="panel stack"><h3>Tools & extra proficiencies</h3><div class="grid2"><label class="field"><span class="lbl">Tools (comma separated)</span><input type="text" id="f-tools" data-in="tools" value="${esc(ch.tools)}"${dis(ro)}></label><label class="field"><span class="lbl">Extra weapon or armor proficiencies</span><input type="text" id="f-profx" data-in="profExtra" value="${esc(ch.profExtra)}" placeholder="e.g. Longswords, Heavy Armor"${dis(ro)}></label></div></div>`;
   return rows + add + tools;
@@ -3656,7 +3709,7 @@ function sheetView(ch, D, ro, e) {
         const list = known.filter(x => x.s.lvl === l).sort((a, b) => a.s.name.localeCompare(b.s.name));
         return `<div class="splv"><h3>${l ? ORD(l) + ' level' : 'Cantrips'}</h3>${n ? `<span class="pips">${Array.from({ length: n }, (_, i) => `<button class="pip${i < n - u ? '' : ' used'}" data-act="slot" data-l="${l}" data-n="${i < n - u ? u + 1 : u - 1}" aria-label="Level ${l} slot ${i + 1} of ${n}, ${i < n - u ? 'available' : 'used'}"${dis(ro)}></button>`).join('')}</span><span class="small muted">${n - u} left</span>` : ''}</div>
           ${list.map(({ s, c }) => { const m = spellMathFor(ch, D, s, s.lvl, c); return `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r, s.conc ? 'Concentration' : '', s.rit ? 'Ritual' : '', c.name, c.freeTxt || ''].filter(Boolean).join(' · '))}</div></div>
-              <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(dmgLabel(m))}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
+              <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(dmgLabel(m))}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`; }).join('')}`;
       }).join('')}</div>`;
   }
   const secSpells = `<div class="stack sec sec-spells">${spells || '<div class="panel muted nospell">No spells on this character.</div>'}</div>`;
@@ -3710,7 +3763,7 @@ function viewParty() {
       ${slotsLeft.length || D.pact ? `<div class="small muted">Slots ${slotsLeft.join(' · ')}${D.pact ? ` · Pact ${D.pact.n - (+p.pact || 0)}/${D.pact.n}` : ''}</div>` : ''}
       <div class="small muted">Saves ${ABIL.map(a => a.toUpperCase() + ' ' + sgn(D.save[a])).join(' ')}</div>
       ${advMode() === 'xp' ? `<div class="small"><b class="num">${fmtN(xpOf(ch, D))} XP</b>${D.level < 20 ? (xpOf(ch, D) >= XP_LEVEL[D.level] ? ' <span class="pill brass">ready to level up</span>' : ` <span class="muted">· ${fmtN(XP_LEVEL[D.level] - xpOf(ch, D))} to level ${D.level + 1}</span>`) : ''}</div>` : (+(p.lvlUpTo || 0) > D.level ? '<div class="small"><span class="pill brass">level up waiting</span></div>' : '')}
-      ${D.issues.length || D.flags.length ? `<details class="feat" data-k="rev-${esc(owner)}-${esc(ch.id)}"><summary><b class="small">Review</b>${D.issues.length ? `<span class="pill ${D.issues.some(i => i.hard) ? 'bad' : 'brass'}">${D.issues.some(i => i.hard) ? 'breaks a rule · ' : ''}${D.issues.length} unfinished</span>` : ''}${D.flags.length ? `<span class="pill">${D.flags.length} house-ruled</span>` : ''}</summary><ul class="small" style="margin:6px 0 0;padding-left:1.2em">${D.issues.map(i => `<li>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}</li>`).join('')}${D.flags.map(f => `<li class="muted">${esc(f)}</li>`).join('')}</ul></details>` : '<div class="small"><span class="pill acc">Build complete</span></div>'}
+      ${D.issues.length || D.flags.length ? `<details class="feat" data-k="rev-${esc(owner)}-${esc(ch.id)}"><summary><b class="small">Review</b>${D.issues.length ? `<span class="pill ${D.issues.some(i => i.hard) ? 'bad' : 'todo'}">${D.issues.some(i => i.hard) ? 'breaks a rule · ' : ''}${D.issues.length} unfinished</span>` : ''}${D.flags.length ? `<span class="pill">${D.flags.length} house-ruled</span>` : ''}</summary><ul class="small" style="margin:6px 0 0;padding-left:1.2em">${D.issues.map(i => `<li>${i.hard ? '<b>Rule: </b>' : ''}${esc(i.msg)}</li>`).join('')}${D.flags.map(f => `<li class="muted">${esc(f)}</li>`).join('')}</ul></details>` : '<div class="small"><span class="pill acc">Build complete</span></div>'}
     </article>`;
   }).join('');
   return head + intro + handouts + dmPartyPanel() + partyXpPanel() + `<div class="cards">${cards}</div>`;
@@ -5405,13 +5458,13 @@ function onClick(ev) {
   if (el.disabled) return;
   flushTyping();
   const fn = ACT[el.dataset.act];
-  if ((UI.bmore || UI.chmore) && !/^(bmore|chmore|popclose)$/.test(el.dataset.act)) { UI.bmore = false; UI.chmore = false; queueRender(); }
+  if ((UI.bmore || UI.chmore || RUN.menu) && !/^(bmore|chmore|cmore|popclose)$/.test(el.dataset.act)) { UI.bmore = false; UI.chmore = false; RUN.menu = null; queueRender(); }
   if (fn) { if (el.dataset.act !== 'bgclose') ev.preventDefault(); fn(el, ev); }
 }
 function onKey(ev) {
   if (ev.key === 'Enter' && ev.target.id === 'f-cttx') { ev.preventDefault(); ACT.ctsend(); return; }
   if (ev.key === 'Escape' && UI.modal) { closeModal(); return; }
-  if (ev.key === 'Escape' && (UI.bmore || UI.chmore)) { closePops(); return; }
+  if (ev.key === 'Escape' && (UI.bmore || UI.chmore || RUN.menu)) { closePops(); return; }
   if (ev.key === 'Tab' && UI.modal) {
     const dlg = document.querySelector('#modal .modal');
     if (dlg) {
@@ -5853,7 +5906,7 @@ function viewCombat() {
   const sel = cb.list.find(c => c.id === RUN.sel) || cb.list.find(c => c.id === cb.cur) || null;
   const rows = cb.list.map(c => {
     const nm = liveName(c);
-    if (c.kind === 'lair') return `<div class="crow${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}">
+    if (c.kind === 'lair') return `<div class="crow lair${c.id === cb.cur ? ' cur' : ''}${sel && sel.id === c.id ? ' sel' : ''}">
       <span style="width:20px"></span><input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
       <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">Lair actions, loses initiative ties</span></button>
       <span class="row cx"><button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span></div>`;
@@ -5867,8 +5920,8 @@ function viewCombat() {
       <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">${esc(sub)}</span>${conds.length || (c.fxs || []).length || c.kind === 'mon' ? `<span class="row small">${c.kind === 'mon' ? monTags(c) : ''}${condPills(conds, fxPub(c))}</span>` : ''}</button>
       <div class="chp"><span class="num"><b>${hp == null ? '—' : hp}</b>${max ? ' / ' + max : ''}${hp == null && c.taken ? ` <span class="small muted" title="HP isn't set, so damage is only tallied">took ${c.taken}</span>` : ''}</span><div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div></div>
       <span class="num cac" title="Armor Class">AC ${ac == null || ac === '' ? '?' : ac}</span>
-      <span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
-      <span class="row cx">${c.kind === 'mon' ? combatPips(c, 'rxu', 1, 'Reaction') : ''}<button class="btn ghost sm" data-act="crx" data-v="${esc(c.id)}" title="Attack with this creature's reaction">Reaction attack</button><button class="btn ghost sm" data-act="cdelay" data-v="${esc(c.id)}" title="Optional table rule (the core rules only have Ready): move to after the creature whose turn it is"${dis(!cb.cur)}>Delay</button><button class="btn ghost sm" data-act="csurp" data-v="${esc(c.id)}"${pressed(c.surp)} title="Surprised: 2014 loses its first turn, 2024 rolls initiative with disadvantage">Surprised</button>${c.kind === 'mon' ? `<button class="btn ghost sm" data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span>
+      <div class="cact"><span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
+      <span class="row cx">${c.kind === 'mon' ? combatPips(c, 'rxu', 1, 'Reaction') : ''}<button class="btn sm crx-d" data-act="crx" data-v="${esc(c.id)}" title="Attack with this creature's reaction">Reaction attack</button><span class="cmorewrap"><button class="btn sm" data-act="cmore" data-v="${esc(c.id)}" aria-expanded="${RUN.menu === c.id}" aria-haspopup="menu" aria-label="More for ${esc(nm)}" title="Delay, Surprised, Hide, Remove">${b23Icon('more', 18)}</button>${RUN.menu === c.id ? `<div class="popbg" data-act="popclose"></div><div class="popmenu cmenu" role="menu"><button class="crx-m" data-act="crx" data-v="${esc(c.id)}">Reaction attack</button><button data-act="cdelay" data-v="${esc(c.id)}" title="Optional table rule (the core rules only have Ready): move to after the creature whose turn it is"${dis(!cb.cur)}>Delay</button><button data-act="csurp" data-v="${esc(c.id)}"${pressed(c.surp)} title="Surprised: 2014 loses its first turn, 2024 rolls initiative with disadvantage">Surprised</button>${c.kind === 'mon' ? `<button data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="danger" data-act="crm" data-v="${esc(c.id)}">Remove</button></div>` : ''}</span></span></div>
     </div>`;
   }).join('');
   const last = UNDO[UNDO.length - 1];
@@ -5881,7 +5934,7 @@ function viewCombat() {
     <div class="row"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2><span class="pill acc">Round ${cb.round || 1}</span><span class="spacer"></span>${cb.list.length ? '<span class="small muted kbdhint">Keys: N next turn, P back</span>' : ''}${window.PL_SITE ? `<a class="btn ghost sm" href="?v=table${location.hash}" target="_blank" rel="noopener">Open table display</a>` : ''}</div>
     ${S.mode === 'live' && !isResolver() ? `<div class="note row"><span class="grow">Player attacks and saves are being settled in another DM window. If that window is closed, nothing gets applied.</span><button class="btn sm" data-act="ctake">Settle them here</button></div>` : ''}
     ${cbar(cb)}
-    <div class="row ctool"><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button><button class="btn" data-act="mbrowse">Add monsters</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div>
+    <details class="ctools" data-k="ctools"${window.matchMedia('(min-width: 701px)').matches ? ' open' : ''}><summary class="btn">Combat tools</summary><div class="row ctool"><button class="btn" data-act="csort"${dis(!cb.list.length)}>Sort</button><button class="btn" data-act="crollmon"${dis(!cb.list.some(c => c.kind === 'mon'))}>Roll monster initiative</button><button class="btn" data-act="cparty">Add the party</button><button class="btn" data-act="mbrowse">Add monsters</button>${last ? `<button class="btn" data-act="undo" title="${esc(last.label)}">Undo: ${esc(last.label.slice(0, 26))}</button>` : ''}<button class="btn danger" data-act="cend"${dis(!cb.list.length)}>End combat</button></div></details>
     <div class="row small"><label class="chk"><input type="checkbox" data-act="cskip"${cb.skipDead !== false ? ' checked' : ''}> Auto-skip dead monsters</label><label class="row" style="gap:6px">Effects count down at <select data-act="ctick" aria-label="Effects count down at">${opt('end', 'end of turn', cb.tick !== 'start')}${opt('start', 'start of turn', cb.tick === 'start')}</select></label></div>
     ${absentBanner(cb)}
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
@@ -5954,30 +6007,31 @@ function combatDetail(c, cb) {
   };
   const left = k => Math.max(0, ex[k] - (+c[k === 'la' ? 'lau' : 'lru'] || 0));
   const pct = c.max ? clamp((c.hp == null ? 0 : c.hp) / c.max * 100, 0, 100) : 0, pills = condPills(c.cond || [], fxPub(c));
-  /* the read-only picture of this creature right now: hit points, conditions, legendary and reaction state, lair, concentration, edits */
-  const status = `<div class="stack" style="gap:6px"><div class="row"><b class="num mhp">${c.hp == null ? '—' : c.hp}${c.max ? ' / ' + c.max : ''} HP</b><div class="hpbar grow" style="min-width:60px"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div><span class="pill">AC ${c.ac == null || c.ac === '' ? '?' : c.ac}</span>${d && d.speed ? `<span class="pill">${esc(d.speed)}</span>` : ''}</div>
+  /* the tracker strip above the stat block: conditions, legendary and reaction state, lair, concentration, edits, target. The stat block itself reads like the book: type line, AC and HP, abilities, actions. */
+  const hpline = `<div class="row mstat"><b class="num mhp">${c.hp == null ? '—' : c.hp}${c.max ? ' / ' + c.max : ''} HP</b><div class="hpbar grow" style="min-width:60px"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div><span class="pill">AC ${c.ac == null || c.ac === '' ? '?' : c.ac}</span>${d && d.speed ? `<span class="pill">${esc(d.speed)}</span>` : ''}</div>`;
+  const strip = `<div class="mstrip stack">
     ${pills ? `<div class="row small">${pills}</div>` : ''}
     <div class="row small">${ex.la ? `<span class="row" style="gap:6px;flex-wrap:nowrap"><span class="lbl">Legendary actions</span>${combatPips(c, 'lau', ex.la, 'Legendary action')}<span class="muted">${left('la')} of ${ex.la} left</span></span>` : ''}${ex.lr ? `<span class="row" style="gap:6px;flex-wrap:nowrap"><span class="lbl">Legendary resistance</span>${combatPips(c, 'lru', ex.lr, 'Legendary resistance')}<span class="muted">${left('lr')} of ${ex.lr} left</span></span>` : ''}<span class="pill ${c.rxu ? '' : 'acc'}">Reaction ${c.rxu ? 'used' : 'ready'}</span>${lair ? `<span class="pill brass">Lair actions at initiative ${lair.init == null ? '?' : lair.init}</span>` : ''}</div>
-    ${c.conc ? `<div class="row small"><span class="pill brass">Concentrating: ${esc(c.conc)}</span><button class="btn ghost sm" data-act="mbreak" data-v="${esc(c.id)}">Break</button><span class="muted">Damage asks for a Con save</span></div>` : ''}
+    ${c.conc ? `<div class="row small"><span class="pill acc">Concentrating: ${esc(c.conc)}</span><button class="btn ghost sm" data-act="mbreak" data-v="${esc(c.id)}">Break</button><span class="muted">Damage asks for a Con save</span></div>` : ''}
     ${spells.length ? `<div class="row small"><span class="lbl">Cast (concentration)</span>${spells.map(s => `<button class="btn sm" data-act="mcast" data-v="${esc(c.id)}" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
-    ${c.ed ? `<div class="note small"><b>Edited for this fight:</b> ${esc(edNote(c))}${c.ed.note ? `<div style="margin-top:4px">${esc(c.ed.note)}</div>` : ''}</div>` : ''}</div>`;
+    ${c.ed ? `<div class="note small"><b>Edited for this fight:</b> ${esc(edNote(c))}${c.ed.note ? `<div style="margin-top:4px">${esc(c.ed.note)}</div>` : ''}</div>` : ''}
+    ${d ? `<div class="row"><span class="lbl">Target</span>${tsel}${advSeg()}</div>` : ''}</div>`;
   const quick = `<div class="row"><label class="field" style="width:210px;max-width:100%"><span class="small muted">Name</span><input type="text" id="f-dn" data-act="cset" data-k="name" data-v="${esc(c.id)}" value="${esc(c.name)}"></label><label class="field" style="width:76px"><span class="small muted">HP</span><input type="number" id="f-dh" data-act="cset" data-k="hp" data-v="${esc(c.id)}" value="${esc(c.hp == null ? '' : c.hp)}"></label><label class="field" style="width:76px"><span class="small muted">Max</span><input type="number" id="f-dm" data-act="cset" data-k="max" data-v="${esc(c.id)}" value="${esc(c.max == null ? '' : c.max)}"></label><label class="field" style="width:70px"><span class="small muted">AC</span><input type="number" id="f-da" data-act="cset" data-k="ac" data-v="${esc(c.id)}" value="${esc(c.ac == null ? '' : c.ac)}"></label></div>`;
   const conds = `<details class="feat" data-k="mconds" open><summary><b>Conditions and effects</b></summary><div class="body stack">${condChips(c.cond, 'ccond', `data-v="${esc(c.id)}"`)}${fxPanel(c)}</div></details>`;
-  const block = d ? `<div class="row"><span class="lbl">Target</span>${tsel}${advSeg()}</div>
-    ${KINDS.some(([k]) => (d[k] || []).some(a => a.dc && a.dc.v)) ? `<div class="small muted">Save buttons roll for the creatures you tick in the turn order${nTick ? ' (' + nTick + ' ticked)' : ''}.</div>` : ''}
-    ${KINDS.filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}
-    ${conds}
-    <div class="small muted">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)}${d.xp ? ' (' + d.xp + ' XP)' : ''}</div>
+  const block = d ? `<div class="small muted mtype">${esc([d.size, d.type].filter(Boolean).join(' '))} · CR ${crLabel(d.cr)}${d.xp ? ' (' + d.xp + ' XP)' : ''}</div>
+    ${hpline}
     <div class="abgrid">${ABIL.map(a => `<button class="vital" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" title="Roll a ${ABN[a]} check"><div class="lbl">${a}</div><div class="num"><b>${d.ab[a]}</b> ${sgn(mod(d.ab[a]))}</div></button>`).join('')}</div>
     <div class="row small"><span class="lbl">Saves</span>${ABIL.map(a => `<button class="roll" data-act="mroll" data-v="${esc(c.id)}" data-ab="${a}" data-sv="1">${a.toUpperCase()} ${sgn(d.saves && d.saves[a] != null ? +d.saves[a] : mod(d.ab[a]))}</button>`).join('')}</div>
     ${d.skills ? `<div class="row small"><span class="lbl">Skills</span>${Object.entries(d.skills).map(([k, v]) => { const s = SKILL[k] || { name: k, ab: '' }; return `<button class="roll" data-act="mroll" data-v="${esc(c.id)}" data-ab="${s.ab}" data-b="${+v}" data-l="${esc(s.name)}">${esc(s.name)} ${sgn(+v)}</button>`; }).join('')}</div>` : ''}
     ${['vuln', 'res', 'imm', 'cimm'].filter(k => d[k]).map(k => `<div class="small"><span class="lbl">${{ vuln: 'Vulnerable', res: 'Resists', imm: 'Immune', cimm: 'Condition immune' }[k]}</span> ${esc(d[k].join('; '))}</div>`).join('')}
     <div class="small"><span class="lbl">Senses</span> ${esc(d.senses || '—')} · <span class="lbl">Languages</span> ${esc(d.langs || '—')}</div>
+    ${KINDS.some(([k]) => (d[k] || []).some(a => a.dc && a.dc.v)) ? `<div class="small muted">Save buttons roll for the creatures you tick in the turn order${nTick ? ' (' + nTick + ' ticked)' : ''}.</div>` : ''}
+    ${KINDS.filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}
     ${(d.traits || []).length ? `<details class="feat" data-k="mtraits"><summary><b>Traits (${d.traits.length})</b> <span class="small muted">${esc(d.traits.map(t => t.n).join(', '))}</span></summary><div class="body stack">${d.traits.map(t => `<div class="rt small"><b>${esc(t.n)}.</b> ${md(t.d).replace(/^<p>/, '').replace(/<\/p>$/, '')}</div>`).join('')}</div></details>` : ''}`
-    : `<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>${conds}`;
-  return `<div class="panel stack mdet${isCur ? ' mcur' : ''}"><div class="ph">${esc(c.name)}${isCur ? '<span class="pill brass">Acting now</span>' : ''}${c.hidden ? '<span class="pill">hidden</span>' : ''}${c.ed ? '<span class="pill" title="' + esc(edNote(c)) + '">edited</span><button class="btn ghost sm" data-act="mfreset" data-v="' + esc(c.id) + '">Reset to stat block</button>' : ''}<span class="spacer"></span>${!isCur && cb.cur ? '<button class="btn ghost sm" data-act="cback">Back to current turn</button>' : ''}<button class="btn sm" data-act="mfight" data-v="${esc(c.id)}">Edit for this fight</button></div>
-    ${status}${quick}
-    ${block}</div>`;
+    : `${hpline}<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>`;
+  return `<div class="mwrap stack">${strip}<div class="panel stack mdet${isCur ? ' mcur' : ''}"><div class="ph">${esc(c.name)}${isCur ? '<span class="pill live">Acting now</span>' : ''}${c.hidden ? '<span class="pill">hidden</span>' : ''}${c.ed ? '<span class="pill" title="' + esc(edNote(c)) + '">edited</span><button class="btn ghost sm" data-act="mfreset" data-v="' + esc(c.id) + '">Reset to stat block</button>' : ''}<span class="spacer"></span>${!isCur && cb.cur ? '<button class="btn ghost sm" data-act="cback">Back to current turn</button>' : ''}<button class="btn sm" data-act="mfight" data-v="${esc(c.id)}">Edit for this fight</button></div>
+    ${block}</div>
+    <div class="panel stack mquick">${quick}${conds}</div></div>`;
 }
 function viewCombatPublic(big) {
   const I = S.init || { list: [] }, list = I.list || [];
@@ -5989,7 +6043,7 @@ function viewCombatPublic(big) {
     return `<div class="irow${c.id === I.cur ? ' cur' : ''}${big ? ' big' : ''}"><div class="iv">${c.init == null ? '—' : c.init}</div><div class="grow"><b>${esc(liveName(c))}</b>${mine(c) ? ' <span class="pill acc">you</span>' : ''}<div class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${condPills(conds, c.fx)}</div></div>${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const cur = list.find(c => c.id === I.cur);
-  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:${big ? 40 : 26}px">${big ? esc((S.campaign && S.campaign.name) || 'Initiative') : 'Combat'}</h2>${list.length ? `<span class="pill acc"${big ? ' style="font-size:18px"' : ''}>Round ${I.round || 1}</span>` : ''}${cur && mine(cur) ? '<span class="pill brass">Your turn</span>' : I.unseen ? '<span class="pill">Something unseen acts</span>' : ''}</div>
+  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:${big ? 40 : 26}px">${big ? esc((S.campaign && S.campaign.name) || 'Initiative') : 'Combat'}</h2>${list.length ? `<span class="pill acc"${big ? ' style="font-size:18px"' : ''}>Round ${I.round || 1}</span>` : ''}${cur && mine(cur) ? '<span class="pill live">Your turn</span>' : I.unseen ? '<span class="pill">Something unseen acts</span>' : ''}</div>
     ${list.length ? `<div class="init" style="max-width:${big ? 900 : 720}px">${rows}</div>` : `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`}
     ${big ? '' : `<p class="small muted" style="margin-top:12px">Attack and cast from your sheet: pick a target there and the DM's screen settles hits and damage.</p>`}`;
 }
@@ -6323,7 +6377,7 @@ MODALS.cast = () => {
     : `<div class="stack"><span class="lbl">${math.heal ? 'Who is healed' : math.n > 1 ? `Aim the ${math.noun}s: they go round the ticked targets` : 'Who is caught in it'}</span><div class="row">${math.heal ? `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="self"${tg.self ? ' checked' : ''}> Yourself</label>` : ''}${all.map(t => `<label class="chk small"><input type="checkbox" data-act="casttg" data-v="${esc(t.id)}"${tg[t.id] ? ' checked' : ''}> ${esc(t.name)}</label>`).join('')}</div>${all.length ? '' : '<span class="small muted">No fight is running, so this just rolls.</span>'}</div>`);
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Cast a spell"><div class="row"><h2>Cast ${esc(s.name)}</h2><span class="spacer"></span><button class="btn ghost" data-act="closemodal" aria-label="Close">${svgIcon('x', 16)}</button></div>
     <div class="stack"><span class="lbl">Spell slot</span>${opts.length ? `<div class="row">${opts.map(o => `<button class="btn sm" data-act="castslot" data-v="${o.k}"${pressed(m.slot === o.k)}>${esc(o.label)}${o.left != null ? ` <span class="muted">${o.left} left</span>` : ''}</button>`).join('')}</div>` : '<div class="errline">No spell slots left for this spell. Take a rest, or ask the DM for an exception.</div>'}</div>
-    <div class="row small">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${math.save ? `<span class="pill">${ABN[math.save]} save DC ${c.dc}${math.half ? ', half on a success' : ''}</span>` : ''}${math.dmg ? `<span class="pill">${esc(dmgLabel(math))} ${esc(math.dt || '')}</span>` : ''}${math.heal ? `<span class="pill acc">heals ${esc(math.heal)}</span>` : ''}${s.conc ? `<span class="pill brass">Concentration${ch.play.conc && ch.play.conc !== s.name ? ': ends ' + esc(ch.play.conc) : ''}</span>` : ''}</div>
+    <div class="row small">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${math.save ? `<span class="pill">${ABN[math.save]} save DC ${c.dc}${math.half ? ', half on a success' : ''}</span>` : ''}${math.dmg ? `<span class="pill">${esc(dmgLabel(math))} ${esc(math.dt || '')}</span>` : ''}${math.heal ? `<span class="pill acc">heals ${esc(math.heal)}</span>` : ''}${s.conc ? `<span class="pill acc">Concentration${ch.play.conc && ch.play.conc !== s.name ? ': ends ' + esc(ch.play.conc) : ''}</span>` : ''}</div>
     ${pickers}
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="castgo"${dis(!opts.length)}>Cast</button></div></div>`;
 };
@@ -8094,7 +8148,7 @@ function viewCombatPlayer() {
       ${isMine ? `<button class="btn ghost sm" data-act="crx" data-v="${esc(c.id)}" title="Attack with your reaction">Reaction attack</button>` : ''}${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const notIn = chars().filter(x => x.mine && !mineIn.includes(x));
-  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill brass">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : ''}</div>`;
+  const head = `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:26px">Combat</h2>${list.length ? `<span class="pill acc">Round ${I.round || 1}</span>` : ''}${actingMine ? `<span class="pill live">Your turn: ${esc(actingMine.ch.name)}</span><button class="btn pri sm" data-act="pendturn" data-cid="${esc(actingMine.ch.id)}">End my turn</button>` : ''}</div>`;
   if (!list.length) return head + `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`;
   const left = `<div class="stack"><div class="init">${rows}</div>
     ${me ? `<p class="small muted">Tap someone to target them, then attack or cast from your sheet. The DM's screen settles hits, saves and damage.</p>` : ''}
@@ -8333,10 +8387,11 @@ function attackCantrips(ch, D, known, ro) {
   const list = known.filter(x => x.s.lvl === 0).map(x => Object.assign({ m: spellMathFor(ch, D, x.s, 0, x.c) }, x)).filter(x => x.m && x.m.dmg && (x.s.atk || x.m.save));
   if (!list.length) return '';
   return `<div class="panel atkcan"><div class="ph">Attack cantrips</div>${list.sort((a, b) => a.s.name.localeCompare(b.s.name)).map(({ s, c, m }) => `<div class="spl"><div><span class="nm" data-act="spellinfo" data-v="${esc(s.id)}" role="button" tabindex="0">${esc(s.name)}</span><div class="tags">${esc([s.t, s.r].filter(Boolean).join(' · '))}</div></div>
-    <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}<span class="pill">${esc(dmgLabel(m))}</span><button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`).join('')}</div>`;
+    <div class="row" style="gap:4px;justify-content:flex-end">${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}<span class="pill">${esc(dmgLabel(m))}</span><button class="btn sm" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro)}>Cast</button></div></div>`).join('')}</div>`;
 }
-function closePops() { if (UI.bmore || UI.chmore) { UI.bmore = false; UI.chmore = false; queueRender(); } }
+function closePops() { if (UI.bmore || UI.chmore || RUN.menu) { UI.bmore = false; UI.chmore = false; RUN.menu = null; queueRender(); } }
 Object.assign(ACT, {
+  cmore(el) { RUN.menu = RUN.menu === el.dataset.v ? null : el.dataset.v; UI.bmore = false; UI.chmore = false; queueRender(); },
   bmore() { UI.bmore = !UI.bmore; UI.chmore = false; queueRender(); },
   chmore() { UI.chmore = !UI.chmore; UI.bmore = false; queueRender(); },
   popclose() { closePops(); },
@@ -8670,7 +8725,7 @@ function absentPanel(c, x, D) {
   const btn = `<button class="btn ghost sm" data-act="absent" data-cid="${esc(x.ch.id)}" data-owner="${esc(x.owner)}"${pressed(abs)}>${abs ? 'Mark present' : 'Mark absent'}</button>`;
   if (!abs) return `<div class="row small">${btn}</div>`;
   UI.cur = { cid: x.ch.id, owner: x.owner };   // the sheet's own buttons act on UI.cur
-  return `<div class="row small">${btn}<span class="pill brass">${c.id === cbt().cur ? 'Their turn: you run it' : 'You run this character'}</span></div><div class="cbsheet">${sheetView(x.ch, D, !canEditChar(x.owner), x)}</div>`;
+  return `<div class="row small">${btn}<span class="pill live">${c.id === cbt().cur ? 'Their turn: you run it' : 'You run this character'}</span></div><div class="cbsheet">${sheetView(x.ch, D, !canEditChar(x.owner), x)}</div>`;
 }
 function absentBanner(cb) {
   const c = cb.list.find(x => x.id === cb.cur);
@@ -9110,7 +9165,7 @@ function whatCanIDo(ch, D, known, ro, inFight) {
     const k = /^bonus/i.test(s.t) ? 'Bonus action' : /^reaction/i.test(s.t) ? 'Reaction' : /^action/i.test(s.t) ? 'Action' : 'Other';
     const tag = [s.lvl ? ORD(s.lvl) + ' level' : 'Cantrip', s.lvl ? (left ? left + (left === 1 ? ' slot' : ' slots') + ' left' : opts.length ? 'ritual only' : 'no slots left') : '', s.conc ? 'Concentration' : '', c.freeTxt || ''].filter(Boolean).join(' · ');
     G[k].push(row(`<button type="button" class="rl" data-act="spellinfo" data-v="${esc(s.id)}" title="Show the rules for ${esc(s.name)}">${esc(s.name)}</button>`, tag,
-      `${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(dmgLabel(m))}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm pri" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro || (s.lvl && !opts.length))}>Cast</button>`));
+      `${s.atk ? `<span class="pill">${sgn(c.atk)} to hit</span>` : ''}${m.save ? `<span class="pill">${m.save.toUpperCase()} ${c.dc}</span>` : ''}${m.dmg ? `<span class="pill">${esc(dmgLabel(m))}</span>` : ''}${m.heal ? `<span class="pill acc">heals ${esc(m.heal)}</span>` : ''}<button class="btn sm" data-act="cast" data-v="${esc(s.id)}" data-c="${esc(c.id)}"${dis(ro || (s.lvl && !opts.length))}>Cast</button>`));
   }
   const nk = s => String(s).toLowerCase().replace(/[^a-z]/g, ''), rs = D.res.filter(r => !r.cf);
   const feats = [...D.features.filter(x => !x.isFeat), ...D.traits.filter(t => !t.l || t.l <= D.level), ...(D.bg && D.bg.feature ? [D.bg.feature] : []), ...D.feats.map(x => ({ n: x.f.name, d: x.f.d }))];
