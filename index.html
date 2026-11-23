@@ -1111,7 +1111,9 @@ const BUILTIN_PACKS = [{"id":"celestial-classes","name":"Celestial Classes","rul
 const BUILTIN_IDS = new Set(BUILTIN_PACKS.map(p => p.id));
 const allPacks = () => BUILTIN_PACKS.concat(PACKS);
 let OFF_SRC = new Set(); // sources the DM switched off: hidden from pickers, still readable on sheets
-function setOffSources(arr) { OFF_SRC = new Set(arr || []); packsVersion++; regCache.clear(); }
+let HIDE = {};   // Build 36: built-in entries the DM hid for this campaign, {type: [ids]}: dropped from pickers (R.list), still readable on sheets (R[type])
+const hid = (t, id) => !!(HIDE[t] && HIDE[t].includes(id));
+function setOffSources(arr) { OFF_SRC = new Set(arr || []); HIDE = (typeof S !== 'undefined' && S.settings && S.settings.hide) || {}; packsVersion++; regCache.clear(); }
 
 /* ===== 2024 class choices the free rules describe but the data left as text ===== */
 const INVOCATIONS_24 = [
@@ -1400,23 +1402,24 @@ function registry(rs) {
   for (const [id, c] of R.classes) R.classes.set(id, normClass(c));
   for (const [id, fx] of Object.entries(SPELL_FX)) { const s = R.spells.get(id); if (s && fx.atk && !s.atk) R.spells.set(id, Object.assign({}, s, { atk: fx.atk })); }   // the 2014 Scorching Ray and 2024 Chromatic Orb lack the attack flag
   R.spellsByClass = new Map();
-  for (const s of R.spells.values()) { if (OFF_SRC.has(s.src)) continue; for (const c of s.cls || []) { if (!R.spellsByClass.has(c)) R.spellsByClass.set(c, []); R.spellsByClass.get(c).push(s); } }
+  for (const s of R.spells.values()) { if (OFF_SRC.has(s.src) || hid('spells', s.id)) continue; for (const c of s.cls || []) { if (!R.spellsByClass.has(c)) R.spellsByClass.set(c, []); R.spellsByClass.get(c).push(s); } }
   const spBySlug = R.spBySlug = new Map(); for (const s of R.spells.values()) spBySlug.set(slug(s.name), s);
   for (const c of R.classes.values()) if (Array.isArray(c.list)) {
     const arr = R.spellsByClass.get(c.id) || []; const have = new Set(arr.map(s => s.id));
-    for (const id of c.list) { const s = R.spells.get(id) || spBySlug.get(id); if (s && !have.has(s.id) && !OFF_SRC.has(s.src)) { arr.push(s); have.add(s.id); } }
+    for (const id of c.list) { const s = R.spells.get(id) || spBySlug.get(id); if (s && !have.has(s.id) && !OFF_SRC.has(s.src) && !hid('spells', s.id)) { arr.push(s); have.add(s.id); } }
     R.spellsByClass.set(c.id, arr);
   }
   for (const a of R.spellsByClass.values()) a.sort((x, y) => x.lvl - y.lvl || x.name.localeCompare(y.name));
   const lists = {};
   const srdFirst = (a, b) => (/^SRD/.test(b.src || '') - /^SRD/.test(a.src || '')) || byName(a, b);
-  R.list = t => lists[t] || (lists[t] = Array.from(R[t].values()).filter(e => !OFF_SRC.has(e.src)).sort(srdFirst));
+  R.list = t => lists[t] || (lists[t] = Array.from(R[t].values()).filter(e => !OFF_SRC.has(e.src) && !hid(t, e.id)).sort(srdFirst));
   regCache.set(key, R);
   return R;
 }
 function bumpPacks(packs) { PACKS = packs; packsVersion++; regCache.clear(); syncConds(); }
 /* homebrew conditions join the built-in lists (sheet, combat, effects) and their rules text; a built-in name always wins a clash */
 const BASE_CONDS = CONDITIONS.slice();
+const condsFor = cur => CONDITIONS.filter(c => !hid('conditions', slug(c)) || (cur || []).includes(c));
 let CONDBASE = null;   // the built-in rules text and effects, kept so a campaign change can be undone
 const condBase = () => CONDBASE || (CONDBASE = { rules: Object.assign({}, COND_RULES), fx: clone(COND_FX) });
 function syncConds() {
@@ -1645,7 +1648,7 @@ function derive(ch) {
   D.asiSlots = asiSlots;
   D.feats = feats;
   const G = applyGrants(ch, D, feats, features);
-  const hasFeature =(re) => features.some(x => re.test(x.n));
+  const hasFeature =(re) => features.some(x => re.test(x.n) || (x.f && x.f.orig && re.test(x.f.orig)));
   const choiceNames = features.map(x => ch.choices[x.key]).flat().filter(Boolean);
   const hasChoice = (re) => choiceNames.some(n => re.test(n));
   const hasFeat = id => feats.some(x => x.f.id === id || slug(x.f.name) === id);
@@ -1922,7 +1925,7 @@ function derive(ch) {
     if (finesse || isMonkW) ab = D.m.dex > D.m.str ? 'dex' : 'str';
     if (D.pactBlade && !ranged && D.m.cha > D.m[ab]) ab = 'cha';
     const prof = profWeapon(weapons, d, w) || !!(D.pactBlade && !ranged);
-    const bonusAtk = itemMod(ch, it, 'atk', d) + gsum(G.atk), bonusDmg = itemMod(ch, it, 'dmg', d) + gsum(G.dmg);
+    const wn = it.name || d.name, bonusAtk = itemMod(ch, it, 'atk', d) + gwsum(G.atk, wn), bonusDmg = itemMod(ch, it, 'dmg', d) + gwsum(G.dmg, wn);
     const atk = D.m[ab] + (prof ? D.pb : 0) + bonusAtk + (archery && ranged ? 2 : 0);
     let dice = w.dmg || '1';
     if (isMonkW && martialDie && diceAvg(martialDie) > diceAvg(dice)) dice = martialDie;
@@ -1936,18 +1939,27 @@ function derive(ch) {
     D.attacks.push({ name: 'Unarmed Strike', atk: D.m[ab] + D.pb, dmg: dice ? dice + (dm ? (dm > 0 ? '+' : '-') + Math.abs(dm) : '') : String(Math.max(1, 1 + dm)), dt: 'Bludgeoning', props: '', range: '', prof: true, flat: !dice, ab, melee: true, weapon: false });
   }
 
+  /* Build 36: action grants. An attack becomes an attack row (so the roll buttons, targets and advantage all work); the save DC and damage are kept for whatCanIDo */
+  D.gacts = G.acts.map(g => {
+    const ab = ABIL.includes(g.ab) ? g.ab : '', m = ab ? D.m[ab] : 0, dice = String(g.dmg || '').replace(/\s+/g, '');
+    const dc = !g.save ? 0 : /^spell$/i.test(String(g.dc || '')) || !g.dc ? 8 + D.pb + D.m[ab || bestMental(D)] : evalMax(String(g.dc).replace(/\bab\b/gi, ab || bestMental(D)), D.level, D);
+    const o = { key: g.key, name: g.name, act: g.act, save: g.save || '', dc, dmg: dice ? dice + (g.atk && m ? (m > 0 ? '+' : '-') + Math.abs(m) : '') : '', dt: g.dt || '' };
+    if (g.atk === 'melee' || g.atk === 'ranged') { o.ai = D.attacks.length; D.attacks.push({ name: g.name, atk: m + D.pb + (+g.bonus || 0), dmg: o.dmg || '0', dt: g.dt || '', props: '', range: '', prof: true, flat: !o.dmg, ab: ab || 'str', melee: g.atk === 'melee', weapon: false, ga: 1 }); }
+    return o;
+  });
+
   /* resources */
   D.res = [];
   const addRes = (key, n, max, reset, note) => { if (max > 0) D.res.push({ key, n, max, reset, note }); };
   for (const x of cls) {
     const row = x.def.table[x.c.lvl - 1] || {};
-    for (const r of x.def.resources || []) {
+    for (const own of [x.def, x.sub]) for (const r of (own && own.resources) || []) {   // a subclass can track resources the same way a class does
       let max = 0;
       if (r.key && row.x && row.x[r.key] != null) max = +row.x[r.key];
       else if (r.max != null) max = evalMax(r.max, x.c.lvl, D);
       if (r.key === 'rage_count' && x.c.lvl >= 20 && !is24) max = 0;
       if (max > 0 && r.key && x.sub && x.sub.resBonus) max += +x.sub.resBonus[r.key] || 0;
-      addRes(x.def.id + ':' + (r.key || slug(r.n)), r.n, max, r.reset || 'long', r.note || '');
+      addRes(own.id + ':' + (r.key || slug(r.n)), r.n, max, r.reset || 'long', r.note || '');
     }
     if (hasFeatureIn(x, /^bardic inspiration/i)) addRes('bardic', 'Bardic Inspiration', Math.max(1, D.m.cha), x.c.lvl >= 5 ? 'short' : 'long', (row.x && row.x.bardic_inspiration_die) ? 'd' + String(row.x.bardic_inspiration_die).replace(/^d/, '') : '');
     if (hasFeatureIn(x, /^lay on hands/i)) addRes('loh', 'Lay on Hands pool', 5 * x.c.lvl, 'long');
@@ -1968,7 +1980,7 @@ function derive(ch) {
     const hasRes = n => D.res.some(r => r.n.toLowerCase() === String(n).toLowerCase());
     for (const z of features) {
       if (z.f && (z.f.usage || z.f.uses)) continue;
-      const t = TRACK_24.find(([re]) => re.test(z.n)); if (!t || hasRes(t[3] || z.n)) continue;
+      const t = TRACK_24.find(([re]) => re.test(z.n) || (z.f && z.f.orig && re.test(z.f.orig))); if (!t || hasRes(t[3] || z.n)) continue;
       const x = cls.find(c => c.def.id === z.cls), r0 = x ? ((x.def.table[x.c.lvl - 1] || {}).x || {}) : {};
       addRes('t:' + z.key, t[3] || z.n, trackMax(t[1], D, r0), t[2]);
     }
@@ -2125,7 +2137,7 @@ function audit(ch, D) {
     const p = ch.asi[s.key]; const what = `${s.cls} ${s.l} ${s.boon ? 'Epic Boon' : 'ability score improvement'}`;
     if (!p) add('features', `Choose your ${what}.`);
     else if (p.type === 'asi') { if ((p.p || []).filter(Boolean).length < 2) add('features', `Finish your ${what}.`); }
-    else { const f = look(ch, 'feats', p.id); if (!f) add('features', `Choose a feat for your ${what}.`); else if (f.asiFeat ? (p.p || []).filter(Boolean).length < 2 : (f.asi && !ABIL.some(a => (p.a || {})[a]))) add('features', `Choose the ability score for ${f.name}.`); }
+    else { const f = look(ch, 'feats', p.id); if (!f) add('features', `Choose a feat for your ${what}.`); else if (f.asiFeat ? (p.p || []).filter(Boolean).length < 2 : (f.asi && ABIL.filter(a => (p.a || {})[a]).length < asiCount(f))) add('features', `Choose the ability score for ${f.name}.`); }
   }
   for (const x of D.features) {
     if (!x.f || !(x.f.opts || x.f.pick)) continue;
@@ -2190,7 +2202,7 @@ function flagsOf(ch) {
   const ib = (ch.inv || []).filter(i => +i.ac || +i.atk || +i.dmg).length; if (ib) F.push(ib + ' item' + (ib === 1 ? '' : 's') + ' with typed-in bonuses');
   return F;
 }
-function hasFeatureIn(x, re) { return (x.def.features || []).some(f => f.l <= x.c.lvl && re.test(f.n)); }
+function hasFeatureIn(x, re) { return (x.def.features || []).some(f => f.l <= x.c.lvl && (re.test(f.n) || (f.orig && re.test(f.orig)))); }
 function profArmor(set, cat) {
   const all = Array.from(set).map(s => s.toLowerCase());
   if (all.some(s => s.includes('all armor'))) return true;
@@ -3249,7 +3261,7 @@ function stepSpecies(ch, D, ro) {
   const sp = D.sp, sub = D.sub;
   let out = `<div class="panel"><h3>Species</h3>${pickerGrid(R.list('species'), ch.species, 'species', ro, x => [x.size, (x.speed || 30) + ' ft.'].filter(Boolean).join(' · '), 'species')}</div>`;
   if (!sp) return out;
-  const subs = (sp.subs || []).filter(s => s.id === ch.sub || !OFF_SRC.has(s.src));
+  const subs = (sp.subs || []).filter(s => s.id === ch.sub || (!OFF_SRC.has(s.src) && !hid('subspecies', s.id)));
   if (subs.length) out += `<div class="panel"><h3>${ch.ruleset === '2024' ? 'Lineage or ancestry' : 'Subrace'}</h3>${pickerGrid(subs, ch.sub, 'sub', ro, x => Object.entries(x.ab || {}).map(([a, v]) => a.toUpperCase() + ' ' + sgn(v)).join(' '), 'options')}</div>`;
   out += lineageSpellPanel(ch, D, ro);
   const abTxt = [...Object.entries(sp.ab || {}), ...Object.entries((sub && sub.ab) || {})].map(([a, v]) => ABN[a] + ' ' + sgn(v)).join(', ');
@@ -3313,11 +3325,28 @@ function toolPickPanel(ch, ro, where, tp) {
   const R = registry(ch.ruleset), opts = toolPickOpts(R, tp), cur = (ch.toolPicks || {})[where] || [];
   return `<div class="stack"><span class="lbl">${esc(tp.label || 'Tool proficiency')}</span><div class="row">${Array.from({ length: tp.n || 1 }, (_, i) => `<select data-act="toolpick" data-w="${where}" data-i="${i}" aria-label="${esc((tp.label || 'Tool proficiency') + ' ' + (i + 1))}"${dis(ro)}>${opt('', 'Choose…', !cur[i])}${opts.filter(o => o === cur[i] || !cur.includes(o)).map(o => opt(o, o, cur[i] === o)).join('')}</select>`).join('')}</div></div>`;
 }
+/* a feat's ability increase: +1 to one (default), +2 to one (asi.mode "two") or +1 to two different (asi.mode "split"), from the abilities it lists */
+const asiCount = f => (f.asi && f.asi.mode === 'split' ? 2 : 1);
+const asiSet = (f, cur, i, v) => { const picks = ABIL.filter(a => (cur || {})[a]), amt = f && f.asi && f.asi.mode === 'two' ? 2 : 1, o = {}; picks[i] = v || null; for (const a of picks) if (a) o[a] = amt; return o; };
 function asiPickFor(act, feat, cur, ro, key) {
-  const from = feat.asi ? feat.asi.from : ABIL;
-  const sel = ABIL.find(a => (cur || {})[a]) || '';
-  return `<label class="field" style="max-width:240px"><span class="lbl">${esc(feat.name)}: +1 to</span><select data-act="${act}"${key ? ` data-key="${esc(key)}"` : ''}${dis(ro)}>${opt('', 'Choose…')}${from.map(a => opt(a, ABN[a], sel === a)).join('')}</select></label>`;
+  const from = feat.asi ? feat.asi.from : ABIL, n = asiCount(feat), amt = feat.asi && feat.asi.mode === 'two' ? 2 : 1, picks = ABIL.filter(a => (cur || {})[a]);
+  return `<div class="row">${Array.from({ length: n }, (_, i) => `<label class="field" style="max-width:240px"><span class="lbl">${esc(feat.name)}: +${amt} to${n > 1 ? ' (' + (i + 1) + ' of ' + n + ')' : ''}</span><select data-act="${act}" data-i="${i}"${key ? ` data-key="${esc(key)}"` : ''}${dis(ro)}>${opt('', 'Choose…')}${from.filter(a => a === picks[i] || !picks.includes(a)).map(a => opt(a, ABN[a], picks[i] === a)).join('')}</select></label>`).join('')}</div>`;
 }
+/* feat prerequisites as data: need = {ab: [[ability, score]...], any, cls: [class ids], caster, sp: species id}. featNeedOK checks them for a character; featPre is the text shown with the feat */
+function featNeedOK(ch, D, f) {
+  const n = f.need; if (!n || ch.free) return true;
+  if ((n.ab || []).length) { const t = ([a, v]) => D.sc[a] >= v; if (n.any ? !n.ab.some(t) : !n.ab.every(t)) return false; }
+  if ((n.cls || []).length && !D.cls.some(x => n.cls.includes(x.def.id))) return false;
+  if (n.caster && !D.cls.some(x => (x.def.spell && x.def.spell.ab) || (x.sub && x.sub.spell && x.sub.spell.ab))) return false;
+  if (n.sp && !(D.sp && D.sp.id === n.sp)) return false;
+  return true;
+}
+function featNeedText(f, rs) {
+  const n = f.need; if (!n) return '';
+  const R = registry(rs || '2024'), nm = (t, id) => (R[t].get(id) || {}).name || id;
+  return [(n.ab || []).map(([a, v]) => a.toUpperCase() + ' ' + v).join(n.any ? ' or ' : ', '), (n.cls || []).map(c => nm('classes', c)).join(' or '), n.caster ? 'Spellcasting' : '', n.sp ? nm('species', n.sp) : ''].filter(Boolean).join('; ');
+}
+const featPre = (f, rs) => f.prereq || featNeedText(f, rs);
 function mcReqText(c) { const req = (c.mc && c.mc.req) || []; return req.map(([a, n]) => a.toUpperCase() + ' ' + n).join(c.mc && c.mc.any ? ' or ' : ' + '); }
 function mcReqMet(c, D) { const req = (c.mc && c.mc.req) || []; return !req.length || (c.mc.any ? req.some(([a, n]) => D.sc[a] >= n) : req.every(([a, n]) => D.sc[a] >= n)); }
 
@@ -3344,11 +3373,11 @@ function stepClass(ch, D, ro) {
       hpRows = `<div class="stack"><div class="row"><span class="lbl">Hit point rolls (d${def.hd})</span><button class="btn sm" data-act="rollhp" data-i="${i}"${dis(ro)}>Roll empty levels</button></div><div class="row">${cells.join('')}</div><span class="small muted">Empty levels use the average. Values above ${def.hd} are cut down to ${def.hd}.</span></div>`;
     }
     return `<div class="panel stack">
-      <div class="row"><h3 style="margin:0;font-family:var(--f-display);font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink)">${esc(def.name)}</h3><span class="pill">d${def.hd}</span>${i === 0 ? '<span class="pill brass">Starting class</span>' : ''}<span class="spacer"></span>
+      <div class="row"><h3 style="margin:0;font-family:var(--f-display);font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink)">${esc(def.name)}</h3><span class="pill">d${def.hd}</span>${i === 0 ? '<span class="pill brass">Starting class</span>' : ''}${edLink('classes', def)}<span class="spacer"></span>
         <button class="btn sm" data-act="lvl" data-i="${i}" data-d="-1"${dis(ro || c.lvl <= 1)} aria-label="Lower level">−</button><span class="num" style="font-size:22px;min-width:32px;text-align:center">${c.lvl}</span><button class="btn sm" data-act="lvl" data-i="${i}" data-d="1"${dis(ro || total >= capLevel())} aria-label="Raise level">+</button>
         ${ch.classes.length > 1 || ro ? `<button class="btn ghost sm danger" data-act="rmclass" data-i="${i}"${dis(ro)}>Remove</button>` : `<button class="btn ghost sm" data-act="rmclass" data-i="${i}"${dis(ro)}>Change class</button>`}</div>
       <div class="stack"><span class="lbl">${esc(def.subLabel || 'Subclass')} (level ${def.subLevel || 3})${subs.length > 6 ? ` · ${subs.length} available` : ''}</span>
-        <div class="row">${fselect({ items: subs, cur: c.sub, act: 'subclass', attrs: `data-i="${i}" aria-label="${esc(def.subLabel || 'Subclass')} for ${esc(def.name)}"`, ro, off: !subOK, key: 'sub' + i, placeholder: subOK ? (subs.length ? 'Choose…' : 'None in your content') : 'Unlocks at level ' + (def.subLevel || 3) })}</div>
+        <div class="row">${fselect({ items: subs, cur: c.sub, act: 'subclass', attrs: `data-i="${i}" aria-label="${esc(def.subLabel || 'Subclass')} for ${esc(def.name)}"`, ro, off: !subOK, key: 'sub' + i, placeholder: subOK ? (subs.length ? 'Choose…' : 'None in your content') : 'Unlocks at level ' + (def.subLevel || 3) })}${edLink('subclasses', cur)}</div>
         ${cur && cur.d ? `<details class="feat"><summary><b>About ${esc(cur.name)}</b><span class="small muted">${esc(cur.src || '')}</span></summary><div class="body rt">${md(cur.d)}</div></details>` : ''}</div>
       ${skillPool && skillPool.n ? `<div class="stack"><span class="lbl">${i === 0 ? 'Class skills' : 'Skill from multiclassing'}</span>${skillChecks('clsskill', chosen, skillPool.from, skillPool.n, ro, `data-c="${esc(def.id)}"`, otherSkills(ch, D, 'cls:' + def.id))}</div>` : ''}
       ${i === 0 && def.toolPick ? toolPickPanel(ch, ro, 'cls', def.toolPick) : (def.toolChoices || []).length && i === 0 ? `<div class="small muted">Tool choice: ${esc(def.toolChoices.join('; '))}. Add it under Tools below.</div>` : ''}
@@ -3393,8 +3422,8 @@ function stepFeatures(ch, D, ro) {
   const featList = R.list('feats');
   const taken = new Set(D.feats.map(x => x.f.id));
   const hasFS = D.features.some(x => /fighting style/i.test(x.n));
-  const featOK = (f, cur) => f.id === cur || (!f.asiFeat && (f.type !== 'fighting-style' || hasFS) && (!f.lvl || D.level >= f.lvl || ch.free) && (f.rep || !taken.has(f.id)));
-  const featLabel = f => f.name + (f.prereq ? ' (' + f.prereq + ')' : '');
+  const featOK = (f, cur) => f.id === cur || (!f.asiFeat && (f.type !== 'fighting-style' || hasFS) && (!f.lvl || D.level >= f.lvl || ch.free) && (f.rep || !taken.has(f.id)) && featNeedOK(ch, D, f));
+  const featLabel = f => f.name + (featPre(f, ch.ruleset) ? ' (' + featPre(f, ch.ruleset) + ')' : '');
   if (D.asiSlots.length) {
     out += `<div class="panel stack"><h3>Ability score improvements</h3>${D.asiSlots.map(s => {
       const p = ch.asi[s.key] || { type: 'asi', p: [] };
@@ -3402,7 +3431,7 @@ function stepFeatures(ch, D, ro) {
       if (p.type === 'feat') {
         const f = look(ch, 'feats', p.id);
         const pool = featList.filter(x => featOK(x, p.id));
-        inner = `<div class="row">${fselect({ items: pool, cur: p.id, act: 'asifeat', attrs: `data-key="${esc(s.key)}" aria-label="Feat for ${esc(s.cls)} ${s.l}"`, ro, key: 'asi:' + s.key, placeholder: 'Choose a feat…', label: featLabel })}</div>${f && (f.asi || f.asiFeat) ? (f.asiFeat ? asiPair(s.key, p, ro, 'asifp') : asiPickFor('asifa', f, p.a, ro, s.key)) : ''}${f ? `<details class="feat"><summary><b>${esc(f.name)}</b><span class="small muted">${esc(f.src || '')}</span></summary><div class="body rt">${md(f.d)}</div></details>` : ''}`;
+        inner = `<div class="row">${fselect({ items: pool, cur: p.id, act: 'asifeat', attrs: `data-key="${esc(s.key)}" aria-label="Feat for ${esc(s.cls)} ${s.l}"`, ro, key: 'asi:' + s.key, placeholder: 'Choose a feat…', label: featLabel })}</div>${f && (f.asi || f.asiFeat) ? (f.asiFeat ? asiPair(s.key, p, ro, 'asifp') : asiPickFor('asifa', f, p.a, ro, s.key)) : ''}${f ? `<div class="row">${edLink('feats', f)}</div><details class="feat"><summary><b>${esc(f.name)}</b><span class="small muted">${esc(f.src || '')}</span></summary><div class="body rt">${md(f.d)}</div></details>` : ''}`;
       } else inner = asiPair(s.key, p, ro, 'asip');
       return `<div class="stack" style="border-top:1px solid var(--line);padding-top:10px"><div class="row"><b>${esc(s.cls)} ${s.l}</b><span class="small muted">${s.boon ? 'Epic Boon' : 'Ability Score Improvement'}</span><span class="spacer"></span><div class="seg">${[['asi', 'Raise scores'], ['feat', 'Take a feat']].map(([k, l]) => `<button data-act="asitype" data-key="${esc(s.key)}" data-v="${k}"${pressed(p.type === k)}${dis(ro)}>${l}</button>`).join('')}</div></div>${inner}</div>`;
     }).join('')}</div>`;
@@ -3448,8 +3477,8 @@ function stepFeatures(ch, D, ro) {
     out += `<div class="panel stack"><h3>Expertise</h3><div class="row">${prof.map(([id, n]) => `<label class="chk small"><input type="checkbox" data-act="exp" data-v="${id}"${cur.includes(id) ? ' checked' : ''}${dis(ro || (!cur.includes(id) && cur.length >= expCount && !ch.free))}> ${esc(n)}</label>`).join('')}</div><div class="small ${cur.length > expCount ? 'errline' : 'muted'}">${cur.length} of ${expCount} chosen. Only proficient skills qualify.</div></div>`;
   }
   out += `<div class="panel stack"><h3>Bonus feats</h3><p class="small muted">Feats your DM grants outside of level-ups. The DM sees these listed as house-rule items.</p>
-    ${(ch.feats || []).map((f, i) => { const d = look(ch, 'feats', f.id); return `<div class="row"><b>${esc(d ? d.name : f.id)}</b>${d && d.asi ? asiPickFor('bonusfa', d, f.a, ro, String(i)) : ''}<span class="spacer"></span><button class="btn ghost sm danger" data-act="rmfeat" data-i="${i}"${dis(ro)}>Remove</button></div>`; }).join('')}
-    <div class="row">${fselect({ id: 'f-addfeat', attrs: 'aria-label="Feat to add"', items: featList.filter(f => !f.asiFeat && (f.rep || !taken.has(f.id))), none: false, ro, key: 'bonusfeat', label: f => f.name + (f.type && f.type !== 'general' ? ' · ' + f.type : '') })}<button class="btn" data-act="addfeat"${dis(ro)}>Add feat</button></div></div>`;
+    ${(ch.feats || []).map((f, i) => { const d = look(ch, 'feats', f.id); return `<div class="row"><b>${esc(d ? d.name : f.id)}</b>${edLink('feats', d)}${d && d.asi ? asiPickFor('bonusfa', d, f.a, ro, String(i)) : ''}<span class="spacer"></span><button class="btn ghost sm danger" data-act="rmfeat" data-i="${i}"${dis(ro)}>Remove</button></div>`; }).join('')}
+    <div class="row">${fselect({ id: 'f-addfeat', attrs: 'aria-label="Feat to add"', items: featList.filter(f => !f.asiFeat && (f.rep || !taken.has(f.id)) && featNeedOK(ch, D, f)), none: false, ro, key: 'bonusfeat', label: f => f.name + (f.type && f.type !== 'general' ? ' · ' + f.type : '') })}<button class="btn" data-act="addfeat"${dis(ro)}>Add feat</button></div></div>`;
   const items = D.features.filter(x => !x.isFeat).map(x => ({ l: x.l, n: x.n + (ch.choices[x.key] && x.f.opts ? ': ' + [].concat(ch.choices[x.key]).join(', ') : ''), d: x.d, from: x.from }));
   out += `<div class="panel"><h3>Class features</h3>${items.length ? featureList(items) : '<p class="muted">Pick a class first.</p>'}</div>`;
   const tr = D.traits.filter(t => !t.l || t.l <= D.level);
@@ -3747,7 +3776,7 @@ function compCard(ch, c, st, ci, ro, ws) {
     <div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div>
     ${ro ? '' : `<div class="row"><input type="number" id="f-ca-${esc(id)}" min="0" placeholder="Amount" style="width:90px" aria-label="Amount"><button class="btn sm" data-act="comphp" data-c="${esc(id)}" data-m="dmg">Damage</button><button class="btn sm" data-act="comphp" data-c="${esc(id)}" data-m="heal">Heal</button><button class="btn sm" data-act="comphp" data-c="${esc(id)}" data-m="temp">Set temp</button></div>`}`}
     ${(c.atks || []).map((a, i) => `<div class="row small"><b class="grow">${esc(a.n)}</b><button class="roll pri" data-act="compatk" data-c="${esc(id)}" data-i="${i}">${sgn(+a.b || 0)}</button><span>${esc([a.d, a.t].filter(Boolean).join(' '))}</span></div>`).join('')}
-    <details data-k="ccond-${esc(id)}"><summary class="small" style="cursor:pointer">Conditions${cond.length ? ': ' + esc(cond.join(', ')) : ''}</summary><div class="cond" style="margin-top:6px">${CONDITIONS.map(k => `<button data-act="compcond" data-c="${esc(id)}" data-v="${k}"${pressed(cond.includes(k))}${dis(ro)}>${k}</button>`).join('')}</div></details>
+    <details data-k="ccond-${esc(id)}"><summary class="small" style="cursor:pointer">Conditions${cond.length ? ': ' + esc(cond.join(', ')) : ''}</summary><div class="cond" style="margin-top:6px">${condsFor(cond).map(k => `<button data-act="compcond" data-c="${esc(id)}" data-v="${k}"${pressed(cond.includes(k))}${dis(ro)}>${k}</button>`).join('')}</div></details>
     ${c.notes && !edit ? `<div class="small muted">${esc(c.notes)}</div>` : ''}${edit}</div>`;
 }
 function compView(ch, tg, ro) {
@@ -3819,7 +3848,7 @@ function sheetView(ch, D, ro, e) {
     ${ro ? '' : '<p class="small muted">Track your own counters under Notes: add a section and a counter field.</p>'}
   </div>` : '';
   const conds = `<div class="panel stack"><div class="ph">Conditions<span class="spacer"></span><span class="small" style="text-transform:none;letter-spacing:0">Exhaustion</span><span class="row" style="gap:3px;flex-wrap:nowrap">${[0, 1, 2, 3, 4, 5, 6].map(n => `<button class="btn sm exh" data-act="exh" data-n="${n}"${pressed((+p.exh || 0) === n)}${dis(ro)}>${n}</button>`).join('')}</span></div>
-    <div class="cond">${CONDITIONS.map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>
+    <div class="cond">${condsFor(p.cond).map(c => `<button data-act="cond" data-v="${c}"${pressed((p.cond || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>
     ${(p.cond || []).length || +p.exh ? `<div class="crules">${(p.cond || []).filter(c => COND_RULES[c]).map(c => `<p><b>${esc(c)}.</b> ${esc(COND_RULES[c])}</p>`).join('')}${+p.exh ? `<p><b>Exhaustion.</b> ${esc(exhRule(+p.exh, ch.ruleset).replace(/^Exhaustion \d+: /, ''))}</p>` : ''}</div>` : '<p class="small muted">Tap a condition to see what it does. Rolls change to match where the rules say so.</p>'}
     <label class="row small"><span class="lbl">Concentrating on</span><input type="text" id="f-conc" data-play="conc" value="${esc(p.conc || '')}" placeholder="Nothing" style="flex:1"${dis(ro)}></label></div>`;
   /* Build 23: actions are assembled after the spells, so attack cantrips can sit with the attacks */
@@ -3933,14 +3962,17 @@ function viewLog() {
 const RULESET_OPTS = [['any', 'Both rulesets'], ['2014', '2014 only'], ['2024', '2024 only']];
 const MON_ROW = [['n', 'Name', 'text'], ['atk', 'To hit bonus', 'num'], ['dm', 'Damage dice, e.g. 2d6+3', 'text'], ['dty', 'Damage type', 'text'], ['d', 'Description', 'textarea']];
 const MON_LISTS = ['actions', 'bonus', 'reactions', 'legendary'];
+const ACT_SEL = ['act', 'Takes', 'select', [['', 'From the text'], ['action', 'Action'], ['bonus', 'Bonus action'], ['reaction', 'Reaction'], ['other', 'Other']]];   // Build 36: when a feature is used (whatCanIDo groups by it)
+const USES_ROW = [['umax', 'Uses (number or formula: pb, cha, level)', 'text'], ['ureset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]];
+const RES_ROWS = ['resources', 'Tracked resources', 'rows', [['n', 'Name', 'text'], ['max', 'Max (number or formula like "cha" or "level")', 'text'], ['reset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]]];
 const FORMS = {
   spells: [['name', 'Name', 'text'], ['lvl', 'Level', 'select', [['0', 'Cantrip'], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => [String(n), 'Level ' + n])]], ['sch', 'School', 'select', SCHOOLS.map(s => [s, s])], ['t', 'Casting time', 'text'], ['r', 'Range', 'text'], ['comp', 'Components (V, S, M)', 'text'], ['mat', 'Material component', 'text'], ['dur', 'Duration', 'text'], ['conc', 'Concentration', 'bool'], ['rit', 'Ritual', 'bool'], ['cls', 'On these class spell lists', 'classes'], ['atk', 'Spell attack', 'select', [['', 'None'], ['melee', 'Melee'], ['ranged', 'Ranged']]], ['save', 'Saving throw', 'select', [['', 'None'], ...ABIL.map(a => [a, ABN[a]])]], ['dmg', 'Damage dice (e.g. 3d6)', 'text'], ['dt', 'Damage type', 'text'], ['d', 'Description', 'textarea'], ['hl', 'At higher levels', 'textarea']],
-  feats: [['name', 'Name', 'text'], ['type', 'Feat type', 'select', [['general', 'General'], ['origin', 'Origin'], ['fighting-style', 'Fighting style'], ['epic-boon', 'Epic boon']]], ['prereq', 'Prerequisite', 'text'], ['lvl', 'Minimum level', 'num'], ['asi.from', 'Can raise one of these by 1', 'abchecks'], ['rep', 'Can be taken more than once', 'bool'], ['d', 'Description', 'textarea']],
+  feats: [['name', 'Name', 'text'], ['type', 'Feat type', 'select', [['general', 'General'], ['origin', 'Origin'], ['fighting-style', 'Fighting style'], ['epic-boon', 'Epic boon']]], ['prereq', 'Prerequisite (text shown on the feat)', 'text'], ['lvl', 'Minimum level', 'num'], ['need.ab', 'Needs ability scores (e.g. str 13, dex 13)', 'req'], ['need.any', 'Any one of those scores is enough', 'bool'], ['need.cls', 'Needs one of these classes', 'classes'], ['need.caster', 'Needs the ability to cast spells', 'bool'], ['need.sp', 'Needs this species', 'species'], ['asi.from', 'Ability score increase: choose from these', 'abchecks'], ['asi.mode', 'The increase is', 'select', [['', '+1 to one'], ['two', '+2 to one'], ['split', '+1 to two different']]], ['rep', 'Can be taken more than once', 'bool'], ['d', 'Description', 'textarea']],
   items: [['name', 'Name', 'text'], ['cat', 'Kind', 'select', [['gear', 'Gear'], ['weapon', 'Weapon'], ['armor', 'Armor'], ['shield', 'Shield'], ['magic', 'Magic item']]], ['cost', 'Cost', 'text'], ['wt', 'Weight (lb.)', 'num'], ['rar', 'Rarity', 'select', [['', '—'], ['Common', 'Common'], ['Uncommon', 'Uncommon'], ['Rare', 'Rare'], ['Very Rare', 'Very rare'], ['Legendary', 'Legendary'], ['Artifact', 'Artifact']]], ['att', 'Requires attunement', 'bool'],
     ['w.cat', 'Weapon category', 'select', [['simple', 'Simple'], ['martial', 'Martial']]], ['w.rng', 'Melee or ranged', 'select', [['melee', 'Melee'], ['ranged', 'Ranged']]], ['w.dmg', 'Weapon damage (e.g. 1d8)', 'text'], ['w.dt', 'Damage type', 'text'], ['w.props', 'Properties (comma separated)', 'csv'], ['w.range', 'Range (e.g. 80/320)', 'text'], ['w.two', 'Two-handed damage', 'text'], ['w.mastery', 'Mastery', 'text'],
     ['a.cat', 'Armor category', 'select', [['light', 'Light'], ['medium', 'Medium'], ['heavy', 'Heavy']]], ['a.base', 'Base AC (shield: bonus)', 'num'], ['a.dex', 'Adds Dexterity', 'bool'], ['a.max', 'Max Dex bonus (blank = none)', 'num'], ['a.str', 'Strength needed', 'num'], ['a.stl', 'Stealth disadvantage', 'bool'], ['d', 'Description', 'textarea']],
-  species: [['name', 'Name', 'text'], ['size', 'Size', 'text'], ['speed', 'Speed (ft.)', 'num'], ['dv', 'Darkvision (ft.)', 'num'], ['ab', 'Ability bonuses (2014 style)', 'abil'], ['abChoice.n', 'Extra abilities the player picks', 'num'], ['abChoice.amt', '…raised by', 'num'], ['langs', 'Languages (comma separated)', 'csv'], ['langChoice', 'Extra languages to choose', 'num'], ['skills', 'Skill proficiencies', 'skills'], ['skillChoice.n', 'Skills the player picks', 'num'], ['hpLv', 'Extra HP per level', 'num'], ['originFeat', 'Grants an origin feat (2024 human style)', 'bool'], ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['l', 'Level', 'num'], ['d', 'Description', 'textarea']]]],
-  subspecies: [['name', 'Name', 'text'], ['of', 'Belongs to species', 'species'], ['ab', 'Ability bonuses', 'abil'], ['speed', 'Speed override (ft.)', 'num'], ['dv', 'Darkvision (ft.)', 'num'], ['hpLv', 'Extra HP per level', 'num'], ['skills', 'Skill proficiencies', 'skills'], ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['l', 'Level', 'num'], ['d', 'Description', 'textarea']]]],
+  species: [['name', 'Name', 'text'], ['size', 'Size', 'text'], ['speed', 'Speed (ft.)', 'num'], ['dv', 'Darkvision (ft.)', 'num'], ['ab', 'Ability bonuses (2014 style)', 'abil'], ['abChoice.n', 'Extra abilities the player picks', 'num'], ['abChoice.amt', '…raised by', 'num'], ['langs', 'Languages (comma separated)', 'csv'], ['langChoice', 'Extra languages to choose', 'num'], ['skills', 'Skill proficiencies', 'skills'], ['skillChoice.n', 'Skills the player picks', 'num'], ['hpLv', 'Extra HP per level', 'num'], ['originFeat', 'Grants an origin feat (2024 human style)', 'bool'], ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['l', 'Level', 'num'], ACT_SEL, ['d', 'Description', 'textarea']]]],
+  subspecies: [['name', 'Name', 'text'], ['of', 'Belongs to species', 'species'], ['ab', 'Ability bonuses', 'abil'], ['speed', 'Speed override (ft.)', 'num'], ['dv', 'Darkvision (ft.)', 'num'], ['hpLv', 'Extra HP per level', 'num'], ['skills', 'Skill proficiencies', 'skills'], ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['l', 'Level', 'num'], ACT_SEL, ['d', 'Description', 'textarea']]]],
   backgrounds: [['name', 'Name', 'text'], ['skills', 'Skill proficiencies', 'skills'], ['tools', 'Tool proficiencies (comma separated)', 'csv'], ['langChoice', 'Languages to choose', 'num'], ['abOpts', 'Ability scores it can raise (2024 style, pick 3)', 'abchecks'], ['feat', 'Origin feat', 'feat'], ['featNote', 'Feat note', 'text'], ['feature.n', 'Feature name', 'text'], ['feature.d', 'Feature description', 'textarea'], ['gold', 'Starting gold', 'num'], ['equipText', 'Starting equipment (text)', 'textarea'], ['d', 'Description', 'textarea']],
   classes: [['name', 'Name', 'text'], ['hd', 'Hit die', 'select', [['6', 'd6'], ['8', 'd8'], ['10', 'd10'], ['12', 'd12']]], ['saves', 'Saving throws', 'abchecks'], ['armor', 'Armor (comma separated)', 'csv'], ['weapons', 'Weapons (comma separated)', 'csv'], ['tools', 'Tools (comma separated)', 'csv'], ['skills.n', 'Skills to choose', 'num'], ['skills.from', '…from these', 'skills'],
     ['spell.ab', 'Spellcasting ability', 'select', [['', 'Not a caster'], ...ABIL.map(a => [a, ABN[a]])]], ['spell.prog', 'Spell slot progression', 'select', [['full', 'Full caster (wizard)'], ['half', 'Half caster, 2014 (paladin)'], ['halfup', 'Half caster, 2024 / artificer'], ['third', 'Third caster'], ['pact', 'Pact magic (warlock)']]], ['spell.prep', 'How spells are chosen', 'select', [['known', 'Known spells'], ['level', 'Prepare ability mod + level'], ['half', 'Prepare ability mod + half level'], ['table', 'Fixed prepared count (table below)']]], ['spell.book', 'Uses a spellbook', 'bool'],
@@ -3948,8 +3980,9 @@ const FORMS = {
     ['subLevel', 'Subclass at level', 'num'], ['subLabel', 'Subclass name (e.g. Arcane Tradition)', 'text'], ['asiLevels', 'ASI levels (comma separated)', 'csvnum'],
     ['unarmored', 'Unarmored Defense', 'select', [['', 'None'], ['con', '10 + Dex + Con, shield allowed'], ['wis', '10 + Dex + Wis, no shield'], ['cha', '10 + Dex + Cha, no shield'], ['int', '10 + Dex + Int, no shield']]],
     ['mc.req', 'Multiclass requirement (e.g. str 13, dex 13)', 'req'], ['mc.any', 'Any one of those is enough', 'bool'], ['mc.armor', 'Multiclass armor (comma separated)', 'csv'], ['mc.weapons', 'Multiclass weapons (comma separated)', 'csv'],
-    ['features', 'Class features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ['usage', 'Uses (e.g. 1/Short Rest)', 'text'], ['asi', 'Ability Score Improvement', 'bool'], ['d', 'Description', 'textarea']]],
-    ['resources', 'Tracked resources', 'rows', [['n', 'Name', 'text'], ['max', 'Max (number or formula like "cha" or "level")', 'text'], ['reset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]]]],
+    ['list', 'Extra class spells', 'rows', [['s', 'Spell', 'spell']]],
+    ['features', 'Class features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ACT_SEL, ['usage', 'Uses (e.g. 1/Short Rest)', 'text'], ...USES_ROW, ['asi', 'Ability Score Improvement', 'bool'], ['d', 'Description', 'textarea']]],
+    RES_ROWS],
   monsters: [['name', 'Name', 'text'], ['size', 'Size', 'text'], ['type', 'Type', 'text'], ['ac', 'Armor Class', 'num'], ['hp', 'Hit points', 'num'], ['hd', 'Hit dice (e.g. 4d8+4)', 'text'], ['speed', 'Speed', 'text'], ['cr', 'Challenge rating (1/2 = 0.5)', 'num'], ['xp', 'XP', 'num'],
     ['ab', 'Ability scores (blank = 10)', 'abil'], ['saves', 'Saving throw bonuses (only where proficient)', 'abil'], ['skills', 'Skills (e.g. Perception +5, Stealth +4)', 'skillb'], ['res', 'Damage resistances (comma separated)', 'csv'], ['imm', 'Damage immunities (comma separated)', 'csv'], ['vuln', 'Damage vulnerabilities (comma separated)', 'csv'], ['cimm', 'Condition immunities (comma separated)', 'csv'], ['senses', 'Senses', 'text'], ['langs', 'Languages', 'text'],
     ['traits', 'Traits', 'rows', [['n', 'Name', 'text'], ['d', 'Description', 'textarea']]],
@@ -3957,7 +3990,7 @@ const FORMS = {
     ['la', 'Legendary actions per round (blank = 3)', 'num'], ['legendary', 'Legendary actions', 'rows', MON_ROW], ['lair', 'Lair actions (text)', 'textarea']],
   conditions: [['name', 'Name', 'text'], ['d', 'Rules text', 'textarea'], ['fx.disAtk', 'Disadvantage on attack rolls', 'bool'], ['fx.disCheck', 'Disadvantage on ability checks', 'bool'], ['fx.disSave', 'Disadvantage on saving throws', 'bool'], ['fx.speed0', 'Speed becomes 0', 'bool'], ['fx.advAgainst', 'Attacks against the creature have advantage', 'bool']],
   subclasses: [['name', 'Name', 'text'], ['cls', 'Class', 'class'], ['d', 'Description', 'textarea'], ['spell.ab', 'Subclass spellcasting (e.g. Eldritch Knight)', 'select', [['', 'None'], ...ABIL.map(a => [a, ABN[a]])]], ['spell.prog', 'Slot progression', 'select', [['third', 'Third caster'], ['half', 'Half caster'], ['full', 'Full caster']]], ['spell.list', 'Uses this class spell list', 'class'],
-    ['spells', 'Always-prepared spells', 'rows', [['l', 'Class level', 'num'], ['s', 'Spell', 'spell']]], ['features', 'Features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ['usage', 'Uses (e.g. 1/Long Rest)', 'text'], ['d', 'Description', 'textarea']]]],
+    ['spells', 'Always-prepared spells', 'rows', [['l', 'Class level', 'num'], ['s', 'Spell', 'spell']]], ['features', 'Features', 'rows', [['l', 'Level', 'num'], ['n', 'Name', 'text'], ACT_SEL, ['usage', 'Uses (e.g. 1/Long Rest)', 'text'], ...USES_ROW, ['d', 'Description', 'textarea']]], RES_ROWS],
 };
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
 const setP = (o, p, v) => { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) { if (a[ks[i]] == null || typeof a[ks[i]] !== 'object') a[ks[i]] = {}; a = a[ks[i]]; } a[ks[ks.length - 1]] = v; };
@@ -3966,12 +3999,18 @@ function hbEntryForForm(type, e) {
   const x = clone(e || {});
   if (type === 'subclasses' && Array.isArray(x.spells)) x.spells = x.spells.map(s => Array.isArray(s) ? { l: s[0], s: s[1] } : s);
   if (type === 'classes' && x.unarmored && typeof x.unarmored === 'object') x.unarmored = (x.unarmored.add || [])[0] || '';
+  if (type === 'classes' && Array.isArray(x.list)) x.list = x.list.map(s => ({ s }));
+  if ((type === 'classes' || type === 'subclasses') && Array.isArray(x.features)) x.features = x.features.map(f => { const g = Object.assign({}, f); if (g.uses) { g.umax = g.uses.max; g.ureset = g.uses.reset; delete g.uses; } return g; });
   if (type === 'monsters') for (const k of MON_LISTS) x[k] = (x[k] || []).map(a => Object.assign({}, a, { dm: a.dm || ((a.dmg || [])[0] || [])[0] || '', dty: a.dty || ((a.dmg || [])[0] || [])[1] || '' }));
   return x;
 }
 function hbEntryFromForm(type, x) {
   if (type === 'subclasses' && Array.isArray(x.spells)) x.spells = x.spells.filter(r => r.s).map(r => [+r.l || 1, r.s]);
-  if (type === 'feats' && x.asi && (!x.asi.from || !x.asi.from.length)) delete x.asi; else if (type === 'feats' && x.asi) x.asi.n = 1;
+  if (type === 'feats' && x.asi && (!x.asi.from || !x.asi.from.length)) delete x.asi; else if (type === 'feats' && x.asi) { x.asi.n = x.asi.mode === 'two' ? 2 : 1; if (!x.asi.mode) delete x.asi.mode; }
+  if (type === 'feats' && x.need) { const n = x.need; if (!(n.ab || []).length) { delete n.ab; delete n.any; } if (!n.any) delete n.any; if (!(n.cls || []).length) delete n.cls; if (!n.caster) delete n.caster; if (!n.sp) delete n.sp; if (!Object.keys(n).length) delete x.need; }
+  if (type === 'classes' && Array.isArray(x.list)) { x.list = x.list.map(r => r.s).filter(Boolean); if (!x.list.length) delete x.list; }
+  if ((type === 'classes' || type === 'subclasses') && Array.isArray(x.features)) x.features = x.features.map(f => { const g = Object.assign({}, f); if (g.umax != null && g.umax !== '') g.uses = { max: g.umax, reset: g.ureset === 'short' ? 'short' : 'long' }; delete g.umax; delete g.ureset; return g; });
+  if ((type === 'classes' || type === 'subclasses') && !(x.resources || []).length) delete x.resources;
   if (type === 'species' && x.abChoice && !+x.abChoice.n) delete x.abChoice;
   if (type === 'species' && x.skillChoice && !+x.skillChoice.n) delete x.skillChoice; else if (type === 'species' && x.skillChoice && !x.skillChoice.from) x.skillChoice.from = 'any';
   if (type === 'classes' && x.spell && !x.spell.ab) x.spell = null;
@@ -4118,7 +4157,7 @@ function hbSummary(t, e) {
   if (t === 'subclasses') return (e.cls || '?') + (e.src ? ' · ' + e.src : '');
   if (t === 'subspecies') return 'of ' + (e.of || '?');
   if (t === 'items') return [e.cat, e.rar].filter(Boolean).join(' · ');
-  if (t === 'feats') return [e.type, e.prereq].filter(Boolean).join(' · ');
+  if (t === 'feats') return [e.type, featPre(e)].filter(Boolean).join(' · ');
   if (t === 'monsters') return ['CR ' + (e.cr == null ? '?' : e.cr), 'AC ' + (e.ac == null ? '?' : e.ac), (e.hp || '?') + ' HP'].join(', ');
   if (t === 'conditions') return Object.keys(e.fx || {}).filter(k => e.fx[k]).map(k => ({ disAtk: 'attacks', disCheck: 'checks', disSave: 'saves', speed0: 'speed 0', advAgainst: 'attacked with advantage' }[k] || k)).join(', ') || 'rules text only';
   return e.src || '';
@@ -5389,19 +5428,19 @@ const ACT = {
   hpmode(el) { const ch = C(); ch.hpMode = el.dataset.v; commit(ch); },
   spab(el) { const ch = C(); const D = getD(ch); const a = el.dataset.v; if (ch.spBonus[a]) delete ch.spBonus[a]; else ch.spBonus[a] = (D.sp.abChoice || {}).amt || 1; commit(ch); },
   lang(el) { const ch = C(); toggleIn(ch, 'langs', el.dataset.v); commit(ch); },
-  bgfeatasi(el) { const ch = C(); ch.bgFeatAsi = el.value ? { [el.value]: 1 } : {}; commit(ch); },
+  bgfeatasi(el) { const ch = C(), bg = look(ch, 'backgrounds', ch.bg); ch.bgFeatAsi = asiSet(bg && look(ch, 'feats', bg.feat), ch.bgFeatAsi, +el.dataset.i || 0, el.value); commit(ch); },
   subclass(el) { const ch = C(); ch.classes[+el.dataset.i].sub = el.value; commit(ch); },
   rollhp(el) { const ch = C(); const i = +el.dataset.i; const c = ch.classes[i]; const def = look(ch, 'classes', c.id); c.hp = c.hp || []; for (let l = 1; l <= c.lvl; l++) { if (i === 0 && l === 1) continue; if (!c.hp[l - 1]) c.hp[l - 1] = rnd(def.hd); } commit(ch); },
   pb(el) { const ch = C(); const a = el.dataset.v; ch.abil.base[a] = clamp((+ch.abil.base[a] || 8) + (+el.dataset.d), 8, 15); commit(ch); },
   asitype(el) { const ch = C(); const k = el.dataset.key; ch.asi[k] = el.dataset.v === 'feat' ? { type: 'feat', id: '', a: {} } : { type: 'asi', p: [], a: {} }; commit(ch); },
   asip(el) { const ch = C(); const k = el.dataset.key; const p = ch.asi[k] && ch.asi[k].type === 'asi' ? ch.asi[k] : { type: 'asi', p: [] }; p.p = p.p || []; p.p[+el.dataset.i] = el.value || null; p.a = {}; for (const a of p.p) if (a) p.a[a] = (p.a[a] || 0) + 1; ch.asi[k] = p; commit(ch); },
   asifeat(el) { const ch = C(); const k = el.dataset.key; ch.asi[k] = { type: 'feat', id: el.value, a: {}, p: [] }; commit(ch); },
-  asifa(el) { const ch = C(); const k = el.dataset.key; const p = ch.asi[k]; if (!p) return; p.a = el.value ? { [el.value]: 1 } : {}; commit(ch); },
+  asifa(el) { const ch = C(); const k = el.dataset.key; const p = ch.asi[k]; if (!p) return; p.a = asiSet(look(ch, 'feats', p.id), p.a, +el.dataset.i || 0, el.value); commit(ch); },
   asifp(el) { const ch = C(); const k = el.dataset.key; const p = ch.asi[k]; if (!p) return; p.p = p.p || []; p.p[+el.dataset.i] = el.value || null; p.a = {}; for (const a of p.p) if (a) p.a[a] = (p.a[a] || 0) + 1; commit(ch); },
   fchoice(el) { const ch = C(); ch.choices[el.dataset.key] = el.value; commit(ch); },
   addfeat() { const ch = C(); const id = $('#f-addfeat').value; if (!id) return; ch.feats = ch.feats || []; ch.feats.push({ id, a: {}, from: 'Bonus' }); commit(ch); },
   rmfeat(el) { const ch = C(); ch.feats.splice(+el.dataset.i, 1); commit(ch); },
-  bonusfa(el) { const ch = C(); const f = ch.feats[+el.dataset.key]; if (f) f.a = el.value ? { [el.value]: 1 } : {}; commit(ch); },
+  bonusfa(el) { const ch = C(); const f = ch.feats[+el.dataset.key]; if (f) f.a = asiSet(look(ch, 'feats', f.id), f.a, +el.dataset.i || 0, el.value); commit(ch); },
   spellq(el) { UI.spellQ = el.value; queueRender(); },
   spelllvl(el) { UI.spellLvl = el.value; queueRender(); },
   spellinfo(el) {
@@ -6122,7 +6161,7 @@ function fxRead(el) {
   return out;
 }
 function crLabel(v) { return v === 0.125 ? '1/8' : v === 0.25 ? '1/4' : v === 0.5 ? '1/2' : String(v); }
-function condChips(cur, act, attrs, ro) { return `<div class="cond">${CONDITIONS.map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>`; }
+function condChips(cur, act, attrs, ro) { return `<div class="cond">${condsFor(cur).map(c => `<button data-act="${act}" ${attrs || ''} data-c="${c}"${pressed((cur || []).includes(c))}${dis(ro)} title="${esc(COND_RULES[c] || '')}">${c}</button>`).join('')}</div>`; }
 function viewCombat() {
   if (UI.view === 'table') return viewCombatPublic(true);
   if (!isDMish()) return viewCombatPlayer();
@@ -9246,26 +9285,39 @@ MODALS.impchar = () => {
     <div class="row"><span class="spacer"></span><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" id="f-impgo" data-act="impcgo">Import</button></div></div>`;
 };
 /* ===== Build 29: grants by level on homebrew content, and campaign changes to built-in content =====
+   Build 36 adds: action {name, act: action|bonus|reaction|other, d, n (uses: number or pb), reset, atk: melee|ranged, ab, bonus, save: ability, dc: number | spell | formula like 8+pb+cha, dmg, dt}
+          choice {name, opts: [{label, grants: [...]}]}: the player picks one option (ch.choices['gc:<source>:<name>']), its grants apply (one level deep)
+          prof also takes weapon (a named weapon), atk and dmg take w (only for a weapon with that name)
    An entry's `grants: [{l, k, ...}]` is applied in derive() by applyGrants(). l = character level (class level for classes and subclasses).
    Kinds: ab {a, n, max}  abset {a, n: score is N unless already higher}  ac {n, un: only with no armor and no shield}  hp/hpl/speed/init/sense/save/check/atk/dmg {n} (save, check: all of them; atk, dmg: all weapons)  skill {v: skill id, n}  prof {v: 'skill:id' | 'save:ab' | 'armor:..' | 'weapon:..', tool}  exp {v: skill id}
           spell {v: spell id, ab, n: free casts or 'pb', reset}  res {name, n: number or 'pb', reset}  text {name, d}  resist {v: damage type}
    A built-in entry edited for the campaign lives in the pack "Campaign changes" (id cc-<ruleset>) under the SAME id, so registry() returns it instead. */
 const GRANT_TYPES = ['feats', 'species', 'subspecies', 'backgrounds', 'classes', 'subclasses', 'items'];
-const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance'], ['abset', 'Ability score becomes (at least)'], ['save', 'All saving throws'], ['check', 'All ability checks'], ['skill', 'One skill'], ['atk', 'Weapon attack rolls'], ['dmg', 'Weapon damage rolls']];
-const NUM_G = ['n', 'Amount', 'num'];
+const GRANT_KINDS = [['ab', 'Ability score'], ['ac', 'Armor Class'], ['hp', 'Max HP (flat)'], ['hpl', 'Max HP per level'], ['speed', 'Speed'], ['init', 'Initiative'], ['prof', 'Proficiency'], ['exp', 'Expertise'], ['sense', 'Darkvision'], ['spell', 'Spell'], ['res', 'Counter'], ['text', 'Feature text'], ['resist', 'Damage resistance'], ['abset', 'Ability score becomes (at least)'], ['save', 'All saving throws'], ['check', 'All ability checks'], ['skill', 'One skill'], ['atk', 'Weapon attack rolls'], ['dmg', 'Weapon damage rolls'], ['action', 'Action, bonus action or reaction'], ['choice', 'A choice for the player']];
+const NUM_G = ['n', 'Amount', 'num'], GW = ['w', 'Only for this weapon (name, blank = all weapons)', 'text'];
 const GRANT_FIELDS = {
   ab: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], NUM_G, ['max', 'Cap (blank = 20)', 'num']],
-  abset: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], ['n', 'Score', 'num']], ac: [NUM_G, ['un', 'Only with no armor and no shield', 'bool']], save: [NUM_G], check: [NUM_G], atk: [NUM_G], dmg: [NUM_G], skill: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])], NUM_G],
+  abset: [['a', 'Ability', 'select', ABIL.map(a => [a, ABN[a]])], ['n', 'Score', 'num']], ac: [NUM_G, ['un', 'Only with no armor and no shield', 'bool']], save: [NUM_G], check: [NUM_G], atk: [NUM_G, GW], dmg: [NUM_G, GW], skill: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])], NUM_G],
   hp: [NUM_G], hpl: [['n', 'Amount per level', 'num']], speed: [['n', 'Feet', 'num']], init: [NUM_G], sense: [['n', 'Feet', 'num']],
-  prof: [['v', 'Proficiency', 'select', [['', '—'], ...SKILLS.map(([s, n]) => ['skill:' + s, 'Skill: ' + n]), ...ABIL.map(a => ['save:' + a, 'Save: ' + ABN[a]]), ...['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields'].map(a => ['armor:' + a, a]), ...['Simple Weapons', 'Martial Weapons'].map(a => ['weapon:' + a, a])]], ['tool', '…or a tool (name)', 'text']],
+  prof: [['v', 'Proficiency', 'select', [['', '—'], ...SKILLS.map(([s, n]) => ['skill:' + s, 'Skill: ' + n]), ...ABIL.map(a => ['save:' + a, 'Save: ' + ABN[a]]), ...['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields'].map(a => ['armor:' + a, a]), ...['Simple Weapons', 'Martial Weapons'].map(a => ['weapon:' + a, a])]], ['tool', '…or a tool (name)', 'text'], ['weapon', '…or one named weapon', 'text']],
   exp: [['v', 'Skill', 'select', SKILLS.map(([s, n]) => [s, n])]],
   spell: [['v', 'Spell', 'spell'], ['ab', 'Casting ability', 'select', [['', 'Best of Int, Wis, Cha'], ...ABIL.map(a => [a, ABN[a]])]], ['n', 'Free casts (number or pb)', 'text'], ['reset', 'Free casts return on', 'select', [['long', 'Long rest'], ['short', 'Short rest']]]],
   res: [['name', 'Name', 'text'], ['n', 'Uses (number or pb)', 'text'], ['reset', 'Recharges on', 'select', [['long', 'Long rest'], ['short', 'Short rest'], ['none', 'Never']]]],
   text: [['name', 'Name', 'text'], ['d', 'Description', 'textarea']],
+  action: [['name', 'Name', 'text'], ['act', 'Takes', 'select', [['action', 'Action'], ['bonus', 'Bonus action'], ['reaction', 'Reaction'], ['other', 'Other']]], ['d', 'Description', 'textarea'], ['n', 'Uses (number or pb, blank = unlimited)', 'text'], ['reset', 'Uses return on', 'select', [['long', 'Long rest'], ['short', 'Short rest'], ['none', 'Never']]],
+    ['atk', 'Attack roll', 'select', [['', 'None'], ['melee', 'Melee'], ['ranged', 'Ranged']]], ['ab', 'Ability for attack, damage and DC', 'select', [['', 'None (proficiency only)'], ...ABIL.map(a => [a, ABN[a]])]], ['bonus', 'Extra attack bonus', 'num'], ['save', 'Saving throw', 'select', [['', 'None'], ...ABIL.map(a => [a, ABN[a]])]], ['dc', 'Save DC (number, spell, or a formula like 8+pb+cha)', 'text'], ['dmg', 'Damage dice (e.g. 2d6)', 'text'], ['dt', 'Damage type', 'text']],
+  choice: [['name', 'Name of the choice', 'text']],
   resist: [['v', 'Damage type', 'select', ['acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'].map(d => [d, cap(d)])]],
 };
 for (const t of GRANT_TYPES) FORMS[t].push(['grants', 'Grants by level', 'grants']);
 const gsum = a => sum(a.map(g => g.n));
+const gwsum = (a, name) => sum(a.filter(g => !g.w || slug(name).includes(slug(g.w))).map(g => g.n));   // a grant with w counts only for a weapon of that name
+/* one plain line for a grant (the description of a choice option) */
+function grantLine(g) {
+  const lab = (GRANT_KINDS.find(k => k[0] === g.k) || [0, g.k])[1], num = g.n != null && g.n !== '' && !['res', 'spell', 'action'].includes(g.k) ? ' ' + (+g.n >= 0 && g.k !== 'abset' ? '+' : '') + g.n : '';
+  const what = g.k === 'ab' || g.k === 'abset' ? ' ' + (ABN[g.a] || '') : g.k === 'prof' ? ': ' + (g.tool || g.weapon || String(g.v || '').replace(/^\w+:/, '')) : ['skill', 'exp', 'resist', 'spell'].includes(g.k) ? ': ' + (g.v || '') : ['action', 'res', 'text'].includes(g.k) ? ': ' + (g.name || '') : '';
+  return lab + what + num + (g.w ? ' (' + g.w + ' only)' : '');
+}
 function applyGrants(ch, D, feats, features) {
   const src = [];   // [entry, level it counts at]
   for (const x of D.cls) src.push([x.def, x.c.lvl], [x.sub, x.c.lvl]);
@@ -9276,47 +9328,65 @@ function applyGrants(ch, D, feats, features) {
     const grants = (d.grants || []).concat((magicDefault(ch, it, d) || {}).g || [], it.grants || []);
     if (grants.length) src.push([{ name: itemName(ch, it), grants }, D.level]);
   }
-  const G = { ab: [], abset: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], save: [], check: [], skill: [], atk: [], dmg: [], prof: [], exp: [], res: [], resist: [], spellSrc: [] }, seen = new Set(), by = {};
+  const G = { ab: [], abset: [], ac: [], hp: [], hpl: [], speed: [], init: [], sense: [], save: [], check: [], skill: [], atk: [], dmg: [], prof: [], exp: [], res: [], resist: [], acts: [], spellSrc: [] }, seen = new Set(), by = {};
   const uses = v => /^pb$/i.test(v) ? D.pb : Math.max(0, +v || 0);
+  const one = (g, e, lvl, depth) => {
+    const l = +g.l || 1, k = g.k, from = e.name, n = +g.n || 0;
+    if (l > lvl) return;
+    if (k === 'ab') { if (ABIL.includes(g.a) && n) G.ab.push({ a: g.a, n, max: +g.max || 20, from }); }
+    else if (k === 'abset') { if (ABIL.includes(g.a) && n) G.abset.push({ a: g.a, n, from }); }
+    else if (k === 'skill') { if (SKILL[g.v] && n) G.skill.push({ v: g.v, n, from }); }
+    else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense', 'save', 'check', 'atk', 'dmg'].includes(k)) { if (n) G[k].push({ n, from, un: !!g.un, w: String(g.w || '').trim() }); }
+    else if (k === 'prof') { const p = g.tool ? 'tool:' + g.tool : g.weapon ? 'weapon:' + g.weapon : g.v; if (p) G.prof.push({ p, from }); }
+    else if (k === 'exp') { if (SKILL[g.v]) G.exp.push({ v: g.v, from }); }
+    else if (k === 'resist') { if (g.v) G.resist.push({ v: g.v, from }); }
+    else if (k === 'res') { if (g.name) G.res.push({ key: 'gr:' + slug(from) + ':' + slug(g.name), name: g.name, max: uses(g.n), reset: g.reset === 'short' || g.reset === 'none' ? g.reset : 'long', from }); }
+    else if (k === 'text') features.push({ key: 'gr:' + slug(from) + ':' + slug(g.name || '') + ':' + l, l, n: g.name || 'Feature', d: g.d || '', from, f: {}, cls: '' });
+    else if (k === 'action') {
+      if (!g.name) return;
+      const key = 'ga:' + slug(from) + ':' + slug(g.name), act = ['action', 'bonus', 'reaction', 'other'].includes(g.act) ? g.act : 'action';
+      features.push({ key, l, n: g.name, d: g.d || '', from, f: { act }, cls: '', ga: 1 });
+      G.acts.push(Object.assign({}, g, { key, from, act }));
+      if (g.n !== undefined && g.n !== '' && uses(g.n) > 0) G.res.push({ key, name: g.name, max: uses(g.n), reset: g.reset === 'short' || g.reset === 'none' ? g.reset : 'long', from });
+    }
+    else if (k === 'choice') {   // the picked option's grants count too; an option cannot hold another choice
+      const opts = (g.opts || []).filter(o => o && o.label); if (depth || !g.name || !opts.length) return;
+      const key = 'gc:' + slug(from) + ':' + slug(g.name);
+      features.push({ key, l, n: g.name, d: '', from, f: { opts: opts.map(o => ({ n: o.label, d: (o.grants || []).map(grantLine).join('; ') })) }, cls: '' });
+      const pick = [].concat(ch.choices[key] || [])[0], o = opts.find(x => x.label === pick);
+      if (o) for (const sg of o.grants || []) one(sg, e, lvl, 1);
+    }
+    else if (k === 'spell') {
+      const s = look(ch, 'spells', g.v); if (!s) return;
+      const b = by[from] || (by[from] = { key: 'gr:' + slug(from), name: from, ab: g.ab || '', classGrant: 1, hb: 1, all: [] });
+      if (!b.all.some(x => x.id === s.id)) b.all.push({ id: s.id, name: s.name, lvl: s.lvl, l, free: s.lvl > 0 ? uses(g.n) : 0, at: s.lvl, ok: true, reset: g.reset === 'short' ? 'short' : 'long' });
+    }
+  };
   for (const [e, lvl] of src) {
     if (!e || !Array.isArray(e.grants) || seen.has(e)) continue;
     seen.add(e);
-    for (const g of e.grants) {
-      const l = +g.l || 1, k = g.k, from = e.name, n = +g.n || 0;
-      if (l > lvl) continue;
-      if (k === 'ab') { if (ABIL.includes(g.a) && n) G.ab.push({ a: g.a, n, max: +g.max || 20, from }); }
-      else if (k === 'abset') { if (ABIL.includes(g.a) && n) G.abset.push({ a: g.a, n, from }); }
-      else if (k === 'skill') { if (SKILL[g.v] && n) G.skill.push({ v: g.v, n, from }); }
-      else if (['ac', 'hp', 'hpl', 'speed', 'init', 'sense', 'save', 'check', 'atk', 'dmg'].includes(k)) { if (n) G[k].push({ n, from, un: !!g.un }); }
-      else if (k === 'prof') { const p = g.tool ? 'tool:' + g.tool : g.v; if (p) G.prof.push({ p, from }); }
-      else if (k === 'exp') { if (SKILL[g.v]) G.exp.push({ v: g.v, from }); }
-      else if (k === 'resist') { if (g.v) G.resist.push({ v: g.v, from }); }
-      else if (k === 'res') { if (g.name) G.res.push({ key: 'gr:' + slug(from) + ':' + slug(g.name), name: g.name, max: uses(g.n), reset: g.reset === 'short' || g.reset === 'none' ? g.reset : 'long', from }); }
-      else if (k === 'text') features.push({ key: 'gr:' + slug(from) + ':' + slug(g.name || '') + ':' + l, l, n: g.name || 'Feature', d: g.d || '', from, f: {}, cls: '' });
-      else if (k === 'spell') {
-        const s = look(ch, 'spells', g.v); if (!s) continue;
-        const b = by[from] || (by[from] = { key: 'gr:' + slug(from), name: from, ab: g.ab || '', classGrant: 1, hb: 1, all: [] });
-        if (!b.all.some(x => x.id === s.id)) b.all.push({ id: s.id, name: s.name, lvl: s.lvl, l, free: s.lvl > 0 ? uses(g.n) : 0, at: s.lvl, ok: true, reset: g.reset === 'short' ? 'short' : 'long' });
-      }
-    }
+    for (const g of e.grants) one(g, e, lvl, 0);
   }
   G.spellSrc = Object.values(by).map(b => Object.assign(b, { spells: b.all }));
   return G;
 }
 /* the "Grants" editor in the homebrew form: one row per grant, its fields follow the chosen kind */
-function grantsHTML(type, f, val, rs, id) {
-  const lv = type === 'classes' || type === 'subclasses' ? 'Class level' : 'Level';
+function grantsHTML(type, f, val, rs, id, path, deep) {
+  path = path || 'grants';
+  const lv = type === 'classes' || type === 'subclasses' ? 'Class level' : 'Level', kinds = GRANT_KINDS.filter(([v]) => !deep || v !== 'choice');   // an option of a choice cannot hold another choice
   const rows = (Array.isArray(val) ? val : []).map((r, i) => {
     const p = id + '-' + i, k = GRANT_FIELDS[r.k] ? r.k : 'ab';
-    return `<div class="rowed">${fieldHTML(type, ['l', lv, 'num'], r.l == null ? 1 : r.l, rs, p)}<label class="field"><span class="lbl">Gives</span><select id="${p}-k" data-act="hbgk">${GRANT_KINDS.map(([v, l]) => opt(v, l, k === v)).join('')}</select></label>${GRANT_FIELDS[k].map(sf => fieldHTML(type, sf, r[sf[0]], rs, p)).join('')}<div class="wide row"><span class="spacer"></span><button class="btn ghost sm danger" data-act="hbrowrm" data-p="grants" data-i="${i}">Remove</button></div></div>`;
+    const opts = k !== 'choice' ? '' : `<div class="field wide" style="grid-column:1/-1"><span class="lbl">Options (the player picks one)</span><div class="rows">${(r.opts || []).map((o, j) => `<div class="rowed"><label class="field"><span class="lbl">Option name</span><input type="text" id="${p}-o${j}-label" value="${esc(o.label || '')}"></label>${grantsHTML(type, ['grants', 'What this option gives', 'grants'], o.grants, rs, `${p}-o${j}-g`, `${path}.${i}.opts.${j}.grants`, 1)}<div class="wide row"><span class="spacer"></span><button class="btn ghost sm danger" data-act="hbrowrm" data-p="${path}.${i}.opts" data-i="${j}">Remove option</button></div></div>`).join('')}</div><button class="btn sm" data-act="hbrowadd" data-p="${path}.${i}.opts" style="align-self:flex-start">Add option</button></div>`;
+    return `<div class="rowed">${fieldHTML(type, ['l', lv, 'num'], r.l == null ? 1 : r.l, rs, p)}<label class="field"><span class="lbl">Gives</span><select id="${p}-k" data-act="hbgk">${kinds.map(([v, l]) => opt(v, l, k === v)).join('')}</select></label>${GRANT_FIELDS[k].map(sf => fieldHTML(type, sf, r[sf[0]], rs, p)).join('')}${opts}<div class="wide row"><span class="spacer"></span><button class="btn ghost sm danger" data-act="hbrowrm" data-p="${path}" data-i="${i}">Remove</button></div></div>`;
   }).join('');
-  return `<div class="field" style="grid-column:1/-1"><span class="lbl">${esc(f[1])}</span><p class="small muted">Things this gives a character from the level you set. ${type === 'items' ? 'An item gives them while equipped, and attuned if it needs attunement.' : type === 'classes' || type === 'subclasses' ? 'The level is the character’s level in this class.' : 'The level is the character’s total level.'}</p><div class="rows">${rows}</div><button class="btn sm" data-act="hbrowadd" data-p="grants" style="align-self:flex-start">Add grant</button></div>`;
+  return `<div class="field" style="grid-column:1/-1"><span class="lbl">${esc(f[1])}</span>${deep ? '' : `<p class="small muted">Things this gives a character from the level you set. ${type === 'items' ? 'An item gives them while equipped, and attuned if it needs attunement.' : type === 'classes' || type === 'subclasses' ? 'The level is the character’s level in this class.' : 'The level is the character’s total level.'}</p><p class="small muted">Kinds: ${GRANT_KINDS.map(k => k[1].toLowerCase()).join(', ')}.</p>`}<div class="rows">${rows}</div><button class="btn sm" data-act="hbrowadd" data-p="${path}" style="align-self:flex-start">Add grant</button></div>`;
 }
 function grantsRead(rs, id, root) {
   const out = [], el = s => root.querySelector('#' + CSS.escape(s));
   for (let i = 0; el(id + '-' + i + '-k'); i++) {
     const p = id + '-' + i, k = el(p + '-k').value, r = { l: readField(['l', '', 'num'], rs, p, root) || 1, k };
     for (const sf of GRANT_FIELDS[k] || []) { const v = readField(sf, rs, p, root); if (v !== '' && v != null && v !== false) r[sf[0]] = v; }
+    if (k === 'choice') { r.opts = []; for (let j = 0; el(`${p}-o${j}-label`); j++) r.opts.push({ label: el(`${p}-o${j}-label`).value.trim(), grants: grantsRead(rs, `${p}-o${j}-g`, root) }); }
     out.push(r);
   }
   return out;
@@ -9326,7 +9396,8 @@ const ccCan = () => S.mode !== 'live' || S.me.isOwner;
 const ccId = rs => 'cc-' + rs;
 function ccBuiltin(t, rs) {
   if (t === 'conditions') { const b = condBase(); return BASE_CONDS.map(n => ({ id: slug(n), name: n, d: b.rules[n] || '', fx: clone(b.fx[n] || {}) })); }
-  const out = ((SRD[rs] || {})[t] || []).map(e => Object.assign({ src: rs === '2014' ? 'SRD 5.1' : 'SRD 5.2' }, e));   // the source stays, so rules that check for free-rules content still do
+  const out = t === 'subspecies' ? ((SRD[rs] || {}).species || []).flatMap(sp => (sp.subs || []).map(s => Object.assign({ src: rs === '2014' ? 'SRD 5.1' : 'SRD 5.2', of: sp.id }, s)))   // subspecies live inside their species in the book data
+    : ((SRD[rs] || {})[t] || []).map(e => Object.assign({ src: rs === '2014' ? 'SRD 5.1' : 'SRD 5.2' }, e));   // the source stays, so rules that check for free-rules content still do
   for (const p of BUILTIN_PACKS) if (p.ruleset === 'any' || p.ruleset === rs) for (const e of (p.entries || {})[t] || []) out.push(Object.assign({ src: p.name }, e));
   return out;
 }
@@ -9339,16 +9410,27 @@ async function ccPack(rs) {
   }
   return PACKS.find(p => p.id === id);
 }
+/* open a built-in entry in the homebrew form (or the campaign's own version of it). A built-in class or subclass keeps a stable id and the original name on each feature (orig), so renaming one
+   does not lose its tracker (derive finds trackers by feature name) or the uses already spent. */
+async function ccEdit(t, rs, id) {
+  const p = await ccPack(rs);
+  const mine = ((p && p.entries || {})[t] || []).find(e => e.id === id), raw = mine || ccBuiltin(t, rs).find(e => e.id === id);
+  if (!raw) return;
+  const src = !mine && (t === 'classes' || t === 'subclasses') ? Object.assign({}, raw, { features: (raw.features || []).map((f, i) => Object.assign({}, f, { id: f.id || (t === 'classes' ? raw.id + '-f' + i + '-' + slug(f.n) : slug(f.n)), orig: f.n })) }) : raw;
+  openModal({ kind: 'hb', type: t, pack: p.id, entry: hbEntryForForm(t, src), isNew: false, id: raw.id });
+}
+/* "Edit for campaign" in the builder, for the DM, on built-in (or already campaign-edited) classes, subclasses and feats */
+const edLink = (t, e) => S.mode === 'live' && S.me && S.me.isOwner && e && (!e.pack || BUILTIN_IDS.has(e.pack) || /^cc-/.test(e.pack)) ? `<button class="btn ghost sm" data-act="cced" data-t="${t}" data-v="${esc(e.id)}" title="Change this entry for this campaign only">Edit for campaign</button>` : '';
 function ccPanel() {
   if (!ccCan()) return '';
   const h = UI.hb, t = h.bt || 'feats', rs = h.brs || newRsEff(), q = (h.bq || '').toLowerCase();
   const ents = (PACKS.find(p => p.id === ccId(rs)) || {}).entries || {};
-  const over = new Set((ents[t] || []).map(e => e.id)), n = sum(TYPES.map(k => (ents[k] || []).length));
+  const over = new Set((ents[t] || []).map(e => e.id)), n = sum(TYPES.map(k => (ents[k] || []).length)), gone = new Set(HIDE[t] || []), nh = sum(Object.values(HIDE).map(a => a.length));
   const list = ccBuiltin(t, rs).filter(e => !q || String(e.name).toLowerCase().includes(q)).slice().sort(byName);
-  return `<details class="panel" data-k="builtin" style="margin-bottom:12px"><summary class="ph" style="cursor:pointer;margin:0">Built-in rules: edit for this campaign<span class="pill ${n ? 'brass' : ''}" style="text-transform:none;letter-spacing:0">${n} changed</span></summary>
-    <div class="stack" style="margin-top:10px"><p class="small muted">Change a built-in class, feat, spell and so on for this campaign only. Your version replaces the original for everyone, and characters keep using it. “Restore original” brings the book version back.</p>
-    <div class="row"><div class="seg">${['2024', '2014'].map(r => `<button data-act="hbbrs" data-v="${r}"${pressed(rs === r)}>${r}</button>`).join('')}</div><select data-act="hbbt" aria-label="What to change">${TYPES.filter(k => k !== 'subspecies').map(k => opt(k, TYPE_LABEL[k], k === t)).join('')}</select><input type="search" id="f-hbbq" data-act="hbbq" placeholder="Search" value="${esc(h.bq || '')}" style="max-width:220px"></div>
-    ${list.slice(0, 100).map(e => `<div class="hb-row"><div><b>${esc(e.name)}</b> <span class="small muted">${esc(hbSummary(t, e))}</span>${over.has(e.id) ? ' <span class="pill brass">Changed for this campaign</span>' : ''}</div><div class="row"><button class="btn sm" data-act="hbccedit" data-v="${esc(e.id)}">Edit for this campaign</button>${over.has(e.id) ? `<button class="btn ghost sm" data-act="hbccrestore" data-v="${esc(e.id)}">Restore original</button>` : ''}</div></div>`).join('') || '<p class="muted">Nothing found.</p>'}${list.length > 100 ? '<p class="small muted">Showing 100. Search to narrow it down.</p>' : ''}</div></details>`;
+  return `<details class="panel" data-k="builtin" open style="margin-bottom:12px"><summary class="ph" style="cursor:pointer;margin:0">Core rules: edit or hide<span class="pill ${n ? 'brass' : ''}" style="text-transform:none;letter-spacing:0">${n} changed</span><span class="pill ${nh ? 'brass' : ''}" style="text-transform:none;letter-spacing:0">${nh} hidden</span></summary>
+    <div class="stack" style="margin-top:10px"><p class="small muted">Change or hide a built-in class, subclass, species, feat, spell, item, monster and so on for this campaign only. Your version replaces the original for everyone, and characters keep using it. A hidden entry leaves the pickers, but characters who already have it keep it. “Restore original” brings the book version back; “Show again” puts a hidden one back in the pickers. The same hide applies to both rulesets.</p>
+    <div class="row"><div class="seg">${['2024', '2014'].map(r => `<button data-act="hbbrs" data-v="${r}"${pressed(rs === r)}>${r}</button>`).join('')}</div><select data-act="hbbt" aria-label="What to change">${TYPES.map(k => opt(k, TYPE_LABEL[k], k === t)).join('')}</select><input type="search" id="f-hbbq" data-act="hbbq" placeholder="Search" value="${esc(h.bq || '')}" style="max-width:220px"></div>
+    ${list.slice(0, 100).map(e => `<div class="hb-row"><div><b>${esc(e.name)}</b> <span class="small muted">${esc(hbSummary(t, e))}</span>${over.has(e.id) ? ' <span class="pill brass">Changed for this campaign</span>' : ''}${gone.has(e.id) ? ' <span class="pill bad">Hidden</span>' : ''}</div><div class="row"><button class="btn sm" data-act="hbccedit" data-v="${esc(e.id)}">Edit</button><button class="btn ghost sm" data-act="cchide" data-t="${t}" data-v="${esc(e.id)}"${pressed(gone.has(e.id))}>${gone.has(e.id) ? 'Show again' : 'Hide'}</button>${over.has(e.id) ? `<button class="btn ghost sm" data-act="hbccrestore" data-v="${esc(e.id)}">Restore</button>` : ''}</div></div>`).join('') || '<p class="muted">Nothing found.</p>'}${list.length > 100 ? '<p class="small muted">Showing 100. Search to narrow it down.</p>' : ''}</div></details>`;
 }
 /* Build 31: the same grants editor on one inventory entry (stored as it.grants). It reuses the homebrew handlers hbrowadd, hbrowrm and hbgk, which only need modal.type and modal.entry. */
 MODALS.itemgr = () => {
@@ -9373,11 +9455,12 @@ Object.assign(ACT, {
   hbbt(el) { UI.hb.bt = el.value; queueRender(); },
   hbbrs(el) { UI.hb.brs = el.dataset.v; queueRender(); },
   hbbq(el) { UI.hb.bq = el.value; queueRender(); },
-  async hbccedit(el) {
-    const t = UI.hb.bt || 'feats', rs = UI.hb.brs || newRsEff(), p = await ccPack(rs);
-    const raw = ((p && p.entries || {})[t] || []).find(e => e.id === el.dataset.v) || ccBuiltin(t, rs).find(e => e.id === el.dataset.v);
-    if (!raw) return;
-    openModal({ kind: 'hb', type: t, pack: p.id, entry: hbEntryForForm(t, raw), isNew: false, id: raw.id });
+  hbccedit(el) { return ccEdit(UI.hb.bt || 'feats', UI.hb.brs || newRsEff(), el.dataset.v); },
+  cced(el) { return ccEdit(el.dataset.t, C().ruleset, el.dataset.v); },   // the "Edit for campaign" links in the builder
+  cchide(el) {
+    const t = el.dataset.t, id = el.dataset.v, a = new Set(HIDE[t] || []), h = clone(HIDE);
+    if (a.has(id)) a.delete(id); else a.add(id);
+    h[t] = Array.from(a); saveSettings({ hide: h }); queueRender();
   },
   hbccrestore(el) {
     const t = UI.hb.bt || 'feats', p = PACKS.find(x => x.id === ccId(UI.hb.brs || newRsEff()));
@@ -9407,6 +9490,8 @@ function ruleLink(kind, name, cls) {
   return `<button type="button" class="${cls || 'rl'}" data-act="rule" data-k="${esc(kind)}" data-v="${esc(name)}" title="Show the rules for ${esc(name)}">${esc(name)}</button>`;
 }
 /* shortcut: activation is read from the feature's text (first mention of Bonus Action, Reaction or an Action); features that never say it land in Other. Add a structured field when the content gets one. */
+const ACTK = { action: 'Action', bonus: 'Bonus action', reaction: 'Reaction', other: 'Other' };
+const actOf = f => ACTK[f.act || (f.f && f.f.act)] || actKind(f.d);   // Build 36: a feature row can say when it is used; otherwise it is read from its text
 function actKind(text) {
   const m = /\bBonus Action\b|\bReaction\b|\bMagic action\b|\bas an? Action\b/i.exec(text || '');
   return !m ? 'Other' : /^bonus/i.test(m[0]) ? 'Bonus action' : /^reaction/i.test(m[0]) ? 'Reaction' : 'Action';
@@ -9416,6 +9501,7 @@ function whatCanIDo(ch, D, known, ro, inFight) {
   const itemNames = new Set(R.list('items').map(d => d.name)), taken = new Set();
   const row = (name, tags, ctl) => `<div class="spl"><div>${name}${tags ? `<div class="tags">${esc(tags)}</div>` : ''}</div><div class="row" style="gap:4px;justify-content:flex-end">${ctl || ''}</div></div>`;
   D.attacks.forEach((a, i) => {
+    if (a.ga) return;   // an action grant's attack is rolled from its own row below
     const am = ammoFor(ch, a), nm = itemNames.has(a.name) ? ruleLink('Item', a.name) : `<b>${esc(a.name)}</b>`;
     const dmg = a.flat ? `<span class="num small">${esc(a.dmg)}</span>` : `<button class="roll" data-act="dmgroll" data-label="${esc(a.name)} damage" data-x="${esc(a.dmg)}" data-i="${i}" title="Roll damage">${esc(a.dmg)}</button>`;
     G.Action.push(row(nm, [a.prof ? '' : 'Not proficient', a.range ? a.range + ' ft.' : '', am ? (am.none ? 'No ammunition' : am.d.name + ': ' + (+am.it.q || 0)) : ''].filter(Boolean).join(' · '),
@@ -9434,11 +9520,13 @@ function whatCanIDo(ch, D, known, ro, inFight) {
   const libs = fxAvailable(ch, D).filter(x => x.need), onFx = new Set(p.fx || []);
   for (const f of feats) {
     if (/^(Spellcasting|Pact Magic|Ability Score Improvement)$|Subclass$/.test(f.n)) continue;
-    const r = nk(f.n).length > 3 && rs.find(z => !taken.has(z.key) && (nk(z.n).includes(nk(f.n)) || nk(f.n).includes(nk(z.n)))), k = actKind(f.d);
+    const ga = f.ga ? (D.gacts || []).find(g => g.key === f.key) : null;
+    const r = (ga ? rs.find(z => z.key === f.key) : nk(f.n).length > 3 && rs.find(z => !taken.has(z.key) && (nk(z.n).includes(nk(f.n)) || nk(f.n).includes(nk(z.n))))), k = actOf(f);
     const lib = libs.find(x => x.need.test(f.n)), smite = /^(divine smite|paladin.s smite)$/i.test(f.n);   // Rage, Reckless Attack, Sneak Attack... switch an effect; Divine Smite adds radiant dice
-    if (k === 'Other' && !r && !lib && !smite) continue;
+    if (k === 'Other' && !r && !lib && !smite && !ga) continue;
     if (r) taken.add(r.key);
-    G[k].push(row(ruleLink('Feature', f.n), f.from || '', (r ? resCtl(r, p, ro, resActs(r, ch, D)) : '') + (lib ? `<button class="btn sm" data-act="fx" data-v="${esc(lib.id)}"${pressed(onFx.has(lib.id))}${dis(ro)} title="${esc(lib.note || '')}">${onFx.has(lib.id) ? 'On' : 'Use'}</button>` : '') + (smite ? `<button class="btn sm" data-act="smite"${dis(ro)} title="Spend a spell slot for extra radiant damage on a hit">Smite…</button>` : '')));
+    const gaCtl = !ga ? '' : (ga.ai != null ? `<button class="roll pri" data-act="attack" data-i="${ga.ai}" title="Attack roll">${sgn(D.attacks[ga.ai].atk)}</button>` : '') + (ga.save ? `<span class="pill" title="Saving throw DC">${ga.save.toUpperCase()} DC ${ga.dc}</span>` : '') + (ga.dmg ? `<button class="roll" data-act="dmgroll" data-label="${esc(ga.name)} damage" data-x="${esc(ga.dmg)}"${ga.ai != null ? ` data-i="${ga.ai}"` : ''} title="Roll damage${ga.dt ? ', ' + esc(ga.dt) : ''}">${esc(ga.dmg)}</button>` : '');
+    G[k].push(row(ga ? `<b>${esc(f.n)}</b>` : ruleLink('Feature', f.n), ga ? [f.from, ga.dt, f.d].filter(Boolean).join(' · ') : f.from || '', gaCtl + (r ? resCtl(r, p, ro, resActs(r, ch, D)) : '') + (lib ? `<button class="btn sm" data-act="fx" data-v="${esc(lib.id)}"${pressed(onFx.has(lib.id))}${dis(ro)} title="${esc(lib.note || '')}">${onFx.has(lib.id) ? 'On' : 'Use'}</button>` : '') + (smite ? `<button class="btn sm" data-act="smite"${dis(ro)} title="Spend a spell slot for extra radiant damage on a hit">Smite…</button>` : '')));
   }
   for (const r of rs.filter(z => !taken.has(z.key))) G.Other.push(row(ruleLink('Feature', r.n), (r.reset === 'short' ? 'short rest' : r.reset === 'none' ? 'no reset' : 'long rest') + (r.note ? ' · ' + r.note : ''), resCtl(r, p, ro, resActs(r, ch, D))));
   const slots = D.slots.map((n, i) => n ? `${ORD(i + 1)}: ${n - (+(p.slots || {})[i + 1] || 0)} of ${n}` : '').filter(Boolean).concat(D.pact ? [`Pact: ${D.pact.n - (+p.pact || 0)} of ${D.pact.n}`] : []);
