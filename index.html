@@ -1107,6 +1107,14 @@ function rollExpr(expr, mode) {
 
 /* ===== content registry ===== */
 let SRD = {};
+/* Build 39: two columns of the 2024 class tables came out of the SRD wrong. Druid cantrips are 2 (levels 1-3), 3 (4-9), 4 (10+);
+   Wizard prepared spells are 17, 18, 19, 21, 22, 23, 24, 25 from level 13 on (the copy had the Cleric's numbers). */
+function srdFix(J) {
+  const cl = J && J['2024'] && J['2024'].classes, get = id => Array.isArray(cl) ? cl.find(c => c.id === id) : cl && cl[id];
+  const d = get('druid'), w = get('wizard');
+  if (d && Array.isArray(d.table)) d.table.forEach((r, i) => { r.c = i + 1 >= 10 ? 4 : i + 1 >= 4 ? 3 : 2; });
+  if (w && Array.isArray(w.table)) [17, 18, 19, 21, 22, 23, 24, 25].forEach((p, i) => { if (w.table[12 + i]) w.table[12 + i].p = p; });
+}
 const regCache = new Map();
 let packsVersion = 0;
 let PACKS = []; // [{id,name,ruleset,shared,entries:{type:[...]}}]
@@ -5711,6 +5719,7 @@ function wireDrop() {
 /* ===== boot ===== */
 function boot() {
   try { SRD = JSON.parse(document.getElementById('srd').textContent); } catch (e) { document.getElementById('app').textContent = 'The rules data failed to load.'; return; }
+  srdFix(SRD);
   const app = document.getElementById('app');
   document.addEventListener('click', onClick);
   document.addEventListener('change', onChange);
@@ -5748,9 +5757,9 @@ function publicCombat(cb) {
   const cur = cb.list.find(c => c.id === cb.cur);
   return {
     round: cb.round || 1, cur: cur && !cur.hidden ? cur.id : null, unseen: !!(cur && cur.hidden),
-    list: cb.list.filter(c => !c.hidden).map(c => c.kind === 'lair' ? { id: c.id, kind: 'lair', name: c.name, init: c.init == null ? null : c.init }
+    list: cb.list.filter(c => !c.hidden).map(c => c.kind === 'lair' ? { id: c.id, kind: 'lair', name: lairPub(cb, c), init: c.init == null ? null : c.init }
       : c.kind === 'mon'
-      ? { id: c.id, kind: 'mon', name: c.name, init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [], fx: fxPub(c), surp: c.surp ? 1 : 0, sz: monSize(c), pos: mapPubPos(c), own: c.own || '' }
+      ? { id: c.id, kind: 'mon', name: pubName(c), init: c.init == null ? null : c.init, st: healthWord(c), cond: c.cond || [], fx: fxPub(c), surp: c.surp ? 1 : 0, sz: monSize(c), pos: mapPubPos(c), own: c.own || '' }
       : { id: c.id, kind: 'pc', name: liveName(c), init: c.init == null ? null : c.init, cid: c.cid, owner: c.owner, fx: fxPub(c), surp: c.surp ? 1 : 0 }),
   };
 }
@@ -5772,6 +5781,29 @@ function dropCombatants(cb, ids) {
 function pruneGone(cb) {
   const gone = cb.list.filter(c => c.kind === 'pc' && (S.mode === 'live' ? S.docs[c.owner] : S.mode === 'local') && !findChar(c.cid, c.owner)).map(c => c.id);
   if (gone.length) { dropCombatants(cb, gone); saveCombat(cb); }
+}
+/* Build 39: "Hide what it is". A masked monster stays in the fight for players, named by c.alias ("Unknown creature 2"), never by its real name. */
+const pubName = c => (c.kind === 'mon' && c.alias) || c.name;
+const lairPub = (cb, l) => cb.list.some(c => c.kind === 'mon' && c.mid && c.mid === l.mid && (c.hidden || c.alias)) ? 'Lair actions' : l.name;
+function maskName(cb, c) {
+  const n = (c.name.match(/ (\d+)$/) || [])[1], used = new Set(cb.list.filter(x => x !== c).map(x => x.alias || x.name));
+  let i = n ? +n : 0, nm = 'Unknown creature' + (i ? ' ' + i : '');
+  while (used.has(nm)) nm = 'Unknown creature ' + (++i);
+  return nm;
+}
+/* the copy of a message that leaves this window: real names of masked or hidden monsters become what players see */
+const reEsc = t => t.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
+function scrubMsg(d) {
+  if (!isDMish() || !S.dm || !S.dm.combat) return d;
+  const cb = S.dm.combat, pairs = [];
+  for (const c of cb.list || []) {
+    if (c.kind === 'mon' && (c.hidden || c.alias) && c.name) pairs.push([c.name, c.hidden ? 'Something unseen' : c.alias]);
+    if (c.kind === 'lair' && lairPub(cb, c) !== c.name) pairs.push([c.name, 'Lair actions']);
+  }
+  if (!pairs.length) return d;
+  pairs.sort((a, b) => b[0].length - a[0].length);
+  const fix = v => { if (typeof v !== 'string') return v; for (const [a, b] of pairs) v = v.replace(new RegExp('(^|[^\\w])' + reEsc(a) + '(?![\\w])', 'g'), (m, p) => p + b); return v; };
+  const o = {}; for (const k of Object.keys(d)) o[k] = fix(d[k]); return o;
 }
 function saveCombat(cb) { b31Fight(cb); S.dm.combat = cb; saveDM({ combat: cb }); saveInit(publicCombat(cb)); }
 /* optional rule (the core rules leave ties to the DM): ties go to the higher Dex modifier; the lair always loses a tie */
@@ -5866,19 +5898,19 @@ function fxDrop(c, f, why) {
   c.fxs = (c.fxs || []).filter(x => x.id !== f.id);
   if (f.cond) setCond(c, f.cond, false);
   if (f.fx && c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) fxOff(x.ch, f.fx); }
-  sendMsg({ kind: 'res', text: `${nameOf(c)}: ${f.n} ends${why}.`, hit: true });
+  sendMsg({ kind: 'res', text: `${nameOf(c)}: ${f.n} ends${why}.`, hit: true, priv: hidMsg(c) });
 }
 /* the repeat save failed: a two-stage effect (2024 Sleep) turns into its second condition */
 function fxThen(cb, c, f) {
   c.fxs = (c.fxs || []).filter(x => x.id !== f.id); if (f.cond) setCond(c, f.cond, false);
   addFx(cb, c, { n: f.n, cond: f.th, r: 9, src: f.src, by: f.by, wake: f.wake });
-  sendMsg({ kind: 'res', text: `${nameOf(c)} fails the second save against ${f.n} and is ${f.th}.`, hit: true });
+  sendMsg({ kind: 'res', text: `${nameOf(c)} fails the second save against ${f.n} and is ${f.th}.`, hit: true, priv: hidMsg(c) });
 }
 function fxSave(c, f) {
   if (c.kind === 'pc') { sendMsg({ kind: 'req', rid: uid('q'), who: 'DM', label: `a ${ABN[f.ab]} save to end ${f.n}`, t: 'save', ab: f.ab, dc: f.dc, keys: [c.owner + '|' + c.cid], fx: { cid: c.cid, id: f.id } }); return; }
   const r = monSave(c, f.ab);
   if (r.total >= f.dc) fxDrop(c, f, ` (${f.ab.toUpperCase()} save ${r.total} vs DC ${f.dc})`);
-  else sendMsg({ kind: 'note', text: `${nameOf(c)} fails the ${f.ab.toUpperCase()} save against ${f.n} (${r.total} vs DC ${f.dc}).` });
+  else sendMsg({ kind: 'note', text: `${nameOf(c)} fails the ${f.ab.toUpperCase()} save against ${f.n} (${r.total} vs DC ${f.dc}).`, priv: hidMsg(c) });
 }
 /* a creature's turn ended (end = true) or began: saves are rolled at the end, rounds count down at the end or start as the DM chose */
 function fxTurn(cb, c, end) {
@@ -5899,7 +5931,7 @@ function skipTurn(cb, c) {
   if (!c.surp) return false;
   c.surp = 0;   // 2024 only rolled initiative at a disadvantage; 2014 loses the first turn
   if ((cb.round || 1) > 1 || rsOf(c) !== '2014') return false;
-  sendMsg({ kind: 'note', text: `${nameOf(c)} is surprised and loses its first turn.` });
+  sendMsg({ kind: 'note', text: `${nameOf(c)} is surprised and loses its first turn.`, priv: hidMsg(c) });
   return true;
 }
 function arrive(cb, c) {
@@ -5914,7 +5946,7 @@ function arrive(cb, c) {
     for (const a of d ? [...(d.actions || []), ...(d.bonus || [])] : []) {
       const m = /recharge (\d)-\d/i.exec(a.use || ''), k = 'u_' + slug(a.n); if (!m || !c[k]) continue;
       const r = rnd(6); if (r >= +m[1]) c[k] = 0;
-      sendMsg({ kind: 'note', text: `${seenName(c)} rolls ${r} to recharge ${a.n} (needs ${m[1]}+): ${r >= +m[1] ? 'it is ready' : 'still spent'}.`, priv: UI.priv });
+      sendMsg({ kind: 'note', text: `${seenName(c)} rolls ${r} to recharge ${a.n} (needs ${m[1]}+): ${r >= +m[1] ? 'it is ready' : 'still spent'}.`, priv: hidMsg(c) || UI.priv });
     }
   }
   if (c.kind === 'lair' || isAbsent(c)) RUN.sel = c.id;   // show the lair actions, or the absent player's sheet
@@ -5941,7 +5973,7 @@ function stepTurn(dir) {
 function monConc(c, dmg, down) {
   const dc0 = Math.max(10, Math.floor(dmg / 2)), dc = rsOf(c) === '2024' ? Math.min(30, dc0) : dc0, r = down ? null : monSave(c, 'con'), spell = c.conc;
   const lost = down || r.total < dc; if (lost) c.conc = '';
-  sendMsg({ kind: 'res', text: `${nameOf(c)} ${down ? 'goes down and loses' : lost ? `fails the Con save (${r.total} vs DC ${dc}) and loses` : `holds (Con save ${r.total} vs DC ${dc})`} concentration on ${spell}.`, hit: true });
+  sendMsg({ kind: 'res', text: `${nameOf(c)} ${down ? 'goes down and loses' : lost ? `fails the Con save (${r.total} vs DC ${dc}) and loses` : `holds (Con save ${r.total} vs DC ${dc})`} concentration on ${spell}.`, hit: true, priv: hidMsg(c) });
 }
 function findTarget(id) {
   id = String(id || '');
@@ -6030,7 +6062,7 @@ function sendMsg(d) {
   d = Object.assign({ at: Date.now() }, d);
   for (const k of Object.keys(d)) if (d[k] === undefined) delete d[k];
   handleMsg(Object.assign({}, d, { isMe: true }));
-  if (S.room && !d.priv) S.room.emit('roll', d).catch(() => { });
+  if (S.room && !d.priv) S.room.emit('roll', scrubMsg(d)).catch(() => { });
 }
 function logLine(m) {
   const e = { who: m.who || '', label: m.label || '', total: m.total, detail: m.detail || '', crit: !!m.crit, fail: !!m.fail, at: m.at || Date.now(), kind: m.kind || '', priv: !!m.priv, isMe: !!m.isMe };
@@ -6206,7 +6238,7 @@ function viewCombat() {
       <span style="width:20px"></span><input type="number" class="ini" id="f-ci-${esc(c.id)}" data-act="cinit" data-v="${esc(c.id)}" value="${esc(c.init == null ? '' : c.init)}" aria-label="Initiative">
       <button class="cname" data-act="csel" data-v="${esc(c.id)}"><b>${esc(nm)}</b><span class="small muted">Lair actions, loses initiative ties</span></button>
       <span class="row cx"><button class="btn ghost sm danger" data-act="crm" data-v="${esc(c.id)}" aria-label="Remove">${svgIcon('x', 16)}</button></span></div>`;
-    let hp = c.hp, max = c.max, ac = c.ac, conds = c.cond || [], sub = c.kind === 'mon' ? (c.hidden ? 'Hidden from players' : 'Monster') + (c.conc ? ' · concentrating on ' + c.conc : '') : 'Player character';
+    let hp = c.hp, max = c.max, ac = c.ac, conds = c.cond || [], sub = c.kind === 'mon' ? (c.hidden ? 'Hidden from players' : c.alias ? 'Players see: ' + c.alias : 'Monster') + (c.conc ? ' · concentrating on ' + c.conc : '') : 'Player character';
     if (c.kind === 'pc') { const x = findChar(c.cid, c.owner); if (x) { const D = derive(x.ch); hp = hpOf(x.ch, D); max = D.maxHp; ac = D.ac; conds = x.ch.play.cond || []; sub = (x.ch.play.absent ? 'Absent, you run them · ' : '') + playerName(x.owner) + (x.ch.play.conc ? ' · concentrating on ' + x.ch.play.conc : ''); const ds = downState(x.ch, D); if (ds) conds = [ds].concat(conds); } else sub = 'Sheet not found'; }
     if (c.surp) conds = conds.concat('Surprised');
     const pct = max ? clamp(hp / max * 100, 0, 100) : 0;
@@ -6217,7 +6249,7 @@ function viewCombat() {
       <div class="chp"><span class="num"><b>${hp == null ? '—' : hp}</b>${max ? ' / ' + max : ''}${hp == null && c.taken ? ` <span class="small muted" title="HP isn't set, so damage is only tallied">took ${c.taken}</span>` : ''}</span><div class="hpbar"><i class="${pct <= 25 ? 'low' : pct <= 50 ? 'mid' : ''}" style="width:${pct}%"></i></div></div>
       <span class="num cac" title="Armor Class">AC ${ac == null || ac === '' ? '?' : ac}</span>
       <div class="cact"><span class="row cq"><input type="number" id="f-ca-${esc(c.id)}" min="0" placeholder="±" data-amt="${esc(c.id)}" aria-label="Amount"><button class="btn sm" data-act="cdmg" data-v="${esc(c.id)}">Dmg</button><button class="btn sm" data-act="cheal" data-v="${esc(c.id)}">Heal</button></span>
-      <span class="row cx">${c.kind === 'mon' ? combatPips(c, 'rxu', 1, 'Reaction') : ''}<button class="btn sm crx-d" data-act="crx" data-v="${esc(c.id)}" title="Attack with this creature's reaction">Reaction attack</button><span class="cmorewrap"><button class="btn sm" data-act="cmore" data-v="${esc(c.id)}" aria-expanded="${RUN.menu === c.id}" aria-haspopup="menu" aria-label="More for ${esc(nm)}" title="Delay, Surprised, Hide, Remove">${b23Icon('more', 18)}</button>${RUN.menu === c.id ? `<div class="popbg" data-act="popclose"></div><div class="popmenu cmenu" role="menu"><button class="crx-m" data-act="crx" data-v="${esc(c.id)}">Reaction attack</button><button data-act="cdelay" data-v="${esc(c.id)}" title="Optional table rule (the core rules only have Ready): move to after the creature whose turn it is"${dis(!cb.cur)}>Delay</button><button data-act="csurp" data-v="${esc(c.id)}"${pressed(c.surp)} title="Surprised: 2014 loses its first turn, 2024 rolls initiative with disadvantage">Surprised</button>${c.kind === 'mon' ? `<button data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button>` : ''}<button class="danger" data-act="crm" data-v="${esc(c.id)}">Remove</button></div>` : ''}</span></span></div>
+      <span class="row cx">${c.kind === 'mon' ? combatPips(c, 'rxu', 1, 'Reaction') : ''}<button class="btn sm crx-d" data-act="crx" data-v="${esc(c.id)}" title="Attack with this creature's reaction">Reaction attack</button><span class="cmorewrap"><button class="btn sm" data-act="cmore" data-v="${esc(c.id)}" aria-expanded="${RUN.menu === c.id}" aria-haspopup="menu" aria-label="More for ${esc(nm)}" title="Delay, Surprised, Hide, Hide what it is, Remove">${b23Icon('more', 18)}</button>${RUN.menu === c.id ? `<div class="popbg" data-act="popclose"></div><div class="popmenu cmenu" role="menu"><button class="crx-m" data-act="crx" data-v="${esc(c.id)}">Reaction attack</button><button data-act="cdelay" data-v="${esc(c.id)}" title="Optional table rule (the core rules only have Ready): move to after the creature whose turn it is"${dis(!cb.cur)}>Delay</button><button data-act="csurp" data-v="${esc(c.id)}"${pressed(c.surp)} title="Surprised: 2014 loses its first turn, 2024 rolls initiative with disadvantage">Surprised</button>${c.kind === 'mon' ? `<button data-act="chide" data-v="${esc(c.id)}" title="${c.hidden ? 'Reveal to players' : 'Hide from players'}">${c.hidden ? 'Reveal' : 'Hide'}</button><button data-act="cmask" data-v="${esc(c.id)}" title="${c.alias ? 'Players will see its real name' : 'Players see it in the fight as an unknown creature'}">${c.alias ? 'Show what it is' : 'Hide what it is'}</button>` : ''}<button class="danger" data-act="crm" data-v="${esc(c.id)}">Remove</button></div>` : ''}</span></span></div>
     </div>`;
   }).join('');
   const last = UNDO[UNDO.length - 1];
@@ -6236,10 +6268,10 @@ function viewCombat() {
     ${pend.length ? `<div class="todo-box"><div class="lbl">Needs your call (no AC set for the target)</div>${pend.map((m, i) => `<div class="row" style="margin-top:4px"><span>${esc(m.who)} rolled <b>${m.total}</b> to hit ${esc(m.tgtName || '')} for ${m.dmg}</span><button class="btn sm" data-act="cpend" data-i="${i}" data-v="hit">Hit</button><button class="btn sm" data-act="cpend" data-i="${i}" data-v="miss">Miss</button></div>`).join('')}</div>` : ''}
     ${cb.list.length ? `<div class="clist">${rows}</div>` : `<div class="empty">No fight running. Add the party, then find monsters to fight.<div class="row" style="justify-content:center;margin-top:12px"><button class="btn pri" data-act="mbrowse">Add monsters</button></div></div>`}
     <div class="panel stack"><div class="ph">With ${picks.length ? picks.length + ' selected' : 'the whole party'}</div>
-      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button><span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
+      <div class="row"><input type="number" id="f-ma" min="0" placeholder="Amount" style="width:90px"><button class="btn sm" data-act="cmass" data-v="dmg"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Damage</button><button class="btn sm" data-act="cmass" data-v="heal"${dis(!picks.length)}${picks.length ? '' : ' title="Tick monsters or characters in the list first"'}>Heal</button>${cb.list.some(c => c.kind === 'mon') ? `<button class="btn sm" data-act="chideall" data-v="1" title="${picks.some(c => c.kind === 'mon') ? 'Hide the ticked monsters' : 'Hide every monster'} from players">${picks.some(c => c.kind === 'mon') ? 'Hide ticked' : 'Hide all monsters'}</button><button class="btn sm" data-act="chideall" data-v="0" title="${picks.some(c => c.kind === 'mon') ? 'Show the ticked monsters' : 'Show every monster'} to players">${picks.some(c => c.kind === 'mon') ? 'Reveal ticked' : 'Reveal all'}</button><button class="btn sm" data-act="cmaskall" data-v="1" title="Players see them in the fight as Unknown creature">${picks.some(c => c.kind === 'mon') ? 'Hide what ticked are' : 'Hide what they are'}</button><button class="btn sm" data-act="cmaskall" data-v="0">${picks.some(c => c.kind === 'mon') ? 'Name ticked' : 'Show real names'}</button>` : ''}<span class="spacer"></span><button class="btn sm" data-act="crest" data-v="short">Short rest</button><button class="btn sm" data-act="crest" data-v="long">Long rest</button></div>
       <div class="row"><select id="f-rt" aria-label="Roll to ask for">${rollOpts()}</select><input type="number" id="f-rdc" placeholder="DC" style="width:70px"><input type="number" id="f-rdmg" placeholder="Damage on a fail" aria-label="Damage on a failed save" style="width:190px"><label class="chk small"><input type="checkbox" id="f-rhalf"> half on success</label><button class="btn pri sm" data-act="cask">Ask for the roll</button></div></div>
     <div class="panel stack"><div class="ph">Add monsters<span class="spacer"></span><span class="seg" style="text-transform:none;letter-spacing:0">${['2024', '2014'].map(r => `<button data-act="mrs" data-v="${r}"${pressed(RUN.rs === r)} class="mini">${r}</button>`).join('')}</span></div>
-      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small"><input type="checkbox" id="f-mh"> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative (DMG optional rule)</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span><button class="btn sm" data-act="mbrowse">Browse all monsters</button></div>
+      <div class="row"><input type="search" id="f-mq" data-act="mq" placeholder="Search ${R.monsters.size} monsters" value="${esc(RUN.q)}" style="max-width:240px"><input type="number" id="f-mn" min="1" max="20" value="1" style="width:64px" aria-label="How many"><label class="chk small" title="Players see it in the fight as Unknown creature, never its name"><input type="checkbox" id="f-mu" data-act="munk"${RUN.unk ? ' checked' : ''}> add as unknown</label><label class="chk small" title="Only you see hidden monsters. Players see nothing until you reveal them."><input type="checkbox" id="f-mh" data-act="mhid"${RUN.hid ? ' checked' : ''}> add hidden</label><label class="chk small" title="One initiative roll for all monsters of the same name"><input type="checkbox" data-act="mgrp"${RUN.grp ? ' checked' : ''}> group initiative (DMG optional rule)</label><span class="seg" role="group" aria-label="Hit points">${[['avg', 'HP: average'], ['roll', 'HP: rolled']].map(([v, l]) => `<button data-act="mhp" data-v="${v}"${pressed(RUN.hpm === v)} class="mini">${l}</button>`).join('')}</span><button class="btn sm" data-act="mbrowse">Browse all monsters</button></div>
       ${hits.length ? `<div class="row">${hits.map(m => `<button class="btn sm" data-act="madd" data-v="${esc(m.id)}">+ ${esc(m.name)} <span class="muted">CR ${crLabel(m.cr)}</span></button>`).join('')}</div>` : (q.length >= 2 ? '<div class="small muted">No monsters match. Add your own in Homebrew, or use the quick line below.</div>' : '')}
       <div class="row"><input type="text" id="f-cn" placeholder="Quick add: name" style="max-width:170px"><input type="number" id="f-cib" placeholder="Init +" style="width:80px"><input type="number" id="f-chp" placeholder="HP" style="width:70px"><input type="number" id="f-cac" placeholder="AC" style="width:70px"><button class="btn sm" data-act="cquick">Add</button></div>
       <div class="row"><select id="f-enc" aria-label="Saved encounters">${enc.length ? enc.map(e => opt(e.id, `${e.name} (${sum(e.list.map(x => x.n))})`)).join('') : opt('', 'No saved encounters')}</select><button class="btn sm" data-act="encload"${dis(!enc.length)}>Load</button><button class="btn ghost sm danger" data-act="encdel"${dis(!enc.length)}>Delete</button><input type="text" id="f-encn" placeholder="Name this fight" style="max-width:170px"><button class="btn sm" data-act="encsave"${dis(!cb.list.some(c => c.kind === 'mon'))}>Save monsters as encounter</button></div></div>
@@ -6329,7 +6361,8 @@ function combatDetail(c, cb) {
     ${KINDS.filter(([k]) => (d[k] || []).length).map(([k, l]) => `<div class="lbl" style="margin-top:6px">${l}</div>${d[k].map(a => act(a, k)).join('')}`).join('')}
     ${(d.traits || []).length ? `<details class="feat" data-k="mtraits"><summary><b>Traits (${d.traits.length})</b> <span class="small muted">${esc(d.traits.map(t => t.n).join(', '))}</span></summary><div class="body stack">${d.traits.map(t => `<div class="rt small"><b>${esc(t.n)}.</b> ${md(t.d).replace(/^<p>/, '').replace(/<\/p>$/, '')}</div>`).join('')}</div></details>` : ''}`
     : `${hpline}<div class="row"><span class="lbl">Target</span>${tsel}</div><div class="row"><input type="number" id="f-qa" placeholder="To hit +" style="width:90px"><input type="text" id="f-qd" placeholder="Damage, e.g. 1d8+2" style="width:150px"><button class="btn sm" data-act="mquick" data-v="${esc(c.id)}">Attack</button></div><p class="small muted">No stat block for this one. Add monsters from the library or Homebrew to get rollable actions.</p>`;
-  return `<div class="mwrap stack">${strip}<div class="panel stack mdet${isCur ? ' mcur' : ''}"><div class="ph">${esc(c.name)}${isCur ? '<span class="pill live">Acting now</span>' : ''}${c.hidden ? '<span class="pill">hidden</span>' : ''}${c.ed ? '<span class="pill" title="' + esc(edNote(c)) + '">edited</span><button class="btn ghost sm" data-act="mfreset" data-v="' + esc(c.id) + '">Reset to stat block</button>' : ''}<span class="spacer"></span>${!isCur && cb.cur ? '<button class="btn ghost sm" data-act="cback">Back to current turn</button>' : ''}<button class="btn sm" data-act="mfight" data-v="${esc(c.id)}">Edit for this fight</button></div>
+  return `<div class="mwrap stack">${strip}<div class="panel stack mdet${isCur ? ' mcur' : ''}"><div class="ph">${esc(c.name)}${isCur ? '<span class="pill live">Acting now</span>' : ''}${c.hidden ? '<span class="pill">hidden</span>' : ''}${c.alias ? '<span class="pill" title="Players see it as ' + esc(c.alias) + '">unknown to players</span>' : ''}${c.ed ? '<span class="pill" title="' + esc(edNote(c)) + '">edited</span><button class="btn ghost sm" data-act="mfreset" data-v="' + esc(c.id) + '">Reset to stat block</button>' : ''}<span class="spacer"></span>${!isCur && cb.cur ? '<button class="btn ghost sm" data-act="cback">Back to current turn</button>' : ''}<button class="btn sm" data-act="mfight" data-v="${esc(c.id)}">Edit for this fight</button></div>
+    ${c.kind === 'mon' ? `<div class="row small"><label class="row" style="gap:6px">Players see it as <input type="text" id="f-al-${esc(c.id)}" data-act="calias" data-v="${esc(c.id)}" value="${esc(c.alias || '')}" placeholder="${esc(c.name)} (its real name)" style="max-width:220px"></label><button class="btn ghost sm" data-act="cmask" data-v="${esc(c.id)}">${c.alias ? 'Show what it is' : 'Hide what it is'}</button></div>` : ''}
     ${block}</div>
     <div class="panel stack mquick">${quick}${conds}</div></div>`;
 }
@@ -6343,7 +6376,7 @@ function viewCombatPublic(big) {
     return `<div class="irow${c.id === I.cur ? ' cur' : ''}${big ? ' big' : ''}"><div class="iv">${c.init == null ? '—' : c.init}</div><div class="grow"><b>${esc(liveName(c))}</b>${mine(c) ? ' <span class="pill acc">you</span>' : ''}<div class="row small">${st ? `<span class="pill ${/Down|Critical/.test(st) ? 'bad' : /Bloodied/.test(st) ? 'brass' : ''}">${esc(st)}</span>` : ''}${condPills(conds, c.fx)}</div></div>${c.id === I.cur ? '<span class="pill acc">acting</span>' : ''}</div>`;
   }).join('');
   const cur = list.find(c => c.id === I.cur);
-  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:${big ? 40 : 26}px">${big ? esc((S.campaign && S.campaign.name) || 'Initiative') : 'Combat'}</h2>${list.length ? `<span class="pill acc"${big ? ' style="font-size:18px"' : ''}>Round ${I.round || 1}</span>` : ''}${cur && mine(cur) ? '<span class="pill live">Your turn</span>' : I.unseen ? '<span class="pill">Something unseen acts</span>' : ''}</div>
+  return `<div class="row" style="margin-bottom:12px"><h2 style="font-family:var(--f-display);font-size:${big ? 40 : 26}px">${big ? esc((S.campaign && S.campaign.name) || 'Initiative') : 'Combat'}</h2>${list.length ? `<span class="pill acc"${big ? ' style="font-size:18px"' : ''}>Round ${I.round || 1}</span>` : ''}${cur && mine(cur) ? '<span class="pill live">Your turn</span>' : I.unseen ? '<span class="pill">DM’s turn</span>' : ''}</div>
     ${list.length ? `<div class="init" style="max-width:${big ? 900 : 720}px">${rows}</div>` : `<div class="empty">No fight running. The DM starts one from their Combat screen.</div>`}
     ${big ? '' : `<p class="small muted" style="margin-top:12px">Attack and cast from your sheet: pick a target there and the DM's screen settles hits and damage.</p>`}`;
 }
@@ -6354,7 +6387,7 @@ function addMonster(cb, def, rs, name, hidden, o) {
   o = o || {};
   const ib = mod((def.ab || {}).dex || 10), hp = o.roll && def.hd ? Math.max(1, rollExpr(def.hd).total) : +def.hp || 1;
   const m = { id: uid('m'), kind: 'mon', mid: def.id, rs, name, init: 0, ib, hp, max: hp, ac: def.ac == null ? null : +def.ac, hidden: !!hidden, cond: [] };
-  m.init = rollInit(m, o.memo); cb.list.push(m);
+  m.init = rollInit(m, o.memo); cb.list.push(m); if (RUN.unk && !hidden) m.alias = maskName(cb, m);
   if (monExtra(def).lair && !cb.list.some(c => c.kind === 'lair' && c.mid === def.id)) cb.list.push({ id: uid('l'), kind: 'lair', mid: def.id, rs, name: 'Lair (' + def.name + ')', init: 20 });
 }
 function uniqueNames(cb, base, n) {
@@ -6384,6 +6417,8 @@ function addGroup(def, rs, n, hidden) {
   sortCombat(cb); saveCombat(cb); toastMsg(`Added ${n} × ${def.name}${hidden ? ' (hidden)' : ''}.`); queueRender();
 }
 const seenName = c => c.hidden ? 'Something unseen' : c.name;
+/* Build 39: a hidden monster's own rolls and notes go to the DM only; an attack or save that hits a character still reaches the table */
+const hidMsg = c => !!(c && c.kind === 'mon' && c.hidden);
 function monAction(c, kind, name) { const d = monDef(c); return d ? (d[kind] || []).find(a => a.n === name) : null; }
 function rollDmgList(list, crit) {
   let total = 0; const det = [];
@@ -6419,7 +6454,13 @@ Object.assign(ACT, {
     for (const id of Object.keys(RUN.picks)) { const t = findTarget(id); if (t) { if (el.dataset.v === 'heal') mend(t, v); else hurt(t, v); } }
     queueRender();
   },
-  chide(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.hidden = !c.hidden; saveCombat(cb); queueRender(); },
+  chide(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.hidden = !c.hidden; saveCombat(cb); toastMsg(c.hidden ? c.name + ' is hidden from players.' : c.name + ' is now visible to players.'); queueRender(); },
+  chideall(el) { const cb = cbt(), on = el.dataset.v === '1', ticked = cb.list.filter(c => c.kind === 'mon' && RUN.picks[c.id]), mons = ticked.length ? ticked : cb.list.filter(c => c.kind === 'mon'); if (!mons.length) return; for (const c of mons) c.hidden = on; saveCombat(cb); toastMsg((mons.length === 1 ? mons[0].name + ' is' : mons.length + ' monsters are') + (on ? ' hidden from players.' : ' visible to players.')); queueRender(); },
+  mhid(el) { RUN.hid = el.checked; },
+  munk(el) { RUN.unk = el.checked; },
+  cmask(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c || c.kind !== 'mon') return; c.alias = c.alias ? '' : maskName(cb, c); RUN.menu = null; saveCombat(cb); toastMsg(c.alias ? 'Players now see ' + c.name + ' as ' + c.alias + '.' : 'Players now see ' + c.name + '.'); queueRender(); },
+  calias(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.alias = el.value.trim().slice(0, 40); saveCombat(cb); queueRender(); },
+  cmaskall(el) { const cb = cbt(), on = el.dataset.v === '1', ticked = cb.list.filter(c => c.kind === 'mon' && RUN.picks[c.id]), mons = ticked.length ? ticked : cb.list.filter(c => c.kind === 'mon'); for (const c of mons) c.alias = on ? (c.alias || maskName(cb, c)) : ''; saveCombat(cb); toastMsg(on ? 'Players see ' + (mons.length === 1 ? 'it' : 'them') + ' as unknown creatures.' : 'Players see the real names.'); queueRender(); },
   crm(el) { const cb = cbt(); const i = cb.list.findIndex(x => x.id === el.dataset.v); if (i < 0) return;
     { const gone = JSON.parse(JSON.stringify(cb.list[i])), at = i; pushUndo('removed ' + gone.name, () => { const c2 = cbt(); if (!c2.list.some(x => x.id === gone.id)) { c2.list.splice(Math.min(at, c2.list.length), 0, gone); saveCombat(c2); } }); toastMsg('Removed ' + gone.name + '. Undo is in the toolbar.'); } dropCombatants(cb, [el.dataset.v]); saveCombat(cb); queueRender(); },
   cend() {
@@ -6451,8 +6492,8 @@ Object.assign(ACT, {
   cpip(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c[el.dataset.k] = +el.dataset.n; saveCombat(cb); queueRender(); },
   cfxadd(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v), f = c && fxRead(el); if (f) { addFx(cb, c, f); queueRender(); } },
   cfxrm(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v), f = c && (c.fxs || []).find(x => x.id === el.dataset.i); if (f) { fxDrop(c, f, ' (ended by the DM)'); saveCombat(cb); queueRender(); } },
-  mcast(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.conc = el.dataset.s; saveCombat(cb); sendMsg({ kind: 'note', text: `${nameOf(c)} casts ${c.conc} and concentrates on it.` }); queueRender(); },
-  mbreak(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; sendMsg({ kind: 'note', text: `${nameOf(c)} stops concentrating on ${c.conc}.` }); c.conc = ''; saveCombat(cb); queueRender(); },
+  mcast(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; c.conc = el.dataset.s; saveCombat(cb); sendMsg({ kind: 'note', text: `${nameOf(c)} casts ${c.conc} and concentrates on it.`, priv: hidMsg(c) }); queueRender(); },
+  mbreak(el) { const cb = cbt(), c = cb.list.find(x => x.id === el.dataset.v); if (!c) return; sendMsg({ kind: 'note', text: `${nameOf(c)} stops concentrating on ${c.conc}.`, priv: hidMsg(c) }); c.conc = ''; saveCombat(cb); queueRender(); },
   /* Reaction attack: pick a target and one of the creature's attacks; it rolls and spends the reaction */
   crx(el) { openModal({ kind: 'rxatk', id: el.dataset.v, tgt: '' }); },
   rxtgt(el) { UI.modal.tgt = el.value; renderModal(); },
@@ -6476,6 +6517,7 @@ Object.assign(ACT, {
     const cb = cbt(); const nb = $('#f-cn'); const name = (nb.value || '').trim() || 'Creature'; const ib = +$('#f-cib').value || 0;
     const hp = $('#f-chp').value === '' ? null : +$('#f-chp').value, ac = $('#f-cac').value === '' ? null : +$('#f-cac').value;
     cb.list.push({ id: uid('m'), kind: 'mon', name: uniqueNames(cb, name, 1)[0], init: rnd(20) + ib, ib, hp, max: hp, ac, hidden: !!($('#f-mh') || {}).checked, cond: [] });
+    { const m = cb.list[cb.list.length - 1]; if (RUN.unk && !m.hidden) m.alias = maskName(cb, m); }
     nb.value = ''; sortCombat(cb); saveCombat(cb); queueRender();
   },
   encsave() {
@@ -6525,13 +6567,13 @@ Object.assign(ACT, {
     const c = cbt().list.find(x => x.id === el.dataset.v), d = monDef(c); if (!d) return; const ab = el.dataset.ab, sv = !!el.dataset.sv;
     const b = el.dataset.b != null ? +el.dataset.b : sv && d.saves && d.saves[ab] != null ? +d.saves[ab] : mod(d.ab[ab]);   // data-b: a skill's own bonus
     const r = d20Roll({ M: monFx(c), bonus: b, type: sv ? 'save' : 'check', ab });
-    sendMsg({ kind: 'roll', who: seenName(c), label: el.dataset.l ? el.dataset.l + ' check' : ABN[ab] + (sv ? ' save' : ' check'), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, priv: UI.priv });
+    sendMsg({ kind: 'roll', who: seenName(c), label: el.dataset.l ? el.dataset.l + ' check' : ABN[ab] + (sv ? ' save' : ' check'), total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, priv: hidMsg(c) || UI.priv });
   },
   matk(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return;
     RUN.tgt = el.dataset.t != null ? el.dataset.t : ($('#f-mt') || {}).value || '';   // data-t: the target picked in the reaction-attack pop-up
     const r = d20Roll({ M: monFx(c), bonus: +a.atk || 0, type: 'atk', vex: advVs(RUN.tgt) }); const dm = rollDmgList(a.dmg || [], r.crit); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
-    sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: a.n, total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dm.total, dmgDetail: dm.detail, dt: dm.dt, tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: UI.priv });
+    sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: a.n, total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dm.total, dmgDetail: dm.detail, dt: dm.dt, tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: (!t && hidMsg(c)) || UI.priv });
   },
   mmulti(el) {   // "makes two Claw attacks and one Bite attack": rolls each named attack at the target; anything it cannot read stays a note
     const c = cbt().list.find(x => x.id === el.dataset.v), m = c && monAction(c, el.dataset.k, el.dataset.n); if (!m) return;
@@ -6548,7 +6590,7 @@ Object.assign(ACT, {
   mquick(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v); if (!c) return; RUN.tgt = ($('#f-mt') || {}).value || '';
     const r = d20Roll({ M: monFx(c), bonus: +$('#f-qa').value || 0, type: 'atk', vex: advVs(RUN.tgt) }); const expr = ($('#f-qd').value || '1').trim(); const dr = rollExpr(r.crit ? critExpr(expr) : expr); const t = RUN.tgt ? findTarget(RUN.tgt) : null;
-    sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: 'Attack', total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dr.total, dmgDetail: dr.detail, dt: '', tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: UI.priv });
+    sendMsg({ kind: t ? 'atk' : 'roll', rid: uid('a'), who: seenName(c), label: 'Attack', total: r.total, nat: r.nat, detail: r.detail, crit: r.crit, fail: r.fail, dmg: dr.total, dmgDetail: dr.detail, dt: '', tgt: t ? RUN.tgt : '', tgtName: t ? t.name : '', priv: (!t && hidMsg(c)) || UI.priv });
   },
   msave(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a || !a.dc) return;
@@ -6558,7 +6600,7 @@ Object.assign(ACT, {
   },
   mdmg(el) {
     const c = cbt().list.find(x => x.id === el.dataset.v), a = monAction(c, el.dataset.k, el.dataset.n); if (!a) return; const dm = rollDmgList(a.dmg || []);
-    sendMsg({ kind: 'roll', who: seenName(c), label: a.n + ' damage', total: dm.total, detail: dm.detail + ' ' + dm.dt, priv: UI.priv });
+    sendMsg({ kind: 'roll', who: seenName(c), label: a.n + ' damage', total: dm.total, detail: dm.detail + ' ' + dm.dt, priv: hidMsg(c) || UI.priv });
   },
 });
 
@@ -7782,7 +7824,7 @@ function mapTokens() {
     for (const c of cbt().list) {
       if (c.kind !== 'mon') continue;
       if (MAP.asPlayer && (c.hidden || !mapPubPos(c))) { if (c.hidden || (c.pos && c.pos.m === meta.id)) continue; }
-      out.push({ key: c.id, kind: 'mon', name: c.name, pos: at(c.pos), sz: monSize(c), canMove: canAll, cur: c.id === curId, hidden: !!c.hidden,
+      out.push({ key: c.id, kind: 'mon', name: MAP.asPlayer ? pubName(c) : c.name, pos: at(c.pos), sz: monSize(c), canMove: canAll, cur: c.id === curId, hidden: !!c.hidden,
         pct: c.max ? clamp((+c.hp || 0) / c.max * 100, 0, 100) : 100, down: c.hp != null && c.hp <= 0, conds: c.cond || [],
         hpText: c.hp == null ? '' : c.hp + ' / ' + c.max, ac: c.ac, st: healthWord(c) });
     }
@@ -9669,7 +9711,7 @@ function combatCue(I, list, me) {
   const n = list.length, ci = list.findIndex(c => c.id === I.cur), mine = me && list.find(c => c.kind === 'pc' && c.cid === me.ch.id);
   const nm = c => esc(liveName(c)), nextC = ci >= 0 && n > 1 ? list[(ci + 1) % n] : null;
   let line;
-  if (ci < 0) line = I.unseen ? 'Something unseen acts.' : 'No one has taken a turn yet.';
+  if (ci < 0) line = I.unseen ? 'The DM is taking a turn.' : 'No one has taken a turn yet.';
   else if (mine && mine.id === I.cur) line = `<span class="pdesk"><b>It is your turn.</b> </span>${nextC ? 'Next: ' + nm(nextC) + '.' : ''}`;
   else { const away = mine ? (list.indexOf(mine) - ci + n) % n : null; line = `<b>${nm(list[ci])}</b> is acting. ${nextC ? 'Next: ' + nm(nextC) + '.' : ''}${away == null ? '' : away === 1 ? ' You are next.' : ` You go in ${away} turns.`}`; }
   const cond = me ? (me.ch.play.cond || []) : [], exh = me ? +me.ch.play.exh || 0 : 0;
@@ -9838,7 +9880,7 @@ Object.assign(ACT, {
       if ((+c.lau || 0) + cost > la) { toastMsg('No legendary actions left this round.'); return; }
       c.lau = (+c.lau || 0) + cost;
     } else c.rxu = 1;
-    saveCombat(cb); sendMsg({ kind: 'note', text: `${seenName(c)} uses ${a.n} (${leg ? 'legendary action' : 'reaction'}).`, priv: UI.priv }); queueRender();
+    saveCombat(cb); sendMsg({ kind: 'note', text: `${seenName(c)} uses ${a.n} (${leg ? 'legendary action' : 'reaction'}).`, priv: hidMsg(c) || UI.priv }); queueRender();
   },
   mfight(el) { openModal({ kind: 'mfight', id: el.dataset.v }); },
   mfsave() {
